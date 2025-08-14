@@ -17,43 +17,37 @@ export function useNotes() {
   const load = async () => {
     setLoading(true);
     let all = await db.notes.toArray();
-    /*__NORMALIZE_NOTES__*/
-    all = (all || []).filter(Boolean).map((n: any) => ({
-      id: n?.id ?? crypto.randomUUID(),
-      title: n?.title ?? '',
-      content: n?.content ?? '',
-      sourceType: n?.sourceType ?? 'other',
-      sourceUrl: n?.sourceUrl ?? null,
-      createdAt: n?.createdAt ?? Date.now(),
-      updatedAt: n?.updatedAt ?? n?.createdAt ?? Date.now(),
-      topics: Array.isArray(n?.topics) ? n.topics : [],
-      labels: Array.isArray(n?.labels) ? n.labels : [],
-      highlights: Array.isArray(n?.highlights) ? n.highlights : [],
-      todo: Array.isArray(n?.todo) ? n.todo : [],
-      favorite: !!(n?.favorite),
+    // normalize
+    all = (all || []).map(n => ({
+      labels: [], highlights: [], todo: [], favorite: false, sourceType: 'other',
+      ...n
     }));
-
-    const s = (filters?.search || '').toLowerCase().trim();
-    if (s) {
-      all = all.filter((n: any) =>
-        (n.title || '').toLowerCase().includes(s) ||
-        (n.content || '').toLowerCase().includes(s) ||
-        (n.sourceUrl || '').toLowerCase().includes(s)
-      );
+    // filtering
+    const q = (filters.search ?? '').trim().toLowerCase();
+    if (q) {
+      all = all.filter(n => (n.title || '').toLowerCase().includes(q) || (n.content || '').toLowerCase().includes(q));
     }
-    if (filters?.favorite) {
-      all = all.filter((n: any) => !!n.favorite);
+    if (filters.topics && filters.topics.length) {
+      all = all.filter(n => (n.topics || []).some((t: string) => filters.topics!.includes(t)));
     }
-    if (Array.isArray(filters?.topics) && filters.topics.length) {
-      all = all.filter((n: any) => Array.isArray(n.topics) && filters.topics!.every(t => n.topics.includes(t)));
+    if (filters.favorite) {
+      all = all.filter(n => !!n.favorite);
     }
-
-    all.sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
+    if (filters.dateRange && filters.dateRange !== 'all') {
+      const now = Date.now();
+      const cutoff =
+        filters.dateRange === 'today' ? (now - 24*60*60*1000) :
+        filters.dateRange === '7days' ? (now - 7*24*60*60*1000) :
+        (now - 30*24*60*60*1000);
+      all = all.filter(n => (n.createdAt ?? 0) >= cutoff);
+    }
+    // sort new first
+    all.sort((a,b) => (b.createdAt ?? 0) - (a.createdAt ?? 0));
     setNotes(all);
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [JSON.stringify(filters)]);
+  useEffect(() => { load(); }, [filters]);
 
   const toggleFavorite = async (id: string) => {
     const row = await db.notes.get(id);
@@ -62,11 +56,11 @@ export function useNotes() {
     await load();
   };
 
+  // Backward-compatible addNote
   const addNote = async (arg1: any, arg2?: string | null) => {
-    // Backward compatible:
-    // - addNote(content: string, sourceUrl?: string)
+    // - addNote(content: string, sourceUrl?)
     // - addNote({ title?, content, sourceUrl?, sourceType? })
-    let content = "";
+    let content = '';
     let sourceUrl: string | null = null;
     let sourceType: 'youtube' | 'web' | 'other' = 'other';
     let titleFromUser: string | undefined;
@@ -92,9 +86,7 @@ export function useNotes() {
     const topics = await guessTopics(content);
     const now = Date.now();
     const note = {
-      id,
-      title,
-      content,
+      id, title, content,
       sourceUrl,
       sourceType,
       createdAt: now,
@@ -105,10 +97,6 @@ export function useNotes() {
       todo: [],
       favorite: false
     };
-    await db.notes.add(note);
-    await load();
-    return id;
-  };
     await db.notes.add(note);
     await load();
     return id;
