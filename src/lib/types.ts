@@ -1,23 +1,17 @@
 export interface Note {
   id: string;
-  title: string;
   content: string;
-  sourceType: 'youtube' | 'book' | 'web' | 'other';
-  sourceUrl?: string | null;
-  createdAt: string;
   topics: string[];
-  labels: string[];
-  highlights: { text: string; index: number }[];
-  todo: { text: string; done: boolean }[];
   favorite: boolean;
-}
-
-export interface TopicRule {
-  [key: string]: string[];
+  createdAt: number; // epoch ms
+  sourceType?: 'manual' | 'share';
+  title?: string;
+  todo?: { text: string; done: boolean }[];
 }
 
 export interface AppSettings {
-  topicRules: TopicRule;
+  id?: string;
   theme: 'light' | 'dark';
+  topicRules: Record<string, string[]>;
   defaultTopics: string[];
 }
