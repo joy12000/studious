@@ -6,6 +6,7 @@ type Filters = {
   search?: string;
   topics?: string[];
   favorite?: boolean;
+  favoritesOnly?: boolean;
   dateRange?: 'today' | '7days' | '30days' | 'all';
 };
 
@@ -30,7 +31,7 @@ export function useNotes() {
     if (filters.topics && filters.topics.length) {
       all = all.filter(n => (n.topics || []).some((t: string) => filters.topics!.includes(t)));
     }
-    if (filters.favorite) {
+    if (filters.favorite || filters.favoritesOnly) {
       all = all.filter(n => !!n.favorite);
     }
     if (filters.dateRange && filters.dateRange !== 'all') {

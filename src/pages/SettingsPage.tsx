@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Download } from 'lucide-react';
+import { Download, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { canInstall, onCanInstallChange, promptInstall } from '../lib/install';
 import { useNotes } from '../lib/useNotes';
 
@@ -31,7 +32,12 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-2xl mx-auto p-4 space-y-4">
-      <h1 className="text-xl font-bold">설정</h1>
+      <div className="flex items-center gap-3 mb-2">
+        <Link to="/" className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg">
+          <ArrowLeft className="w-5 h-5" />
+        </Link>
+        <h1 className="text-xl font-bold">설정</h1>
+      </div>
 
       <section className="bg-white rounded-xl border border-gray-200 p-4">
         <div className="flex items-center justify-between">
@@ -62,8 +68,6 @@ export default function SettingsPage() {
         <button
           onClick={async () => {
             if (!confirm('정말 모든 노트를 삭제할까요?')) return;
-            // 실제 구현에 맞는 전체 삭제 함수가 있다면 호출
-            // 예: await db.notes.clear();
             indexedDB.deleteDatabase('selfdev-db');
             location.reload();
           }}
