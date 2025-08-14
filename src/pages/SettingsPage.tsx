@@ -1,12 +1,16 @@
+// src/pages/SettingsPage.tsx
 import React, { useEffect, useMemo, useState } from 'react';
-import { Download, Smartphone, RefreshCcw, Sun, Moon, Trash2, Cog, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Home, Smartphone, RefreshCcw, Sun, Moon, Trash2 } from 'lucide-react';
 import { canInstall, onCanInstallChange, promptInstall } from '../lib/install';
 import { useNotes } from '../lib/useNotes';
 import BackupPanel from '../components/BackupPanel';
+import DataUsagePanel from '../components/DataUsagePanel';
+import TopicRulesEditor from '../components/TopicRulesEditor';
 import { db } from '../lib/db';
 import type { AppSettings } from '../lib/types';
+import { autoBackupIfNeeded } from '../lib/backup';
 
-type TabKey = 'general'|'backup'|'app';
+type TabKey = 'general'|'backup'|'data'|'topics'|'app';
 
 function TabButton({active, onClick, children}:{active:boolean; onClick:()=>void; children:React.ReactNode}){
   return (
@@ -25,19 +29,9 @@ export default function SettingsPage(){
   const [installable, setInstallable] = useState(canInstall());
   const [settings, setSettings] = useState<AppSettings | null>(null);
 
-  useEffect(()=>{
-    const off = onCanInstallChange(setInstallable);
-    return off;
-  }, []);
-
-  useEffect(()=>{
-    (async () => {
-      try {
-        const s = await db.settings.get('default');
-        setSettings(s || null);
-      } catch {}
-    })();
-  }, []);
+  useEffect(()=>{ const off = onCanInstallChange(setInstallable); return off; }, []);
+  useEffect(()=>{ (async ()=>{ const s = await db.settings.get('default'); setSettings(s || null); })(); }, []);
+  useEffect(()=>{ autoBackupIfNeeded(); }, []);
 
   const noteCount = notes.length;
   const topicCount = useMemo(()=>{
@@ -50,7 +44,6 @@ export default function SettingsPage(){
     if (!settings) return;
     const next = settings.theme === 'dark' ? 'light' : 'dark';
     const updated = { ...settings, theme: next };
-    // persist
     await db.settings.put({ id: 'default', ...updated } as any);
     setSettings(updated);
     try {
@@ -66,19 +59,33 @@ export default function SettingsPage(){
     location.reload();
   }
 
+  // Back buttons (no Router dependency)
+  function goBack(){ history.back(); }
+  function goHome(){ location.assign('/'); }
+
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">설정</h1>
-          <p className="text-sm text-gray-500">백업/복원, 테마, PWA 설치 등</p>
+        <div className="flex items-center gap-2">
+          <button onClick={goBack} className="p-2 rounded-lg border bg-white hover:bg-gray-50" title="뒤로가기">
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">설정</h1>
+            <p className="text-sm text-gray-500">백업/복원, 데이터, 분류 규칙, PWA 설치</p>
+          </div>
         </div>
+        <button onClick={goHome} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-white hover:bg-gray-50" title="홈으로">
+          <Home className="h-4 w-4" /> 홈으로
+        </button>
       </header>
 
       {/* Tabs */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <TabButton active={tab==='general'} onClick={()=>setTab('general')}>일반</TabButton>
         <TabButton active={tab==='backup'} onClick={()=>setTab('backup')}>백업</TabButton>
+        <TabButton active={tab==='data'} onClick={()=>setTab('data')}>데이터</TabButton>
+        <TabButton active={tab==='topics'} onClick={()=>setTab('topics')}>분류 규칙</TabButton>
         <TabButton active={tab==='app'} onClick={()=>setTab('app')}>앱</TabButton>
       </div>
 
@@ -116,6 +123,18 @@ export default function SettingsPage(){
           <div className="text-xs text-gray-500">
             자동 백업은 앱을 열었을 때 최근 백업이 7일 이상 지났다면 JSON을 다운로드합니다.
           </div>
+        </div>
+      )}
+
+      {tab==='data' && (
+        <div className="space-y-4">
+          <DataUsagePanel />
+        </div>
+      )}
+
+      {tab==='topics' && (
+        <div className="space-y-4">
+          <TopicRulesEditor />
         </div>
       )}
 
