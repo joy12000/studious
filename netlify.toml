@@ -1,0 +1,20 @@
+[[headers]]
+for = "/manifest.webmanifest"
+
+[headers.values]
+Content-Type = "application/manifest+json"
+
+[[headers]]
+for = "/sw.js"
+
+[headers.values]
+Cache-Control = "no-cache"
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
+
+[build]
+command = "npx vite build"
+publish = "dist"
