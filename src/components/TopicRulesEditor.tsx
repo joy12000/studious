@@ -170,14 +170,3 @@ function TopicKeywords({topic, values, onAdd, onRemove}:{topic:string; values:st
     </div>
   );
 }
-
-function Chip({children, onRemove}:{children:React.ReactNode; onRemove?:()=>void}){
-  return (
-    <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border border-gray-200 bg-gray-50">
-      {children}
-      {onRemove && (
-        <button className="ml-1 rounded hover:bg-gray-200 px-1" onClick={onRemove} aria-label="삭제">×</button>
-      )}
-    </span>
-  );
-}
