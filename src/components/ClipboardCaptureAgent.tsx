@@ -1,13 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Clipboard, Check, AlertCircle, X, Save } from 'lucide-react';
-import { useNotes } from '../lib/useNotes';
+import { db } from '../lib/db';
+import { guessTopics, generateTitle } from '../lib/classify';
 
-/**
- * Router-free ClipboardCaptureAgent
- * - 라우터 훅(useLocation/useNavigate) 사용하지 않음 → Router 밖에서도 안전
- * - 현재 경로 감지는 window.location (hash/router 모두 지원)
- * - 저장 후에는 history.pushState로 내부 네비게이션 시도 → 미지원이면 location.assign
- */
 function getPath(): string {
   const { pathname = '/', hash = '' } = window.location;
   if (hash && hash.startsWith('#')) {
@@ -17,7 +12,7 @@ function getPath(): string {
   return pathname || '/';
 }
 
-// set up a global locationchange event so SPA route changes are detectable
+// locationchange wiring (for SPA awareness)
 (function setupLocationChangeEvent(){
   if ((window as any).__locationChangePatched) return;
   (window as any).__locationChangePatched = true;
@@ -30,14 +25,33 @@ function getPath(): string {
   window.addEventListener('hashchange', fire);
 })();
 
+function genId(): string {
+  const g = (crypto as any)?.randomUUID?.();
+  if (g) return g;
+  const r = Math.random().toString(36).slice(2, 8);
+  return `n_${Date.now()}_${r}`;
+}
+
+async function saveRawNote(text: string) {
+  const id = genId();
+  const topics = await guessTopics(text);
+  const title = generateTitle(text);
+  const now = Date.now();
+  await db.notes.put({
+    id, content: text, topics,
+    favorite: false, createdAt: now,
+    title, sourceType: 'share', todo: []
+  } as any);
+  return id;
+}
+
 export default function ClipboardCaptureAgent() {
-  const { addNote } = useNotes();
+  const [path, setPath] = useState<string>(getPath());
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [fallbackOpen, setFallbackOpen] = useState(false);
   const [fallbackText, setFallbackText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const [path, setPath] = useState<string>(getPath());
 
   useEffect(() => {
     const onLoc = () => setPath(getPath());
@@ -74,13 +88,9 @@ export default function ClipboardCaptureAgent() {
     setFallbackOpen(true);
   }
 
-  async function navigateTo(href: string) {
-    try {
-      history.pushState({}, '', href);
-      window.dispatchEvent(new Event('locationchange'));
-    } catch {
-      location.assign(href);
-    }
+  async function navigateHard(href: string) {
+    // 하드 네비게이션으로 라우터/상태 꼬임 방지
+    location.assign(href);
   }
 
   async function pasteAndSave() {
@@ -93,16 +103,18 @@ export default function ClipboardCaptureAgent() {
       if (supported && secure) {
         try {
           const text = (await navigator.clipboard.readText() || '').trim();
+          console.debug('[ClipboardAgent] readText length=', text.length);
           if (text) {
-            const id = await addNote(text);
-            setToast('저장 완료!'); setTimeout(() => setToast(null), 1200);
-            await navigateTo(`/note/${id}`);
+            const id = await saveRawNote(text);
+            setToast('저장 완료!'); setTimeout(() => setToast(null), 1000);
+            await navigateHard(`/note/${id}`);
             return;
           } else {
             openFallback('클립보드가 비어 있어요. 직접 붙여넣기 해주세요.');
             return;
           }
         } catch (e: any) {
+          console.warn('[ClipboardAgent] readText failed:', e);
           const msg = (e?.message || e || '').toString().toLowerCase();
           if (msg.includes('denied') || msg.includes('allow') || msg.includes('permission') || msg.includes('notallowed')) {
             openFallback('클립보드 권한이 차단되어 있어요. 직접 붙여넣기 해주세요.');
@@ -123,19 +135,18 @@ export default function ClipboardCaptureAgent() {
   async function saveFallback() {
     const text = fallbackText.trim();
     if (!text) { setToast('내용이 비어 있어요.'); return; }
-    const id = await addNote(text);
+    const id = await saveRawNote(text);
     setToast('저장 완료!');
     setFallbackOpen(false);
     setFallbackText('');
-    setTimeout(() => setToast(null), 1200);
-    await navigateTo(`/note/${id}`);
+    setTimeout(() => setToast(null), 1000);
+    await navigateHard(`/note/${id}`);
   }
 
   if (!onCapturePage) return null;
 
   return (
     <>
-      {/* Floating button */}
       <button
         onClick={pasteAndSave}
         disabled={busy}
@@ -147,7 +158,6 @@ export default function ClipboardCaptureAgent() {
         <span className="text-sm">붙여넣기</span>
       </button>
 
-      {/* Toast */}
       {toast && (
         <div className="fixed bottom-2 right-3 z-[9999]">
           <div className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg shadow bg-black/80 text-white">
@@ -157,7 +167,6 @@ export default function ClipboardCaptureAgent() {
         </div>
       )}
 
-      {/* Fallback modal */}
       {fallbackOpen && (
         <div className="fixed inset-0 z-[9999] bg-black/50 flex items-center justify-center p-4">
           <div className="w-full max-w-lg bg-white rounded-xl shadow-lg border border-gray-100 p-4 space-y-3">
