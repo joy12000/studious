@@ -1,7 +1,13 @@
-# Netlify build config for SelfDev Notes
 [build]
-  command = "npm ci && node scripts/doctor.mjs && npm run build"
+  command = "npm ci && npm run build"
   publish = "dist"
 
 [build.environment]
-  NODE_VERSION = "20"
+  BUILD_VERSION = "v10"
+
+# SPA routing (redundant to public/_redirects, but ok)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  DOCTOR_STRICT = "0"

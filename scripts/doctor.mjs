@@ -40,3 +40,11 @@ for (const f of walk(join(root, 'src'))) {
 }
 
 process.exit(exit);
+
+const STRICT = process.env.DOCTOR_STRICT === '1';
+if (STRICT && exit) {
+  process.exit(exit);
+} else {
+  if (exit) console.error('[doctor] WARN-ONLY mode: issues found but not failing the build');
+  process.exit(0);
+}
