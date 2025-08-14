@@ -31,7 +31,8 @@ export default defineConfig({
         share_target: {
           action: '/share',
           method: 'GET',
-          params: { title: 'title', text: 'text', url: 'url' }
+          
+          enctype: 'application/x-www-form-urlencoded',params: { title: 'title', text: 'text', url: 'url' }
         }
       }
     })
