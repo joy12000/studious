@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { Search, Star } from 'lucide-react';
 import TopicBadge from './TopicBadge';
