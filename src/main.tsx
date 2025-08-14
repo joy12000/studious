@@ -1,14 +1,17 @@
 import './index.css'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App'
-
+import ErrorBoundary from './components/ErrorBoundary'
+import Root from './Root'
 import { initInstallCapture } from './lib/install'
+
 initInstallCapture()
 
 const container = document.getElementById('root')!
 ReactDOM.createRoot(container).render(
   <React.StrictMode>
-    <App />
+    <ErrorBoundary>
+      <Root />
+    </ErrorBoundary>
   </React.StrictMode>
 )
