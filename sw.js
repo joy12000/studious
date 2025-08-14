@@ -1,5 +1,6 @@
 
-const VERSION = 'sw-v6';
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
+const VERSION = 'sw-v8';
+self.addEventListener('install', (e) => { self.skipWaiting(); });
+self.addEventListener('activate', (e) => { e.waitUntil(self.clients.claim()); });
+// passthrough fetch — no caching to avoid stale assets
 self.addEventListener('fetch', () => {});
