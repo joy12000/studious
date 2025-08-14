@@ -2,73 +2,74 @@ import { useEffect, useState } from 'react';
 import { db } from './db';
 import { generateTitle, guessTopics } from './classify';
 
-export function useNotes(filters: any) {
+type Filters = {
+  search?: string;
+  topics?: string[];
+  favorite?: boolean;
+  dateRange?: 'today' | '7days' | '30days' | 'all';
+};
+
+export function useNotes() {
   const [notes, setNotes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filters, setFilters] = useState<Filters>({ search: '' });
 
   const load = async () => {
+    setLoading(true);
     let all = await db.notes.toArray();
 
-        const s = ((filters && (filters as any).search) || '').toLowerCase().trim();
-if (s) {
+    const s = (filters?.search || '').toLowerCase().trim();
+    if (s) {
       all = all.filter((n: any) =>
         (n.title || '').toLowerCase().includes(s) ||
         (n.content || '').toLowerCase().includes(s) ||
-        (n.sourceUrl || '').toLowerCase().includes(s) ||
-        (Array.isArray(n.topics) && n.topics.join(' ').toLowerCase().includes(s))
+        (n.sourceUrl || '').toLowerCase().includes(s)
       );
     }
-
-    if (filters.favorite) {
+    if (filters?.favorite) {
       all = all.filter((n: any) => !!n.favorite);
     }
-
-    if (Array.isArray(filters.topics) && filters.topics.length) {
-      all = all.filter(
-        (n: any) =>
-          Array.isArray(n.topics) &&
-          filters.topics.every((t: string) => n.topics.includes(t))
-      );
+    if (Array.isArray(filters?.topics) && filters.topics.length) {
+      all = all.filter((n: any) => Array.isArray(n.topics) && filters.topics!.every(t => n.topics.includes(t)));
     }
 
-    // 최신 업데이트 순으로 정렬
-    all.sort(
-      (a: any, b: any) =>
-        (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0)
-    );
-
+    all.sort((a: any, b: any) => (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0));
     setNotes(all);
+    setLoading(false);
   };
 
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    (filters && filters.search),
-    filters.favorite,
-    filters.dateRange,
-    (filters.topics || []).join('|'),
-  ]);
+  useEffect(() => { load(); }, [JSON.stringify(filters)]);
 
-  return { notes, reload: load };
-}
+  const toggleFavorite = async (id: string) => {
+    const row = await db.notes.get(id);
+    if (!row) return;
+    await db.notes.update(id, { favorite: !row.favorite, updatedAt: Date.now() });
+    await load();
+  };
 
-export async function addOrUpdateNote(note: any) {
-  const content = String(note.content || '');
+  const addNote = async (content: string, sourceUrl?: string | null) => {
+    const id = crypto.randomUUID();
+    const title = await generateTitle(content);
+    const topics = await guessTopics(content);
+    const now = Date.now();
+    const note = {
+      id, title, content, sourceUrl: sourceUrl || null, sourceType: 'other',
+      createdAt: now, updatedAt: now, topics, labels: [], highlights: [], todo: [], favorite: false
+    };
+    await db.notes.add(note);
+    await load();
+    return id;
+  };
 
-  if (!note.title || !String(note.title).trim()) {
-    note.title = generateTitle(content);
-  }
+  const updateNote = async (id: string, patch: any) => {
+    await db.notes.update(id, { ...patch, updatedAt: Date.now() });
+    await load();
+  };
 
-  if (!Array.isArray(note.topics) || note.topics.length === 0) {
-    note.topics = await guessTopics(content);
-  }
+  const deleteNote = async (id: string) => {
+    await db.notes.delete(id);
+    await load();
+  };
 
-  note.updatedAt = Date.now();
-
-  if (note.id) {
-    return db.notes.put(note);
-  }
-
-  note.createdAt = Date.now();
-  return db.notes.add(note);
+  return { notes, loading, filters, setFilters, toggleFavorite, addNote, updateNote, deleteNote };
 }

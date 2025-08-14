@@ -19,12 +19,10 @@ export default function FilterBar({ filters = {}, onFiltersChange, availableTopi
   const [isComposing, setIsComposing] = useState(false);
   const first = useRef(true);
 
-  // keep input in sync when external filters change
   useEffect(() => {
     setLocalSearch(filters.search ?? '');
   }, [filters.search]);
 
-  // debounce propagate to parent
   useEffect(() => {
     if (first.current) { first.current = false; return; }
     if (isComposing) return;
@@ -49,11 +47,8 @@ export default function FilterBar({ filters = {}, onFiltersChange, availableTopi
           className="flex-1 outline-none bg-transparent text-sm"
         />
       </div>
-      {/* 토픽 필터 자리 (필요 시 확장) */}
       {Array.isArray(availableTopics) && availableTopics.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2">
-          {/* 간단한 힌트만 남겨둠. 실제 토픽 토글 UI는 이미 NoteCard/TopicBadge 등과 연동되어 있을 수 있어 안전하게 보류 */}
-        </div>
+        <div className="mt-2 flex flex-wrap gap-2"></div>
       )}
     </div>
   );
