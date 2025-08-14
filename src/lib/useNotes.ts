@@ -62,15 +62,53 @@ export function useNotes() {
     await load();
   };
 
-  const addNote = async (content: string, sourceUrl?: string | null) => {
+  const addNote = async (arg1: any, arg2?: string | null) => {
+    // Backward compatible:
+    // - addNote(content: string, sourceUrl?: string)
+    // - addNote({ title?, content, sourceUrl?, sourceType? })
+    let content = "";
+    let sourceUrl: string | null = null;
+    let sourceType: 'youtube' | 'web' | 'other' = 'other';
+    let titleFromUser: string | undefined;
+
+    if (typeof arg1 === 'string') {
+      content = (arg1 ?? '').trim();
+      sourceUrl = (arg2 ?? null) as any;
+    } else if (arg1 && typeof arg1 === 'object') {
+      content = (arg1.content ?? '').trim();
+      titleFromUser = (arg1.title ?? '').trim() || undefined;
+      sourceUrl = (arg1.sourceUrl ?? null) ? String(arg1.sourceUrl).trim() : null;
+      if (arg1.sourceType === 'youtube' || arg1.sourceType === 'web' || arg1.sourceType === 'other') {
+        sourceType = arg1.sourceType;
+      } else if (sourceUrl) {
+        sourceType = sourceUrl.includes('youtube.com') || sourceUrl.includes('youtu.be') ? 'youtube' : 'web';
+      }
+    }
+
+    if (!content) throw new Error('내용이 비어 있음');
+
     const id = crypto.randomUUID();
-    const title = await generateTitle(content);
+    const title = titleFromUser || (await generateTitle(content));
     const topics = await guessTopics(content);
     const now = Date.now();
     const note = {
-      id, title, content, sourceUrl: sourceUrl || null, sourceType: 'other',
-      createdAt: now, updatedAt: now, topics, labels: [], highlights: [], todo: [], favorite: false
+      id,
+      title,
+      content,
+      sourceUrl,
+      sourceType,
+      createdAt: now,
+      updatedAt: now,
+      topics,
+      labels: [],
+      highlights: [],
+      todo: [],
+      favorite: false
     };
+    await db.notes.add(note);
+    await load();
+    return id;
+  };
     await db.notes.add(note);
     await load();
     return id;
