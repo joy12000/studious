@@ -24,7 +24,9 @@ export default function BackupPanel(){
   }
 
   async function onImportFile(e: React.ChangeEvent<HTMLInputElement>){
-    const f = e.target.files?.[0];
+    // React 이벤트 비동기 사용 시 currentTarget이 null이 될 수 있으므로 참조를 먼저 잡아둔다.
+    const inputEl = e.currentTarget as HTMLInputElement | null;
+    const f = inputEl?.files?.[0];
     if (!f) return;
     try {
       setBusy(true);
@@ -32,12 +34,16 @@ export default function BackupPanel(){
         ? await importEncrypted(f, pass)
         : await importPlain(f);
       alert(`${count}개의 노트를 복원했습니다.`);
+      // 파일 입력값 초기화는 reload 전에 안전하게 ref로 처리
+      if (fileRef.current) fileRef.current.value = '';
+      // 바로 새로고침
       location.reload();
     } catch (err:any) {
       alert(`복원 실패: ${err?.message || err}`);
     } finally {
       setBusy(false);
-      e.currentTarget.value = '';
+      // 이벤트가 null이더라도 안전하게 처리
+      if (fileRef.current) fileRef.current.value = '';
     }
   }
 
@@ -68,6 +74,7 @@ export default function BackupPanel(){
           onChange={e=>setPass(e.target.value)}
           placeholder="암호(선택) — 입력하면 암호화"
           className="flex-1 text-sm border rounded px-3 py-2"
+          autoComplete="new-password"
         />
       </div>
 
