@@ -1,53 +1,52 @@
-(function(){
-  // ------ Remove stray "\1" text nodes ------
-  try {
-    var walker = document.createTreeWalker(document.body || document, NodeFilter.SHOW_TEXT, null);
-    var nodes = [];
-    while (walker.nextNode()) nodes.push(walker.currentNode);
-    nodes.forEach(function(n){ if (n.nodeValue && n.nodeValue.trim() === "\\1") n.nodeValue = ""; });
-  } catch(e){}
+/**
+ * Lightweight SW bootstrap + version-aware update nudges.
+ * - Registers VitePWA service worker (registerType: 'autoUpdate')
+ * - Busts cache via BUILD_VERSION (optional)
+ */
+(function () {
+  if (!('serviceWorker' in navigator)) return;
 
-  // ------ Error overlay ------
-  function ensureOverlay(){
-    var el = document.getElementById('__error_overlay__');
-    if (el) return el;
-    el = document.createElement('div');
-    el.id = '__error_overlay__';
-    el.style.position = 'fixed';
-    el.style.top = '0';
-    el.style.left = '0';
-    el.style.right = '0';
-    el.style.zIndex = '999999';
-    el.style.background = 'rgba(220, 38, 38, 0.98)';
-    el.style.color = '#fff';
-    el.style.font = '12px/1.4 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace';
-    el.style.padding = '10px 12px';
-    el.style.whiteSpace = 'pre-wrap';
-    el.style.display = 'none';
-    document.body && document.body.appendChild(el);
-    return el;
-  }
-  function showError(msg){
-    try {
-      var el = ensureOverlay();
-      el.textContent = '[App Error] ' + msg;
-      el.style.display = 'block';
-    } catch(e){}
-  }
-  window.addEventListener('error', function(e){
-    showError(String(e.message || e.error || e));
-  });
-  window.addEventListener('unhandledrejection', function(e){
-    showError('Unhandled promise: ' + String((e&&e.reason)||''));
-  });
+  // Optional build version; can be set via <script>window.BUILD_VERSION="v123"</script>
+  var buildVersion = (window.BUILD_VERSION || '').toString();
 
-  // ------ Service worker register with cache-busting ------
-  if ('serviceWorker' in navigator) {
-    var v = (window.BUILD_VERSION || 'v10') + '-' + Date.now().toString().slice(-6);
-    window.addEventListener('load', function(){
-      navigator.serviceWorker.register('/sw.js?v=' + v).catch(function(err){
-        console && console.warn && console.warn('SW register failed:', err);
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/sw.js').then(function (reg) {
+      // Listen for waiting worker and auto-swap to reduce "stuck old version"
+      function tryActivate(registration) {
+        if (registration.waiting) {
+          // send skipWaiting
+          registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      }
+
+      if (reg.waiting) tryActivate(reg);
+      reg.addEventListener('updatefound', function () {
+        var sw = reg.installing;
+        if (!sw) return;
+        sw.addEventListener('statechange', function () {
+          if (sw.state === 'installed') {
+            tryActivate(reg);
+            // Dispatch a custom event for UI to react (e.g., toast)
+            window.dispatchEvent(new CustomEvent('pwa:update-ready', { detail: { buildVersion: buildVersion } }));
+          }
+        });
       });
+
+      // Periodic checks
+      setInterval(function () {
+        reg.update().catch(function (){});
+      }, 60 * 1000);
+
+      // Claim immediately when controller changes
+      navigator.serviceWorker.addEventListener('controllerchange', function () {
+        // Force refresh once to get the new SW-managed resources
+        if (!window.__pwa_refreshed__) {
+          window.__pwa_refreshed__ = true;
+          window.location.reload();
+        }
+      });
+    }).catch(function (err) {
+      console.warn('[PWA] SW register failed:', err);
     });
-  }
+  });
 })();

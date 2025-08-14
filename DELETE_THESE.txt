@@ -1,0 +1,7 @@
+# Delete these duplicates (keep public/* versions)
+manifest.webmanifest
+sw.js
+pwa-boot.js
+_redirects
+icon-192.png
+icon-512.png
