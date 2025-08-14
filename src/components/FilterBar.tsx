@@ -1,11 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Search, Star } from 'lucide-react';
-
-type Filters = {
-  search?: string;
-  topics?: string[];
-  favorite?: boolean;
-};
+import type { Filters } from '../lib/useNotes';
 
 type Props = {
   filters?: Filters;
@@ -21,18 +16,22 @@ export default function FilterBar({ filters, onFiltersChange, availableTopics = 
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setLocalSearch(filters?.search ?? '');
-    setSelectedTopics(filters?.topics ?? []);
-    setFavOnly(!!filters?.favorite);
-  }, [filters?.search, filters?.topics, filters?.favorite]);
+    // sync from props only if different
+    if ((filters?.search ?? '') !== localSearch) setLocalSearch(filters?.search ?? '');
+    if (JSON.stringify(filters?.topics ?? []) !== JSON.stringify(selectedTopics)) setSelectedTopics(filters?.topics ?? []);
+    if (!!filters?.favorite !== favOnly) setFavOnly(!!filters?.favorite);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters?.search, JSON.stringify(filters?.topics ?? []), filters?.favorite]);
 
   useEffect(() => {
+    if (isComposing) return;
     if (timerRef.current) window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => {
-      onFiltersChange({ search: localSearch, topics: selectedTopics, favorite: favOnly });
-    }, 200);
+      const next: Filters = { search: localSearch, topics: selectedTopics, favorite: favOnly };
+      onFiltersChange(next);
+    }, 250);
     return () => { if (timerRef.current) window.clearTimeout(timerRef.current); };
-  }, [localSearch, selectedTopics, favOnly]);
+  }, [localSearch, selectedTopics, favOnly, isComposing]);
 
   const toggleTopic = (t: string) => {
     setSelectedTopics(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);

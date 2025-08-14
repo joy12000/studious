@@ -1,12 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { db } from './db';
 import { generateTitle, guessTopics } from './classify';
 
-type Filters = {
+export type Filters = {
   search?: string;
   topics?: string[];
   favorite?: boolean;
-  favoritesOnly?: boolean;
   dateRange?: 'today' | '7days' | '30days' | 'all';
 };
 
@@ -14,6 +13,13 @@ export function useNotes() {
   const [notes, setNotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<Filters>({ search: '' });
+
+  const filterKey = useMemo(() => JSON.stringify({
+    search: filters.search ?? '',
+    topics: filters.topics ?? [],
+    favorite: !!filters.favorite,
+    dateRange: filters.dateRange ?? 'all',
+  }), [filters.search, JSON.stringify(filters.topics ?? []), filters.favorite, filters.dateRange]);
 
   const load = async () => {
     setLoading(true);
@@ -31,7 +37,7 @@ export function useNotes() {
     if (filters.topics && filters.topics.length) {
       all = all.filter(n => (n.topics || []).some((t: string) => filters.topics!.includes(t)));
     }
-    if (filters.favorite || filters.favoritesOnly) {
+    if (filters.favorite) {
       all = all.filter(n => !!n.favorite);
     }
     if (filters.dateRange && filters.dateRange !== 'all') {
@@ -48,7 +54,7 @@ export function useNotes() {
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, [filters]);
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [filterKey]);
 
   const toggleFavorite = async (id: string) => {
     const row = await db.notes.get(id);
@@ -113,5 +119,17 @@ export function useNotes() {
     await load();
   };
 
-  return { notes, loading, filters, setFilters, toggleFavorite, addNote, updateNote, deleteNote };
+  // helper: safeSetFilters to avoid identical updates
+  function safeSetFilters(next: Filters) {
+    const prev = filters;
+    const same =
+      (prev.search ?? '') === (next.search ?? '') &&
+      JSON.stringify(prev.topics ?? []) === JSON.stringify(next.topics ?? []) &&
+      !!prev.favorite === !!next.favorite &&
+      (prev.dateRange ?? 'all') === (next.dateRange ?? 'all');
+    if (same) return;
+    setFilters(next);
+  }
+
+  return { notes, loading, filters, setFilters: safeSetFilters, toggleFavorite, addNote, updateNote, deleteNote };
 }
