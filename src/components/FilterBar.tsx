@@ -17,7 +17,6 @@ export default function FilterBar({ filters, onFiltersChange, availableTopics = 
   const [localSearch, setLocalSearch] = useState(filters?.search ?? '');
   const [selectedTopics, setSelectedTopics] = useState<string[]>(filters?.topics ?? []);
   const [favOnly, setFavOnly] = useState<boolean>(!!filters?.favorite);
-  const [isComposing, setIsComposing] = useState(false);
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -30,7 +29,7 @@ export default function FilterBar({ filters, onFiltersChange, availableTopics = 
     if (timerRef.current) window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => {
       onFiltersChange({ search: localSearch, topics: selectedTopics, favorite: favOnly });
-    }, 200);
+    }, 250);
     return () => { if (timerRef.current) window.clearTimeout(timerRef.current); };
   }, [localSearch, selectedTopics, favOnly]);
 
@@ -45,8 +44,6 @@ export default function FilterBar({ filters, onFiltersChange, availableTopics = 
         <input
           value={localSearch}
           onChange={(e) => setLocalSearch(e.target.value)}
-          onCompositionStart={() => setIsComposing(true)}
-          onCompositionEnd={() => setIsComposing(false)}
           placeholder="검색어를 입력하세요"
           className="flex-1 outline-none bg-transparent text-sm"
         />
@@ -59,7 +56,7 @@ export default function FilterBar({ filters, onFiltersChange, availableTopics = 
           즐겨찾기
         </button>
       </div>
-      {Array.isArray(availableTopics) && availableTopics.length > 0 && (
+      {availableTopics.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
           {availableTopics.map(t => (
             <button
