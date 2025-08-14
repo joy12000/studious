@@ -1,112 +1,98 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useNotes } from '../lib/useNotes';
+import { useNotes, type Filters } from '../lib/useNotes';
 import NoteCard from '../components/NoteCard';
 import FilterBar from '../components/FilterBar';
-import { Plus, Settings } from 'lucide-react';
+import { Plus, CalendarDays, Pin } from 'lucide-react';
+
+function QuickRange({ value, onChange }:{ value: Filters['dateRange']; onChange:(v:Filters['dateRange'])=>void }){
+  const opts: Array<{key: Filters['dateRange'], label: string}> = [
+    { key: 'today', label: '오늘' },
+    { key: '7days', label: '7일' },
+    { key: '30days', label: '30일' },
+    { key: 'all', label: '전체' },
+  ];
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <CalendarDays className="h-4 w-4 text-gray-400" />
+      {opts.map(o => (
+        <button key={o.key}
+          onClick={()=>onChange(o.key)}
+          className={`px-2 py-1 rounded-full border ${value===o.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}>
+          {o.label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function HomePage() {
   const { notes, loading, filters, setFilters, toggleFavorite } = useNotes();
   const [availableTopics, setAvailableTopics] = useState<string[]>([]);
+  const [pinFav, setPinFav] = useState<boolean>(() => {
+    try { return localStorage.getItem('pinFavorites') !== 'false'; } catch { return true; }
+  });
 
   useEffect(() => {
     const topics = new Set<string>();
-    notes.forEach(note => {
-      (note.topics || []).forEach((topic: string) => topics.add(topic));
-    });
+    notes.forEach(note => (note.topics || []).forEach((t:string)=>topics.add(t)));
     setAvailableTopics(Array.from(topics).sort());
   }, [notes]);
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">노트를 불러오는 중...</p>
-        </div>
-      </div>
-    );
-  }
+  useEffect(()=>{
+    try { localStorage.setItem('pinFavorites', String(pinFav)); } catch {}
+  }, [pinFav]);
+
+  const sorted = useMemo(() => {
+    const arr = [...notes];
+    // createdAt desc first
+    arr.sort((a,b) => (b?.createdAt ?? 0) - (a?.createdAt ?? 0));
+    if (!pinFav) return arr;
+    // Stable-ish favorites first
+    const favs = arr.filter(n => !!n.favorite);
+    const rest = arr.filter(n => !n.favorite);
+    return [...favs, ...rest];
+  }, [notes, pinFav]);
+
+  const onRangeChange = (r: Filters['dateRange']) => {
+    setFilters({ ...(filters||{}), dateRange: r });
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">SelfDev Notes</h1>
-              <p className="text-gray-600 text-sm">자기계발 요약 & 기록</p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Link
-                to="/capture"
-                className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="h-4 w-4" />
-                새 노트
-              </Link>
-
-              <Link
-                to="/settings"
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <Settings className="h-5 w-5" />
-              </Link>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <FilterBar
-              filters={filters}
-              onFiltersChange={setFilters}
-              availableTopics={availableTopics}
-            />
-          </div>
-        </div>
+    <div className="space-y-4">
+      <header className="flex items-center justify-between">
+        <h1 className="text-lg font-semibold">노트</h1>
+        <Link to="/capture" className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded bg-blue-600 text-white">
+          <Plus className="h-4 w-4" /> 새 노트
+        </Link>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-            <div className="text-2xl font-bold text-blue-600">{notes.length}</div>
-            <div className="text-sm text-gray-600">전체 노트</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-            <div className="text-2xl font-bold text-red-600">{notes.filter(n => n.favorite).length}</div>
-            <div className="text-sm text-gray-600">즐겨찾기</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-            <div className="text-2xl font-bold text-green-600">{availableTopics.length}</div>
-            <div className="text-sm text-gray-600">주제</div>
-          </div>
-          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-100">
-            <div className="text-2xl font-bold text-orange-600">
-              {notes.reduce((acc, note) => acc + (note.todo || []).filter((t: any) => !t.done).length, 0)}
-            </div>
-            <div className="text-sm text-gray-600">할 일</div>
-          </div>
-        </div>
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-3">
+        <FilterBar filters={filters} onFiltersChange={setFilters} availableTopics={availableTopics} />
 
-        {notes.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="text-gray-400 mb-4">
-              <Plus className="h-16 w-16" />
-            </div>
-            <p className="text-gray-600">아직 노트가 없습니다. 상단의 “새 노트” 버튼을 눌러 시작하세요.</p>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {notes.map((note) => (
-              <NoteCard
-                key={note.id}
-                note={note}
-                onToggleFavorite={toggleFavorite}
-              />
-            ))}
-          </div>
-        )}
-      </main>
+        <div className="flex items-center justify-between">
+          <QuickRange value={filters?.dateRange ?? 'all'} onChange={onRangeChange} />
+          <button
+            onClick={()=>setPinFav(v=>!v)}
+            className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded border ${pinFav ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : 'bg-white border-gray-200 text-gray-600'}`}
+            title="즐겨찾기 상단 고정"
+          >
+            <Pin className="h-3 w-3" /> 즐겨찾기 우선: {pinFav ? 'ON' : 'OFF'}
+          </button>
+        </div>
+      </div>
+
+      {loading && <div className="text-center text-gray-500 py-20">불러오는 중…</div>}
+
+      {!loading && sorted.length === 0 && (
+        <div className="text-center text-gray-500 py-20">노트가 없습니다. 오른쪽 상단의 “새 노트”를 눌러 추가해보세요.</div>
+      )}
+
+      <div className="grid grid-cols-1 gap-3">
+        {sorted.map(n => (
+          <NoteCard key={n.id} note={n} onToggleFavorite={toggleFavorite} />
+        ))}
+      </div>
     </div>
   );
 }
