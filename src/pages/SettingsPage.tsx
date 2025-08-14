@@ -1,17 +1,179 @@
-// src/pages/SettingsPage.tsx
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Download, Smartphone, RefreshCcw, Sun, Moon, Trash2, Cog, CheckCircle2 } from 'lucide-react';
+import { canInstall, onCanInstallChange, promptInstall } from '../lib/install';
+import { useNotes } from '../lib/useNotes';
 import BackupPanel from '../components/BackupPanel';
-import { autoBackupIfNeeded } from '../lib/backup';
+import { db } from '../lib/db';
+import type { AppSettings } from '../lib/types';
+
+type TabKey = 'general'|'backup'|'app';
+
+function TabButton({active, onClick, children}:{active:boolean; onClick:()=>void; children:React.ReactNode}){
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-2 text-sm rounded-lg border ${active ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function SettingsPage(){
-  useEffect(()=>{ autoBackupIfNeeded(); }, []);
+  const { notes } = useNotes();
+  const [tab, setTab] = useState<TabKey>('general');
+  const [installable, setInstallable] = useState(canInstall());
+  const [settings, setSettings] = useState<AppSettings | null>(null);
+
+  useEffect(()=>{
+    const off = onCanInstallChange(setInstallable);
+    return off;
+  }, []);
+
+  useEffect(()=>{
+    (async () => {
+      try {
+        const s = await db.settings.get('default');
+        setSettings(s || null);
+      } catch {}
+    })();
+  }, []);
+
+  const noteCount = notes.length;
+  const topicCount = useMemo(()=>{
+    const all = new Set<string>();
+    notes.forEach(n => (n.topics||[]).forEach(t => all.add(t)));
+    return all.size;
+  }, [notes]);
+
+  async function toggleTheme(){
+    if (!settings) return;
+    const next = settings.theme === 'dark' ? 'light' : 'dark';
+    const updated = { ...settings, theme: next };
+    // persist
+    await db.settings.put({ id: 'default', ...updated } as any);
+    setSettings(updated);
+    try {
+      const root = document.documentElement;
+      if (next === 'dark') root.classList.add('dark'); else root.classList.remove('dark');
+      localStorage.setItem('pref-theme', next);
+    } catch {}
+  }
+
+  async function wipeAll(){
+    if (!confirm('정말 모든 노트와 설정을 삭제할까요? 이 작업은 되돌릴 수 없습니다.')) return;
+    indexedDB.deleteDatabase('selfdev-db');
+    location.reload();
+  }
+
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-lg font-semibold">설정</h1>
-        <p className="text-sm text-gray-500">백업/복원 및 기본 설정</p>
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">설정</h1>
+          <p className="text-sm text-gray-500">백업/복원, 테마, PWA 설치 등</p>
+        </div>
       </header>
-      <BackupPanel />
+
+      {/* Tabs */}
+      <div className="flex items-center gap-2">
+        <TabButton active={tab==='general'} onClick={()=>setTab('general')}>일반</TabButton>
+        <TabButton active={tab==='backup'} onClick={()=>setTab('backup')}>백업</TabButton>
+        <TabButton active={tab==='app'} onClick={()=>setTab('app')}>앱</TabButton>
+      </div>
+
+      {tab==='general' && (
+        <div className="space-y-4">
+          <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="font-medium">테마</div>
+                <div className="text-xs text-gray-500">현재: {settings?.theme || 'light'}</div>
+              </div>
+              <button onClick={toggleTheme} className="inline-flex items-center gap-2 px-3 py-2 rounded border bg-white hover:bg-gray-50">
+                {settings?.theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                {settings?.theme === 'dark' ? '라이트로 전환' : '다크로 전환'}
+              </button>
+            </div>
+          </section>
+
+          <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 grid grid-cols-2 gap-3">
+            <div className="p-3 rounded-lg border border-gray-100">
+              <div className="text-xs text-gray-500">전체 노트</div>
+              <div className="text-xl font-semibold">{noteCount.toLocaleString()}</div>
+            </div>
+            <div className="p-3 rounded-lg border border-gray-100">
+              <div className="text-xs text-gray-500">주제 수</div>
+              <div className="text-xl font-semibold">{topicCount.toLocaleString()}</div>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {tab==='backup' && (
+        <div className="space-y-4">
+          <BackupPanel />
+          <div className="text-xs text-gray-500">
+            자동 백업은 앱을 열었을 때 최근 백업이 7일 이상 지났다면 JSON을 다운로드합니다.
+          </div>
+        </div>
+      )}
+
+      {tab==='app' && (
+        <div className="space-y-4">
+          <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Smartphone className="h-4 w-4 text-gray-500" />
+                <div>
+                  <div className="font-medium">PWA 설치</div>
+                  <div className="text-xs text-gray-500">홈화면에 앱처럼 설치합니다.</div>
+                </div>
+              </div>
+              <button
+                disabled={!installable}
+                onClick={promptInstall}
+                className={`px-3 py-2 rounded ${installable ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-500'}`}
+              >
+                설치하기
+              </button>
+            </div>
+          </section>
+
+          <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <RefreshCcw className="h-4 w-4 text-gray-500" />
+              <div>
+                <div className="font-medium">캐시 초기화</div>
+                <div className="text-xs text-gray-500">서비스워커/캐시 꼬임 시 강제 새로고침</div>
+              </div>
+            </div>
+            <div>
+              <button
+                onClick={() => { navigator.serviceWorker?.getRegistrations().then(rs => rs.forEach(r => r.unregister())); location.reload(); }}
+                className="px-3 py-2 rounded border bg-white hover:bg-gray-50"
+              >
+                캐시 비우고 새로고침
+              </button>
+            </div>
+          </section>
+
+          <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+            <div className="flex items-center gap-2 text-red-600">
+              <Trash2 className="h-4 w-4" />
+              <div className="font-medium">위험 구역</div>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">모든 데이터를 완전히 삭제합니다. 백업 후 진행하세요.</p>
+            <button onClick={wipeAll} className="mt-2 px-3 py-2 rounded-lg border bg-white text-red-600 border-red-300">
+              전체 삭제
+            </button>
+          </section>
+
+          <section className="text-xs text-gray-500 px-1">
+            <div>버전: <code>v{(window as any).BUILD_VERSION || (import.meta as any).env?.VITE_APP_VERSION || 'local'}</code></div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
