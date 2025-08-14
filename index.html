@@ -1,65 +1,17 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/icon-192.png" />
-    \1<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#3B82F6" />
-    <title>자기계발 요약·기록 PWA 앱</title>
-    <style>
-      #installBtn {
-        position: fixed;
-        right: 16px;
-        bottom: 16px;
-        z-index: 9999;
-        padding: 10px 16px;
-        background: #3B82F6;
-        color: white;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        display: none;
-      }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SelfDev Notes</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <script defer src="/pwa-boot.js"></script>
   </head>
   <body>
     <div id="root"></div>
-    <button id="installBtn">앱 설치</button>
-    
+    <!-- If your entry is /src/main.jsx or a different path, keep your current line -->
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      // 서비스 워커 등록
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(console.error);
-        });
-      }
-
-      // beforeinstallprompt 이벤트로 설치 버튼 제어
-      let deferredPrompt = null;
-      const btn = document.getElementById('installBtn');
-
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        btn.style.display = 'inline-block';
-      });
-
-      btn.addEventListener('click', async () => {
-        if (!deferredPrompt) return;
-        deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log(`사용자 선택: ${outcome}`);
-        deferredPrompt = null;
-        btn.style.display = 'none';
-      });
-
-      // 앱이 설치된 경우 버튼 숨김
-      window.addEventListener('appinstalled', () => {
-        btn.style.display = 'none';
-        console.log('앱이 설치되었습니다!');
-      });
-    </script>
   </body>
 </html>
