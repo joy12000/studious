@@ -8,8 +8,8 @@ export function useNotes(filters: any) {
   const load = async () => {
     let all = await db.notes.toArray();
 
-    const s = (filters.search || '').toLowerCase().trim();
-    if (s) {
+        const s = ((filters && (filters as any).search) || '').toLowerCase().trim();
+if (s) {
       all = all.filter((n: any) =>
         (n.title || '').toLowerCase().includes(s) ||
         (n.content || '').toLowerCase().includes(s) ||
@@ -43,7 +43,7 @@ export function useNotes(filters: any) {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    filters.search,
+    (filters && filters.search),
     filters.favorite,
     filters.dateRange,
     (filters.topics || []).join('|'),
