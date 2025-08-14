@@ -17,6 +17,21 @@ export function useNotes() {
   const load = async () => {
     setLoading(true);
     let all = await db.notes.toArray();
+    /*__NORMALIZE_NOTES__*/
+    all = (all || []).filter(Boolean).map((n: any) => ({
+      id: n?.id ?? crypto.randomUUID(),
+      title: n?.title ?? '',
+      content: n?.content ?? '',
+      sourceType: n?.sourceType ?? 'other',
+      sourceUrl: n?.sourceUrl ?? null,
+      createdAt: n?.createdAt ?? Date.now(),
+      updatedAt: n?.updatedAt ?? n?.createdAt ?? Date.now(),
+      topics: Array.isArray(n?.topics) ? n.topics : [],
+      labels: Array.isArray(n?.labels) ? n.labels : [],
+      highlights: Array.isArray(n?.highlights) ? n.highlights : [],
+      todo: Array.isArray(n?.todo) ? n.todo : [],
+      favorite: !!(n?.favorite),
+    }));
 
     const s = (filters?.search || '').toLowerCase().trim();
     if (s) {
