@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import TopicBadge from "../components/TopicBadge";
 import TemplatePicker from "../components/TemplatePicker";
 import { cleanPaste } from "../lib/cleanPaste";
 import { readClipboardText } from "../lib/clipboard";
@@ -180,68 +181,7 @@ export default function CapturePage() {
         </div>
       )}
 
-      <section className="rounded-2xl border p-4 bg-white/70 dark:bg-gray-900/60">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-sm font-medium">AI 주제 추천</div>
-          <button
-            className="text-xs px-2 py-1 rounded border hover:bg-gray-50 dark:hover:bg-gray-800"
-            onClick={() => refreshAiTopics()}
-          >
-            다시 분석
-          </button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {aiTopics.length === 0 ? (
-            <span className="text-xs text-gray-500">아직 추천이 없어요. 내용을 입력하거나 붙여넣기 해보세요.</span>
-          ) : (
-            aiTopics.map(t => (
-              <span key={t} className="text-xs px-2 py-1 rounded-full border bg-gray-50 dark:bg-gray-800">
-                #{t}
-              </span>
-            ))
-          )}
-        </div>
-      </section>
-
-      <div className="space-y-3">
-        <textarea
-          ref={textareaRef}
-          value={text}
-          onChange={e => setText(e.target.value)}
-          placeholder="여기에 직접 붙여넣기 하거나, 템플릿을 선택해 시작하세요."
-          className="w-full h-80 px-4 py-3 rounded-2xl border bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm font-mono text-sm shadow-sm"
-        />
-        <div className="flex flex-wrap justify-end gap-2">
-          <button
-            className="px-3 py-2 rounded-xl border hover:bg-gray-50 dark:hover:bg-gray-800"
-            onClick={() => setText("")}
-          >
-            지우기
-          </button>
-          <button
-            className="px-3 py-2 rounded-xl bg-blue-600 text-white disabled:opacity-50"
-            disabled={!text.trim()}
-            onClick={() => saveNote(text)}
-          >
-            이 내용으로 저장
-          </button>
-        </div>
-      </div>
-
-      <section className="rounded-2xl border p-4 bg-white/70 dark:bg-gray-900/60">
-        <div className="font-semibold mb-2">고급 클리닝은 이렇게 정리해요</div>
-        <ul className="list-disc pl-5 space-y-1 text-sm">
-          <li>코드 블록(<code>```</code> … <code>```</code>)은 <b>손대지 않음</b>.</li>
-          <li>글머리표 통일: <code>• · * -</code>처럼 섞여 있으면 <code>-</code>로 바꿔 깔끔하게.</li>
-          <li>번호 목록 정리: <code>1)</code>, <code>1.</code>, <code>1 -</code> → 모두 <code>1.</code> 형식.</li>
-          <li>따옴표/공백: “똑똑한 따옴표”를 일반 따옴표로 바꾸고, 보이지 않는 공백 제거.</li>
-          <li>빈 줄: 줄이 3줄 이상 연달아 나오면 <b>최대 1줄</b>만 남김.</li>
-          <li>링크 꼬리표 제거: <code>?utm_…</code>, <code>gclid</code>, <code>fbclid</code> 같은 <b>추적 파라미터</b>는 삭제해 주소를 짧게.</li>
-        </ul>
-        <div className="mt-2 text-xs text-gray-500">
-          예: <code>https://example.com/page?utm_source=newsletter&amp;ref=abc</code> → <code>https://example.com/page</code>
-        </div>
-      </section>
+      <section className="rounded-2xl border p-4 bg-white/70 dark:bg-gray-900/60"><div className="text-sm font-medium mb-2">고급 클리닝은 이렇게 정리해요</div><ul className="text-sm leading-6 list-disc pl-5"><li><b>코드블록</b>(``` … ```)은 건드리지 않아요.</li><li>글머리표는 제각각이면 <code>-</code> 하나로 통일해요.</li><li>번호목록은 <code>1)</code>/<code>1 -</code>도 <code>1.</code>로 맞춰요.</li><li>“스마트 따옴표”와 숨은 공백은 일반 문자로 바꿔요.</li><li>링크의 추적 꼬리표(<code>utm_</code>, <code>gclid</code> 등)는 지워서 짧게 만들어요.</li></ul></section>
     </div>
   );
 }

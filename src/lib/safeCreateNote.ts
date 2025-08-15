@@ -27,3 +27,5 @@ export async function safeCreateNoteFromText(raw: string) {
 
   return id;
 }
+
+export { safeCreateNoteFromText as safeCreateNote };
