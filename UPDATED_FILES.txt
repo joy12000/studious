@@ -1,5 +1,2 @@
-src/lib/clipboard.ts
-src/lib/cleanPaste.ts
-src/pages/CapturePage.tsx
 src/components/TemplatePicker.tsx
 CHANGELOG.md

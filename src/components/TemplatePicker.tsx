@@ -26,7 +26,6 @@ function loadTemplates(): UserTemplate[] {
     if (!raw) return [];
     const arr = JSON.parse(raw);
     if (Array.isArray(arr)) {
-      // sanitize
       return arr.filter(x => x && typeof x.id === "string" && typeof x.name === "string" && typeof x.content === "string");
     }
   } catch {}
@@ -166,7 +165,10 @@ export default function TemplatePicker({ onInsert }: Props) {
               placeholder="예: 회의 템플릿 v2"
             />
             <label className="block text-sm mb-1">
-              내용 <span className="text-xs text-gray-500">(변수: {{`{{date}}`}}, {{`{{time}}`}})</span>
+              내용{" "}
+              <span className="text-xs text-gray-500">
+                (변수: <code>{'{{date}}'}</code>, <code>{'{{time}}'}</code>)
+              </span>
             </label>
             <textarea
               className="w-full h-56 mb-4 px-3 py-2 rounded-xl border font-mono text-sm bg-transparent"
