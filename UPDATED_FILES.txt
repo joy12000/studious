@@ -1,5 +1,7 @@
-src/lib/createNoteAdapter.ts
-src/components/TemplatePicker.tsx
-src/components/PasteFAB.tsx
 src/pages/CapturePage.tsx
+src/lib/clipboard.ts
+src/lib/createNoteAdapter.ts
+src/lib/topicSuggest.ts
+src/components/TemplatePicker.tsx
 CHANGELOG.md
+INSTALL.md

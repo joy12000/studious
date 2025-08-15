@@ -1,4 +1,3 @@
-// Simple rule-based topic suggestion. Tries to read optional user rules from localStorage.
 export type TopicRule = { name: string; keywords: string[] };
 
 const builtin: TopicRule[] = [

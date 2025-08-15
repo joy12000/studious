@@ -9,17 +9,12 @@ export async function readClipboardText(): Promise<ClipResult> {
       return { ok: false, reason: 'no_api' };
     }
     const text = await nav.clipboard.readText();
-    if (typeof text !== 'string') {
-      return { ok: false, reason: 'empty' };
-    }
+    if (typeof text !== 'string') return { ok: false, reason: 'empty' };
     const trimmed = text.replace(/\r\n?/g, '\n');
-    if (!trimmed.trim()) {
-      return { ok: false, reason: 'empty' };
-    }
-    return { ok: true, text: text };
+    if (!trimmed.trim()) return { ok: false, reason: 'empty' };
+    return { ok: true, text };
   } catch (err: any) {
     const msg = String(err?.message || err || '');
-    // Heuristics for common cases
     if (/denied|permission/i.test(msg)) return { ok: false, reason: 'denied', debug: msg };
     if (/secure|insecure|https|available/i.test(msg)) return { ok: false, reason: 'no_api', debug: msg };
     return { ok: false, reason: 'unknown', debug: msg };

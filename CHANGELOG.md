@@ -1,5 +1,7 @@
-## 2025-08-15 — Patch: Capture UX (one paste button) + AI Topic suggest + global top padding
-- Removed header paste button; footer paste button now uses safe clipboard flow.
-- Restored 'AI 주제 추천' section on Capture page (rule-based, reads user rules if present).
-- Save flow hardened with clearer status and empty-content guard.
-- Add small global top padding via <style> (see ADD_TO_index.html.txt).
+# CHANGELOG
+
+## v5.1
+- dataset 하이픈 키 사용으로 인한 SyntaxError 제거 (`setAttribute('data-robust-paste-bound')` 사용)
+- 기존 우하단 파란 FAB에 강화된 붙여넣기 로직 바인딩
+- 저장 실패 시 짧은 원인 노출
+- 템플릿 팝업 대비(다크모드) 향상

@@ -1,4 +1,4 @@
-// A defensive adapter that tries multiple signatures & return shapes.
+// Tries multiple signatures & return shapes for safeCreateNote
 type CreateFn = (input: any) => any;
 
 function getFn(mod: any): CreateFn | null {
@@ -13,7 +13,6 @@ function titleFrom(content: string): string {
   const first = (content || "").split(/\n+/).map(s => s.trim()).find(Boolean) || "메모";
   return first.slice(0, 80);
 }
-
 function shapes(content: string): any[] {
   const title = titleFrom(content);
   const base = { content, title, topics: [] as string[] };
@@ -28,7 +27,6 @@ function shapes(content: string): any[] {
     { note: content, title },
   ];
 }
-
 function extractId(ret: any): string | null {
   if (ret == null) return null;
   if (typeof ret === "string" && ret.trim()) return ret.trim();
@@ -37,7 +35,6 @@ function extractId(ret: any): string | null {
     const c = ret as any;
     const cand = c.id ?? c.key ?? c.uuid ?? c.noteId ?? c._id ?? c.pk ?? c.primaryKey;
     if (cand != null && String(cand).trim()) return String(cand).trim();
-    // sometimes function returns { ok: true, id: '...' }
     if (c.ok && (c.id || c.data?.id)) return String(c.id || c.data.id);
   }
   try { const s = String(ret); return s.trim() ? s.trim() : null; } catch { return null; }
@@ -52,7 +49,7 @@ export async function createNoteUniversal(moduleRef: any, content: string): Prom
       const id = extractId(out);
       if (id) return id;
     } catch {
-      // try next shape
+      // try next
     }
   }
   throw new Error("safeCreateNote returned empty id");

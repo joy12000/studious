@@ -7,43 +7,56 @@ import * as Safe from "../lib/safeCreateNote";
 import { createNoteUniversal } from "../lib/createNoteAdapter";
 
 // --- Utilities to bind our robust paste handler to an existing FAB button ---
+const MARK_ATTR = "data-robust-paste-bound";
+
 function isPasteButton(el: Element): boolean {
-  const text = (el as HTMLElement).innerText?.trim() || "";
-  const aria = (el as HTMLElement).getAttribute("aria-label") || "";
-  const title = (el as HTMLElement).getAttribute("title") || "";
+  const node = el as HTMLElement;
+  const text = node.innerText?.trim() || "";
+  const aria = node.getAttribute("aria-label") || "";
+  const title = node.getAttribute("title") || "";
   return /붙여넣기/.test(text + aria + title);
 }
 
+function mark(el: HTMLElement) {
+  el.setAttribute(MARK_ATTR, "1");
+}
+function isMarked(el: HTMLElement) {
+  return el.hasAttribute(MARK_ATTR);
+}
+
 function bindPasteToExistingFAB(handler: () => void) {
-  const mark = "robust-paste-bound";
   const nodes = Array.from(document.querySelectorAll("button"));
   const candidates = nodes.filter(n => isPasteButton(n));
   // Hide duplicates (keep the first visible)
   if (candidates.length > 1) {
     candidates.slice(1).forEach(n => ((n as HTMLElement).style.display = "none"));
   }
-  const target = candidates[0];
-  if (target && !(target as HTMLElement).dataset[mark]) {
-    target.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      handler();
-    }, { passive: false });
-    (target as HTMLElement).dataset[mark] = "1";
+  const target = candidates[0] as HTMLElement | undefined;
+  if (target && !isMarked(target)) {
+    target.addEventListener(
+      "click",
+      (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        handler();
+      },
+      { passive: false }
+    );
+    mark(target);
   }
   // Watch for late-added buttons and (re)bind
   const mo = new MutationObserver(() => {
     const news = Array.from(document.querySelectorAll("button")).filter(n => isPasteButton(n));
     if (news.length > 0) {
       if (news.length > 1) news.slice(1).forEach(n => ((n as HTMLElement).style.display = "none"));
-      const t = news[0];
-      if (t && !(t as HTMLElement).dataset[mark]) {
+      const t = news[0] as HTMLElement;
+      if (t && !isMarked(t)) {
         t.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); handler(); }, { passive: false });
-        (t as HTMLElement).dataset[mark] = "1";
+        mark(t);
       }
     }
   });
-  mo.observe(document.body, { childList: true, subtree: true });
+  if (document.body) mo.observe(document.body, { childList: true, subtree: true });
   return () => mo.disconnect();
 }
 
@@ -125,9 +138,9 @@ export default function CapturePage() {
     refreshAiTopics(text);
   }, [text]);
 
-  // Bind our robust paste logic to the existing FAB (bottom-right blue button)
+  // 기존 우하단 파란 FAB에 로직 바인딩
   useEffect(() => {
-    (window as any).__ROBUST_PASTE__ = handlePaste; // allow explicit calls if needed
+    (window as any).__ROBUST_PASTE__ = handlePaste;
     return bindPasteToExistingFAB(handlePaste);
   }, [useSmartClean, text]);
 
