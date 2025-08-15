@@ -77,7 +77,7 @@ export default function TemplatePicker({ onInsert }: Props) {
     <div className="relative inline-block">
       <button
         type="button"
-        className="px-3 py-2 rounded-xl border shadow-sm text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+        className="px-3 py-2 rounded-xl border shadow-sm text-sm bg-white/80 dark:bg-gray-900/70 hover:bg-white dark:hover:bg-gray-900"
         onClick={() => setOpen(v => !v)}
         aria-haspopup="menu"
         aria-expanded={isOpen}
@@ -127,7 +127,7 @@ export default function TemplatePicker({ onInsert }: Props) {
                 수정
               </button>
               <button
-                className="text-xs px-2 py-1 rounded hover:bg-red-50 text-red-600"
+                className="text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/40 text-red-600"
                 onClick={() => remove(t.id)}
               >
                 삭제
@@ -147,19 +147,17 @@ export default function TemplatePicker({ onInsert }: Props) {
 
       {editing && (
         <div
-          className="fixed inset-0 z-30 flex items-center justify-center bg-black/40 p-4"
+          className="fixed inset-0 z-30 flex items-center justify-center bg-black/60 p-4"
           onClick={() => setEditing(null)}
         >
           <div
-            className="w-full max-w-xl rounded-2xl bg-white dark:bg-gray-900 p-4 shadow-2xl"
+            className="w-full max-w-xl rounded-2xl bg-white dark:bg-gray-950 border border-gray-200 dark:border-gray-800 p-5 shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
-            <div className="text-lg font-semibold mb-2">
-              {editing.name ? "템플릿 수정" : "새 템플릿"}
-            </div>
+            <div className="text-lg font-semibold mb-2"> {editing.name ? "템플릿 수정" : "새 템플릿"} </div>
             <label className="block text-sm mb-1">이름</label>
             <input
-              className="w-full mb-3 px-3 py-2 rounded-xl border bg-transparent"
+              className="w-full mb-3 px-3 py-2 rounded-xl border bg-white dark:bg-gray-900"
               value={editing.name}
               onChange={e => setEditing({ ...editing, name: e.target.value })}
               placeholder="예: 회의 템플릿 v2"
@@ -171,7 +169,7 @@ export default function TemplatePicker({ onInsert }: Props) {
               </span>
             </label>
             <textarea
-              className="w-full h-56 mb-4 px-3 py-2 rounded-xl border font-mono text-sm bg-transparent"
+              className="w-full h-56 mb-4 px-3 py-2 rounded-xl border font-mono text-sm bg-white dark:bg-gray-900"
               value={editing.content}
               onChange={e => setEditing({ ...editing, content: e.target.value })}
               placeholder="# 제목 — {{date}}"

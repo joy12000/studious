@@ -1,4 +1,5 @@
-src/lib/topicSuggest.ts
+src/lib/createNoteAdapter.ts
+src/components/TemplatePicker.tsx
+src/components/PasteFAB.tsx
 src/pages/CapturePage.tsx
-ADD_TO_index.html.txt
 CHANGELOG.md
