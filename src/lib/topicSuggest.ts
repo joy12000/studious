@@ -14,25 +14,23 @@ function loadUserRules(): TopicRule[] {
     try {
       const raw = localStorage.getItem(k);
       if (!raw) continue;
-      const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) {
-        return arr
-          .filter(x => x && typeof x.name === "string" && Array.isArray(x.keywords))
-          .map(x => ({ name: x.name, keywords: x.keywords.filter((w: any) => typeof w === "string") }));
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) {
+        return parsed.filter(r => r && typeof r.name === "string" && Array.isArray(r.keywords));
       }
     } catch {}
   }
   return [];
 }
 
-export function suggestTopics(text: string, max = 5): string[] {
-  if (!text || !text.trim()) return [];
-  const rules = [...loadUserRules(), ...builtin];
-  const lc = text.toLowerCase();
+export function suggestTopics(src: string, max = 6): string[] {
+  const rules = [...builtin, ...loadUserRules()];
+  const lc = String(src || "").toLowerCase();
   const hits = new Map<string, number>();
   for (const r of rules) {
-    for (const kw of r.keywords) {
-      const k = String(kw).toLowerCase();
+    const kws = Array.isArray(r.keywords) ? r.keywords : [];
+    for (const kw of kws) {
+      const k = String(kw || "").toLowerCase();
       if (!k) continue;
       if (lc.includes(k)) {
         hits.set(r.name, (hits.get(r.name) || 0) + k.length);

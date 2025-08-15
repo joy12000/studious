@@ -127,8 +127,7 @@ export default function CapturePage() {
   }
 
   return (
-    <main className="page page-center p-safe">
-      <div className="container-readable">
+    <div className="container-readable p-safe pb-24">
       <header className="flex items-center gap-2 justify-between mb-4">
         <h1 className="text-2xl font-semibold">캡처</h1>
         <div className="flex items-center gap-2">
@@ -190,7 +189,7 @@ export default function CapturePage() {
         </div>
       </section>
 
-      <section className="panel">
+      <section className="rounded-2xl border p-4 bg-white/70 dark:bg-gray-900/60">
         <div className="text-sm font-medium mb-2">고급 클리닝은 이렇게 정리해요</div>
         <ul className="text-sm leading-6 list-disc pl-5">
           <li><b>코드블록</b>(``` … ```)은 건드리지 않아요.</li>
@@ -201,6 +200,5 @@ export default function CapturePage() {
         </ul>
       </section>
     </div>
-    </main>
   );
 }

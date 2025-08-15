@@ -68,23 +68,3 @@ input:focus, textarea:focus, select:focus, .btn:focus {
   outline: 2px solid rgb(var(--ring));
   outline-offset: 2px;
 }
-
-
-/* Layout helpers: center a single column nicely on large screens */
-.page {
-  min-height: 100dvh;
-  display: grid;
-  grid-template-columns: 1fr min(72ch, 92vw) 1fr;
-}
-.page > * { grid-column: 2; }
-.page-center { place-items: start center; }
-/* make header row stick to grid width */
-.header-row { display: flex; align-items: center; gap: .5rem; justify-content: flex-end; }
-/* grey panel look */
-.panel {
-  background: color-mix(in oklab, var(--fg) 10%, var(--bg));
-  border: 1px solid color-mix(in oklab, var(--fg) 12%, transparent);
-  border-radius: var(--radius);
-  padding: 1rem;
-}
-
