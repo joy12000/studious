@@ -1,17 +1,51 @@
-import React, { useEffect, useRef, useState, Suspense } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import TemplatePicker from "../components/TemplatePicker";
 import { cleanPaste } from "../lib/cleanPaste";
 import { readClipboardText } from "../lib/clipboard";
 import { suggestTopics } from "../lib/topicSuggest";
 import * as Safe from "../lib/safeCreateNote";
 import { createNoteUniversal } from "../lib/createNoteAdapter";
-import PasteFAB from "../components/PasteFAB";
 
-// Optional legacy AI topic UI auto-detect (non-breaking)
-const legacyCandidates = import.meta.glob("../components/**/AITopic*.tsx");
-const LegacyTopic = Object.keys(legacyCandidates).length
-  ? React.lazy(Object.values(legacyCandidates)[0] as any)
-  : null;
+// --- Utilities to bind our robust paste handler to an existing FAB button ---
+function isPasteButton(el: Element): boolean {
+  const text = (el as HTMLElement).innerText?.trim() || "";
+  const aria = (el as HTMLElement).getAttribute("aria-label") || "";
+  const title = (el as HTMLElement).getAttribute("title") || "";
+  return /붙여넣기/.test(text + aria + title);
+}
+
+function bindPasteToExistingFAB(handler: () => void) {
+  const mark = "robust-paste-bound";
+  const nodes = Array.from(document.querySelectorAll("button"));
+  const candidates = nodes.filter(n => isPasteButton(n));
+  // Hide duplicates (keep the first visible)
+  if (candidates.length > 1) {
+    candidates.slice(1).forEach(n => ((n as HTMLElement).style.display = "none"));
+  }
+  const target = candidates[0];
+  if (target && !(target as HTMLElement).dataset[mark]) {
+    target.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      handler();
+    }, { passive: false });
+    (target as HTMLElement).dataset[mark] = "1";
+  }
+  // Watch for late-added buttons and (re)bind
+  const mo = new MutationObserver(() => {
+    const news = Array.from(document.querySelectorAll("button")).filter(n => isPasteButton(n));
+    if (news.length > 0) {
+      if (news.length > 1) news.slice(1).forEach(n => ((n as HTMLElement).style.display = "none"));
+      const t = news[0];
+      if (t && !(t as HTMLElement).dataset[mark]) {
+        t.addEventListener("click", (e) => { e.preventDefault(); e.stopPropagation(); handler(); }, { passive: false });
+        (t as HTMLElement).dataset[mark] = "1";
+      }
+    }
+  });
+  mo.observe(document.body, { childList: true, subtree: true });
+  return () => mo.disconnect();
+}
 
 export default function CapturePage() {
   const [status, setStatus] = useState<string>("");
@@ -67,13 +101,14 @@ export default function CapturePage() {
       setStatus("저장 중…");
       const id = await createNoteUniversal(Safe as any, processed);
       if (!id) {
-        setStatus("저장에 실패했어요(빈 ID). 잠시 후 다시 시도해주세요.");
+        setStatus("저장 실패: 반환된 ID가 비어있어요.");
         return;
       }
       location.assign(`/note/${encodeURIComponent(id)}`);
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      setStatus("저장에 실패했어요. 내용은 아래 편집창에 남겨 둘게요.");
+      const msg = String(e?.message || e || "");
+      setStatus(`저장 실패: ${msg.slice(0, 100)}`);
       setText(typeof rawInput === "string" ? rawInput : String(rawInput ?? ""));
     } finally {
       busyRef.current = false;
@@ -90,9 +125,14 @@ export default function CapturePage() {
     refreshAiTopics(text);
   }, [text]);
 
+  // Bind our robust paste logic to the existing FAB (bottom-right blue button)
+  useEffect(() => {
+    (window as any).__ROBUST_PASTE__ = handlePaste; // allow explicit calls if needed
+    return bindPasteToExistingFAB(handlePaste);
+  }, [useSmartClean, text]);
+
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
-      {/* 상단 붙여넣기 버튼은 제거 */}
       <header className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">캡처</h1>
         <div className="flex items-center gap-2">
@@ -119,35 +159,28 @@ export default function CapturePage() {
         </div>
       )}
 
-      {/* AI 주제 영역: 레거시가 있으면 해당 컴포넌트를 우선 사용 */}
-      {LegacyTopic ? (
-        <Suspense fallback={<div className="text-xs text-gray-500">AI 주제 로딩 중…</div>}>
-          <LegacyTopic text={text} />
-        </Suspense>
-      ) : (
-        <section className="rounded-2xl border p-3 bg-white/60 dark:bg-gray-900/50">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-medium">AI 주제 추천</div>
-            <button
-              className="text-xs px-2 py-1 rounded border hover:bg-gray-50 dark:hover:bg-gray-800"
-              onClick={() => refreshAiTopics()}
-            >
-              다시 분석
-            </button>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {aiTopics.length === 0 ? (
-              <span className="text-xs text-gray-500">아직 추천이 없어요. 내용을 입력하거나 붙여넣기 해보세요.</span>
-            ) : (
-              aiTopics.map(t => (
-                <span key={t} className="text-xs px-2 py-1 rounded-full border bg-gray-50 dark:bg-gray-800">
-                  #{t}
-                </span>
-              ))
-            )}
-          </div>
-        </section>
-      )}
+      <section className="rounded-2xl border p-3 bg-white/60 dark:bg-gray-900/50">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-medium">AI 주제 추천</div>
+          <button
+            className="text-xs px-2 py-1 rounded border hover:bg-gray-50 dark:hover:bg-gray-800"
+            onClick={() => refreshAiTopics()}
+          >
+            다시 분석
+          </button>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {aiTopics.length === 0 ? (
+            <span className="text-xs text-gray-500">아직 추천이 없어요. 내용을 입력하거나 붙여넣기 해보세요.</span>
+          ) : (
+            aiTopics.map(t => (
+              <span key={t} className="text-xs px-2 py-1 rounded-full border bg-gray-50 dark:bg-gray-800">
+                #{t}
+              </span>
+            ))
+          )}
+        </div>
+      </section>
 
       <div className="space-y-2">
         <textarea
@@ -158,7 +191,6 @@ export default function CapturePage() {
           className="w-full h-72 px-3 py-2 rounded-2xl border bg-transparent font-mono text-sm"
         />
         <div className="flex flex-wrap justify-end gap-2">
-          {/* 인라인 붙여넣기 버튼은 제거하여 중복 없앰 */}
           <button
             className="px-3 py-2 rounded-xl border hover:bg-gray-50 dark:hover:bg-gray-800"
             onClick={() => setText("")}
@@ -184,9 +216,6 @@ export default function CapturePage() {
           <li>URL의 UTM 등 추적 파라미터 제거</li>
         </ul>
       </section>
-
-      {/* 우측 하단 고정 FAB에 강력한 붙여넣기 로직 연결 */}
-      <PasteFAB onClick={handlePaste} />
     </div>
   );
 }
