@@ -1,242 +1,146 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useNotes } from '../lib/useNotes';
-import { guessTopics } from '../lib/classify';
-import TopicBadge from '../components/TopicBadge';
-import { Save, ArrowLeft, Sparkles, ExternalLink } from 'lucide-react';
-import { Link } from 'react-router-dom';
+// src/pages/CapturePage.tsx
+import React, { useEffect, useRef, useState } from "react";
+import { Clipboard, Save as SaveIcon, Trash2, AlertTriangle, Check } from "lucide-react";
+import { safeCreateNoteFromText } from "../lib/safeCreateNote";
+
+function cleanText(s: string) {
+  if (!s) return s;
+  try {
+    // 보수적 클리닝: 개행/공백 정리 + 스마트 따옴표 정규화
+    let t = s.replace(/\r\n/g, "\n");
+    t = t.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+    t = t.replace(/\n{3,}/g, "\n\n").replace(/[ \t]{2,}/g, " ");
+    return t.trim();
+  } catch {
+    return s;
+  }
+}
 
 export default function CapturePage() {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const { addNote } = useNotes();
-  
-  const [content, setContent] = useState('');
-  const [title, setTitle] = useState('');
-  const [sourceUrl, setSourceUrl] = useState('');
-  const [predictedTopics, setPredictedTopics] = useState<string[]>([]);
-  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  
-  const allTopics = ['Productivity', 'Learning', 'Mindset', 'Health', 'Fitness', 'Finance', 'Career', 'Tech', 'Relationships', 'Creativity', 'Other'];
+  const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => () => { mounted.current = false; }, []);
 
-  useEffect(() => {
-    // Get shared data from URL params (from Web Share Target)
-    const sharedText = searchParams.get('text') || '';
-    const sharedTitle = searchParams.get('title') || '';
-    const sharedUrl = searchParams.get('url') || '';
-    
-    if (sharedTitle) { setTitle(sharedTitle); }
-    if (sharedText) {
-      setContent(sharedText);
-    }
-    if (sharedUrl) {
-      setSourceUrl(sharedUrl);
-    }
-  }, [searchParams]);
+  const chars = value.length;
 
-  useEffect(() => {
-    // Predict topics when content changes
-    if (content.trim()) {
-      const predictTopics = async () => {
-        const topics = await guessTopics(`${title}\n${content}`);
-        setPredictedTopics(topics);
-        setSelectedTopics(topics);
-      };
-      predictTopics();
-    } else {
-      setPredictedTopics([]);
-      setSelectedTopics([]);
-    }
-  }, [content, title]);
-
-  const handleTopicToggle = (topic: string) => {
-    setSelectedTopics(prev => 
-      prev.includes(topic)
-        ? prev.filter(t => t !== topic)
-        : [...prev, topic]
-    );
-  };
-
-  const handleSave = async () => {
-    if (!content.trim()) return;
-
-    setLoading(true);
+  async function handlePaste() {
+    setErr(null);
+    setInfo(null);
     try {
-      const sourceType = sourceUrl.includes('youtube.com') || sourceUrl.includes('youtu.be') 
-        ? 'youtube' 
-        : sourceUrl 
-          ? 'web' 
-          : 'other';
-
-      await addNote({
-        title: title.trim() || undefined,
-        content: content.trim(),
-        sourceUrl: sourceUrl.trim() || undefined,
-        sourceType
-      });
-
-      navigate('/');
-    } catch (error) {
-      console.error('Failed to save note:', error);
-      alert('노트 저장에 실패했습니다. 다시 시도해주세요.');
+      setBusy(true);
+      let text = "";
+      try {
+        // 권한 없으면 여기서 throw 가능
+        text = await navigator.clipboard.readText();
+      } catch {
+        // 폴백: 직접 붙여넣기 유도
+        setInfo("클립보드 권한이 거부되었거나 접근이 차단되었습니다. 아래 입력창에 직접 붙여넣어 주세요.");
+        return;
+      }
+      if (!text || !text.trim()) {
+        setInfo("클립보드에 텍스트가 비어 있습니다. 아래 입력창에 직접 붙여넣어 주세요.");
+        return;
+      }
+      const cleaned = cleanText(text);
+      const id = await safeCreateNoteFromText(cleaned);
+      location.assign(`/note/${id}`);
+    } catch (e: any) {
+      console.error("[Capture paste]", e);
+      if (mounted.current) setErr(e?.message || "붙여넣기 중 오류가 발생했습니다.");
     } finally {
-      setLoading(false);
+      if (mounted.current) setBusy(false);
     }
-  };
+  }
 
-  const canSave = content.trim().length > 0;
+  async function handleSave() {
+    setErr(null);
+    setInfo(null);
+    try {
+      setBusy(true);
+      const cleaned = cleanText(value);
+      const id = await safeCreateNoteFromText(cleaned);
+      location.assign(`/note/${id}`);
+    } catch (e: any) {
+      console.error("[Capture save]", e);
+      if (mounted.current) setErr(e?.message || "저장 중 오류가 발생했습니다.");
+    } finally {
+      if (mounted.current) setBusy(false);
+    }
+  }
+
+  function handleClear() {
+    setValue("");
+    setErr(null);
+    setInfo(null);
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link
-                to="/"
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Link>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">새 노트 작성</h1>
-                <p className="text-gray-600 text-sm">Perplexity 요약을 붙여넣고 저장하세요</p>
-              </div>
-            </div>
-            
-            <button
-              onClick={handleSave}
-              disabled={!canSave || loading}
-              className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-                canSave && !loading
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-              }`}
-            >
-              {loading ? (
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-              ) : (
-                <Save className="h-4 w-4" />
-              )}
-              저장하기
-            </button>
-          </div>
+    <div className="space-y-4">
+      {/* 헤더 */}
+      <header className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">노트 캡처</h1>
+          <p className="text-sm text-gray-500">붙여넣거나 직접 입력해서 바로 저장하세요.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handlePaste}
+            disabled={busy}
+            className={`inline-flex items-center gap-2 px-3 py-2 rounded ${busy ? "bg-gray-200 text-gray-500" : "bg-emerald-600 text-white hover:brightness-110"}`}
+            title="클립보드에서 가져오기"
+          >
+            <Clipboard className="h-4 w-4" /> 붙여넣기
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={busy || !value.trim()}
+            className={`inline-flex items-center gap-2 px-3 py-2 rounded ${busy || !value.trim() ? "bg-gray-200 text-gray-500" : "bg-blue-600 text-white hover:brightness-110"}`}
+            title="입력한 내용 저장"
+          >
+            <SaveIcon className="h-4 w-4" /> 저장
+          </button>
+          <button
+            onClick={handleClear}
+            disabled={busy || !value}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded border bg-white hover:bg-gray-50"
+            title="지우기"
+          >
+            <Trash2 className="h-4 w-4" /> 지우기
+          </button>
         </div>
       </header>
 
-      <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          {/* Source URL */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              원문 링크 (선택사항)
-            </label>
-            <div className="relative">
-              <ExternalLink className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="url"
-                value={sourceUrl}
-                onChange={(e) => setSourceUrl(e.target.value)}
-                placeholder="https://youtube.com/watch?v=... 또는 웹사이트 URL"
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* Title */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              제목 (선택사항)
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="제목을 입력하거나 비워두면 자동으로 생성됩니다"
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-
-          {/* Content */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              내용 <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Perplexity에서 요약한 내용을 여기에 붙여넣기하세요...&#10;&#10;예시:&#10;- 핵심 포인트 1&#10;- 핵심 포인트 2&#10;- 실천할 내용&#10;&#10;이렇게 입력하면 자동으로 하이라이트와 할 일이 추출됩니다."
-              rows={12}
-              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            />
-            <div className="mt-2 text-sm text-gray-500">
-              {content.length} 글자
-            </div>
-          </div>
-
-          {/* Topic Prediction */}
-          {predictedTopics.length > 0 && (
-            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center gap-2 mb-3">
-                <Sparkles className="h-4 w-4 text-blue-600" />
-                <span className="text-sm font-medium text-blue-900">
-                  AI가 예측한 주제
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {predictedTopics.map(topic => (
-                  <TopicBadge 
-                    key={topic} 
-                    topic={topic} 
-                    variant="default"
-                  />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Topic Selection */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              주제 선택
-            </label>
-            <div className="flex flex-wrap gap-2">
-              {allTopics.map(topic => (
-                <TopicBadge
-                  key={topic}
-                  topic={topic}
-                  variant={selectedTopics.includes(topic) ? 'selected' : 'default'}
-                  onClick={() => handleTopicToggle(topic)}
-                />
-              ))}
-            </div>
-            <p className="text-sm text-gray-500 mt-2">
-              클릭하여 주제를 선택하거나 해제할 수 있습니다.
-            </p>
-          </div>
-
-          {/* Preview */}
-          {content && (
-            <div className="border-t border-gray-200 pt-6">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">미리보기</h3>
-              <div className="bg-gray-50 rounded-lg p-4">
-                <div className="text-sm text-gray-600 mb-2">
-                  {title || '자동 생성된 제목이 여기에 표시됩니다'}
-                </div>
-                <div className="text-xs text-gray-500 mb-2">
-                  선택된 주제: {selectedTopics.join(', ') || '없음'}
-                </div>
-                <div className="text-sm text-gray-700 line-clamp-3">
-                  {content.slice(0, 200)}
-                  {content.length > 200 && '...'}
-                </div>
-              </div>
-            </div>
-          )}
+      {/* 알림 영역 */}
+      {err && (
+        <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3">
+          <AlertTriangle className="h-4 w-4 mt-0.5" />
+          <div>{err}</div>
         </div>
-      </main>
+      )}
+      {info && (
+        <div className="flex items-start gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded p-3">
+          <Check className="h-4 w-4 mt-0.5" />
+          <div>{info}</div>
+        </div>
+      )}
+
+      {/* 입력 영역 */}
+      <textarea
+        id="capture-ta"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder="여기에 텍스트를 붙여넣거나 작성하세요."
+        className="w-full min-h-[320px] border rounded-lg p-3 outline-none"
+      />
+
+      {/* 푸터: 글자수/도움말 */}
+      <div className="flex items-center justify-between text-xs text-gray-500">
+        <div>글자 수: {chars.toLocaleString()}</div>
+        <div>팁: 권한 거부가 뜨면 입력창에 직접 붙여넣고 ‘저장’을 누르세요.</div>
+      </div>
     </div>
   );
 }
