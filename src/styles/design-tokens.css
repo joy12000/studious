@@ -1,0 +1,37 @@
+/* src/styles/design-tokens.css
+   Light/Dark tokens inspired by Material 3 color roles.
+   Values chosen to meet WCAG AA (aim 4.5:1+) for normal text.
+*/
+:root {
+  --bg: 255 255 255;               /* surface */
+  --bg-muted: 248 250 252;         /* surface-variant */
+  --bg-elev: 255 255 255;
+  --text: 15 23 42;                /* slate-900 */
+  --text-muted: 100 116 139;       /* slate-500 */
+  --primary: 37 99 235;            /* blue-600 */
+  --primary-foreground: 255 255 255;
+  --border: 226 232 240;           /* slate-200 */
+  --card: 255 255 255;
+  --card-contrast: 17 24 39;
+  --accent: 14 165 233;            /* sky-500 */
+  --ring: 59 130 246;              /* ring color */
+  --warning-bg: 255 251 235;       /* amber-50 */
+  --warning-border: 253 230 138;   /* amber-200 */
+}
+
+:root.dark {
+  --bg: 2 6 23;                    /* slate-950 */
+  --bg-muted: 15 23 42;            /* slate-900 */
+  --bg-elev: 17 24 39;             /* slate-800 */
+  --text: 226 232 240;             /* slate-200 */
+  --text-muted: 148 163 184;       /* slate-400 */
+  --primary: 59 130 246;           /* blue-500 */
+  --primary-foreground: 255 255 255;
+  --border: 30 41 59;              /* slate-700 */
+  --card: 15 23 42;
+  --card-contrast: 241 245 249;
+  --accent: 56 189 248;            /* sky-400 */
+  --ring: 96 165 250;
+  --warning-bg: 69 26 3;           /* amber-900/30 approx */
+  --warning-border: 120 53 15;     /* amber-800 */
+}

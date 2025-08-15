@@ -33,7 +33,7 @@ export default function TemplatePicker({ onInsert }: Props) {
     <div className="relative inline-block">
       <button
         type="button"
-        className="px-3 py-2 rounded-xl border shadow-sm text-sm bg-white/80 dark:bg-slate-800 text-slate-800 dark:text-slate-100 hover:bg-white dark:hover:bg-slate-700"
+        className="btn"
         onClick={() => setOpen(v => !v)}
         aria-haspopup="menu"
         aria-expanded={isOpen}
@@ -45,37 +45,37 @@ export default function TemplatePicker({ onInsert }: Props) {
         <div
           role="menu"
           tabIndex={-1}
-          className="absolute z-20 mt-2 w-72 max-h-80 overflow-auto rounded-2xl border bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 shadow-lg p-2"
+          className="absolute z-20 mt-2 w-72 max-h-80 overflow-auto card p-2"
         >
-          <div className="px-2 py-1 text-xs text-slate-500 dark:text-slate-400">기본 템플릿</div>
+          <div className="px-2 py-1 text-xs muted">기본 템플릿</div>
           {defaults.map(t => (
             <button
               key={t.id}
-              className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="w-full text-left px-3 py-2 rounded-lg hover:bg-[rgb(var(--bg-muted))]"
               onClick={() => { onInsert(renderTemplate(t.content)); setOpen(false); }}
             >
               {t.name}
             </button>
           ))}
 
-          <div className="px-2 py-1 text-xs text-slate-500 dark:text-slate-400 mt-2">내 템플릿</div>
+          <div className="px-2 py-1 text-xs muted mt-2">내 템플릿</div>
           {userTemplates.length === 0 && (
-            <div className="px-3 py-2 text-xs text-slate-400 dark:text-slate-500">아직 없어요. 아래에서 추가하세요.</div>
+            <div className="px-3 py-2 text-xs muted">아직 없어요. 아래에서 추가하세요.</div>
           )}
           {userTemplates.map(t => (
             <div key={t.id} className="flex items-center gap-2 px-2 py-1">
               <button
-                className="flex-1 text-left px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800"
+                className="flex-1 text-left px-2 py-1 rounded hover:bg-[rgb(var(--bg-muted))]"
                 onClick={() => { onInsert(renderTemplate(t.content)); setOpen(false); }}
               >
                 {t.name}
               </button>
-              <button className="text-xs px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => setEditing(t)}>수정</button>
-              <button className="text-xs px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/40 text-red-600" onClick={() => remove(t.id)}>삭제</button>
+              <button className="text-xs px-2 py-1 rounded hover:bg-[rgb(var(--bg-muted))]" onClick={() => setEditing(t)}>수정</button>
+              <button className="text-xs px-2 py-1 rounded text-red-600 hover:bg-red-50" onClick={() => remove(t.id)}>삭제</button>
             </div>
           ))}
           <div className="p-2">
-            <button className="w-full text-center px-3 py-2 rounded-xl border hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => setEditing({ id: crypto.randomUUID(), name: "", content: "" })}>
+            <button className="w-full text-center btn" onClick={() => setEditing({ id: crypto.randomUUID(), name: "", content: "" })}>
               + 새 템플릿 추가
             </button>
           </div>
@@ -84,22 +84,22 @@ export default function TemplatePicker({ onInsert }: Props) {
 
       {editing && (
         <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/60 p-4" onClick={() => setEditing(null)}>
-          <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 p-5 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="w-full max-w-xl card p-5" onClick={e => e.stopPropagation()}>
             <div className="text-lg font-semibold mb-2">{editing.name ? "템플릿 수정" : "새 템플릿"}</div>
             <label className="block text-sm mb-1">이름</label>
-            <input className="w-full mb-3 px-3 py-2 rounded-xl border bg-white dark:bg-slate-900" value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="예: 회의 템플릿 v2" />
+            <input className="input w-full mb-3" value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} placeholder="예: 회의 템플릿 v2" />
             <label className="block text-sm mb-1">
               내용{" "}
-              <span className="text-xs text-slate-500">
+              <span className="text-xs muted">
                 (변수: <code>{'{{date}}'}</code>, <code>{'{{time}}'}</code>)
               </span>
             </label>
-            <textarea className="w-full h-56 mb-4 px-3 py-2 rounded-xl border font-mono text-sm bg-white dark:bg-slate-900" value={editing.content} onChange={e => setEditing({ ...editing, content: e.target.value })} placeholder="# 제목 — {{date}}" />
-            <div className="flex justify-between gap-2">
-              <div className="text-xs text-slate-500">미리보기는 삽입 시 적용돼요.</div>
+            <textarea className="input w-full h-56 font-mono text-sm" value={editing.content} onChange={e => setEditing({ ...editing, content: e.target.value })} placeholder="# 제목 — {{date}}" />
+            <div className="flex justify-between gap-2 mt-4">
+              <div className="text-xs muted">미리보기는 삽입 시 적용돼요.</div>
               <div className="flex gap-2">
-                <button className="px-3 py-2 rounded-xl border hover:bg-slate-50 dark:hover:bg-slate-800" onClick={() => setEditing(null)}>닫기</button>
-                <button className="px-3 py-2 rounded-xl bg-blue-600 text-white disabled:opacity-50" disabled={!editing.name || !editing.content} onClick={() => addOrUpdate(editing)}>저장</button>
+                <button className="btn" onClick={() => setEditing(null)}>닫기</button>
+                <button className="btn btn-primary disabled:opacity-50" disabled={!editing.name || !editing.content} onClick={() => addOrUpdate(editing)}>저장</button>
               </div>
             </div>
           </div>
