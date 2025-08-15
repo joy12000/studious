@@ -1,0 +1,5 @@
+<!— add this inside <head> of Vite index.html —>
+<style>
+  body { padding-top: 14px; }
+  @media (min-width: 768px) { body { padding-top: 20px; } }
+</style>

@@ -1,2 +1,4 @@
-src/components/TemplatePicker.tsx
+src/lib/topicSuggest.ts
+src/pages/CapturePage.tsx
+ADD_TO_index.html.txt
 CHANGELOG.md

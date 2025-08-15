@@ -2,8 +2,9 @@ import React, { useEffect, useRef, useState } from "react";
 import TemplatePicker from "../components/TemplatePicker";
 import { cleanPaste } from "../lib/cleanPaste";
 import { readClipboardText } from "../lib/clipboard";
+import { suggestTopics } from "../lib/topicSuggest";
 
-// We don't know the exact signature of safeCreateNote; use a lenient type.
+// safeCreateNote import handling
 import * as Safe from "../lib/safeCreateNote";
 type SafeCreateNoteLike = (arg: any) => Promise<string> | string;
 const createNote = (Safe as unknown as { default?: SafeCreateNoteLike; safeCreateNote?: SafeCreateNoteLike });
@@ -20,6 +21,7 @@ export default function CapturePage() {
     const v = localStorage.getItem("smartPaste.enabled");
     return v ? v === "1" : true;
   });
+  const [aiTopics, setAiTopics] = useState<string[]>([]);
   const busyRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -33,7 +35,7 @@ export default function CapturePage() {
     if (!res.ok) {
       switch (res.reason) {
         case "no_api":
-          setStatus("이 브라우저/설치환경에선 자동 붙여넣기를 쓸 수 없어요. 아래 입력창에 Ctrl/⌘+V로 붙여넣기 해주세요.");
+          setStatus("이 환경에선 자동 붙여넣기를 쓸 수 없어요. 아래 입력창에 Ctrl/⌘+V로 붙여넣기 해주세요.");
           break;
         case "denied":
           setStatus("클립보드 권한이 거부됐어요. 브라우저 설정에서 허용하거나, 아래 입력창에 직접 붙여넣기 해주세요.");
@@ -47,7 +49,11 @@ export default function CapturePage() {
       textareaRef.current?.focus();
       return;
     }
-    await saveNote(res.text);
+    const pasted = useSmartClean ? cleanPaste(res.text) : res.text;
+    setText(prev => (prev ? (prev + (prev.endsWith("\n") ? "" : "\n") + pasted) : pasted));
+    setStatus("붙여넣기 완료");
+    textareaRef.current?.focus();
+    refreshAiTopics(prev => pasted + "\n" + prev);
   }
 
   async function saveNote(rawInput: unknown) {
@@ -61,7 +67,10 @@ export default function CapturePage() {
       }
       setStatus("저장 중…");
       const id = await callCreateNote(processed);
-      // 하드 네비게이션: 기존 앱 규칙 유지
+      if (!id) {
+        setStatus("저장에 실패했어요(빈 ID). 잠시 후 다시 시도해주세요.");
+        return;
+      }
       location.assign(`/note/${encodeURIComponent(id)}`);
     } catch (e) {
       console.error(e);
@@ -72,8 +81,19 @@ export default function CapturePage() {
     }
   }
 
+  function refreshAiTopics(src?: string | ((prev: string) => string)) {
+    const sample = typeof src === "function" ? src(text) : (src ?? text);
+    const sugg = suggestTopics(sample, 5);
+    setAiTopics(sugg);
+  }
+
+  useEffect(() => {
+    refreshAiTopics(text);
+  }, [text]);
+
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
+      {/* 헤더: 상단 '붙여넣기' 버튼은 제거 */}
       <header className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">캡처</h1>
         <div className="flex items-center gap-2">
@@ -83,12 +103,6 @@ export default function CapturePage() {
               textareaRef.current?.focus();
             }}
           />
-          <button
-            className="px-3 py-2 rounded-xl border shadow-sm text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
-            onClick={handlePasteClick}
-          >
-            붙여넣기
-          </button>
           <label className="flex items-center gap-2 px-3 py-2 rounded-xl border text-sm">
             <input
               type="checkbox"
@@ -106,6 +120,30 @@ export default function CapturePage() {
         </div>
       )}
 
+      {/* AI 주제 추천 - 기존 캡처 페이지에 있던 기능 복귀 */}
+      <section className="rounded-2xl border p-3 bg-white/60 dark:bg-gray-900/50">
+        <div className="flex items-center justify-between">
+          <div className="text-sm font-medium">AI 주제 추천</div>
+          <button
+            className="text-xs px-2 py-1 rounded border hover:bg-gray-50 dark:hover:bg-gray-800"
+            onClick={() => refreshAiTopics()}
+          >
+            다시 분석
+          </button>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {aiTopics.length === 0 ? (
+            <span className="text-xs text-gray-500">아직 추천이 없어요. 내용을 입력하거나 붙여넣기 해보세요.</span>
+          ) : (
+            aiTopics.map(t => (
+              <span key={t} className="text-xs px-2 py-1 rounded-full border bg-gray-50 dark:bg-gray-800">
+                #{t}
+              </span>
+            ))
+          )}
+        </div>
+      </section>
+
       <div className="space-y-2">
         <textarea
           ref={textareaRef}
@@ -114,7 +152,13 @@ export default function CapturePage() {
           placeholder="여기에 직접 붙여넣기 하거나, 템플릿을 선택해 시작하세요."
           className="w-full h-72 px-3 py-2 rounded-2xl border bg-transparent font-mono text-sm"
         />
-        <div className="flex justify-end gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            className="px-3 py-2 rounded-xl border hover:bg-gray-50 dark:hover:bg-gray-800"
+            onClick={handlePasteClick}
+          >
+            붙여넣기
+          </button>
           <button
             className="px-3 py-2 rounded-xl border hover:bg-gray-50 dark:hover:bg-gray-800"
             onClick={() => setText("")}
