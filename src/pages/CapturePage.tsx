@@ -1,146 +1,145 @@
-// src/pages/CapturePage.tsx
 import React, { useEffect, useRef, useState } from "react";
-import { Clipboard, Save as SaveIcon, Trash2, AlertTriangle, Check } from "lucide-react";
-import { safeCreateNoteFromText } from "../lib/safeCreateNote";
+import TemplatePicker from "../components/TemplatePicker";
+import { cleanPaste } from "../lib/cleanPaste";
+import { readClipboardText } from "../lib/clipboard";
 
-function cleanText(s: string) {
-  if (!s) return s;
-  try {
-    // 보수적 클리닝: 개행/공백 정리 + 스마트 따옴표 정규화
-    let t = s.replace(/\r\n/g, "\n");
-    t = t.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
-    t = t.replace(/\n{3,}/g, "\n\n").replace(/[ \t]{2,}/g, " ");
-    return t.trim();
-  } catch {
-    return s;
-  }
-}
+// We don't know the exact signature of safeCreateNote; use a lenient type.
+import * as Safe from "../lib/safeCreateNote";
+type SafeCreateNoteLike = (arg: any) => Promise<string> | string;
+const createNote = (Safe as unknown as { default?: SafeCreateNoteLike; safeCreateNote?: SafeCreateNoteLike });
+const callCreateNote = async (content: string): Promise<string> => {
+  const fn = (createNote.safeCreateNote || createNote.default || (Safe as any)) as SafeCreateNoteLike;
+  const result = await Promise.resolve(fn(content));
+  return String(result);
+};
 
 export default function CapturePage() {
-  const [value, setValue] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const [info, setInfo] = useState<string | null>(null);
-  const mounted = useRef(true);
-  useEffect(() => () => { mounted.current = false; }, []);
+  const [status, setStatus] = useState<string>("");
+  const [text, setText] = useState<string>("");
+  const [useSmartClean, setUseSmartClean] = useState<boolean>(() => {
+    const v = localStorage.getItem("smartPaste.enabled");
+    return v ? v === "1" : true;
+  });
+  const busyRef = useRef(false);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  const chars = value.length;
+  useEffect(() => {
+    localStorage.setItem("smartPaste.enabled", useSmartClean ? "1" : "0");
+  }, [useSmartClean]);
 
-  async function handlePaste() {
-    setErr(null);
-    setInfo(null);
-    try {
-      setBusy(true);
-      let text = "";
-      try {
-        // 권한 없으면 여기서 throw 가능
-        text = await navigator.clipboard.readText();
-      } catch {
-        // 폴백: 직접 붙여넣기 유도
-        setInfo("클립보드 권한이 거부되었거나 접근이 차단되었습니다. 아래 입력창에 직접 붙여넣어 주세요.");
-        return;
+  async function handlePasteClick() {
+    setStatus("클립보드 확인 중…");
+    const res = await readClipboardText();
+    if (!res.ok) {
+      switch (res.reason) {
+        case "no_api":
+          setStatus("이 브라우저/설치환경에선 자동 붙여넣기를 쓸 수 없어요. 아래 입력창에 Ctrl/⌘+V로 붙여넣기 해주세요.");
+          break;
+        case "denied":
+          setStatus("클립보드 권한이 거부됐어요. 브라우저 설정에서 허용하거나, 아래 입력창에 직접 붙여넣기 해주세요.");
+          break;
+        case "empty":
+          setStatus("클립보드가 비어 있어요. 복사 후 다시 시도하거나 아래에 직접 붙여넣기 하세요.");
+          break;
+        default:
+          setStatus("클립보드 읽기에 실패했어요. 아래 입력창에 직접 붙여넣기 하세요.");
       }
-      if (!text || !text.trim()) {
-        setInfo("클립보드에 텍스트가 비어 있습니다. 아래 입력창에 직접 붙여넣어 주세요.");
-        return;
-      }
-      const cleaned = cleanText(text);
-      const id = await safeCreateNoteFromText(cleaned);
-      location.assign(`/note/${id}`);
-    } catch (e: any) {
-      console.error("[Capture paste]", e);
-      if (mounted.current) setErr(e?.message || "붙여넣기 중 오류가 발생했습니다.");
-    } finally {
-      if (mounted.current) setBusy(false);
+      textareaRef.current?.focus();
+      return;
     }
+    await saveNote(res.text);
   }
 
-  async function handleSave() {
-    setErr(null);
-    setInfo(null);
+  async function saveNote(rawInput: unknown) {
+    if (busyRef.current) return;
+    busyRef.current = true;
     try {
-      setBusy(true);
-      const cleaned = cleanText(value);
-      const id = await safeCreateNoteFromText(cleaned);
-      location.assign(`/note/${id}`);
-    } catch (e: any) {
-      console.error("[Capture save]", e);
-      if (mounted.current) setErr(e?.message || "저장 중 오류가 발생했습니다.");
+      const processed = useSmartClean ? cleanPaste(rawInput) : (typeof rawInput === "string" ? rawInput : String(rawInput ?? ""));
+      if (!processed.trim()) {
+        setStatus("비어 있는 내용은 저장하지 않아요.");
+        return;
+      }
+      setStatus("저장 중…");
+      const id = await callCreateNote(processed);
+      // 하드 네비게이션: 기존 앱 규칙 유지
+      location.assign(`/note/${encodeURIComponent(id)}`);
+    } catch (e) {
+      console.error(e);
+      setStatus("저장에 실패했어요. 내용은 아래 편집창에 남겨 둘게요.");
+      setText(typeof rawInput === "string" ? rawInput : String(rawInput ?? ""));
     } finally {
-      if (mounted.current) setBusy(false);
+      busyRef.current = false;
     }
-  }
-
-  function handleClear() {
-    setValue("");
-    setErr(null);
-    setInfo(null);
   }
 
   return (
-    <div className="space-y-4">
-      {/* 헤더 */}
-      <header className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold">노트 캡처</h1>
-          <p className="text-sm text-gray-500">붙여넣거나 직접 입력해서 바로 저장하세요.</p>
-        </div>
+    <div className="max-w-3xl mx-auto p-4 space-y-4">
+      <header className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-semibold">캡처</h1>
         <div className="flex items-center gap-2">
+          <TemplatePicker
+            onInsert={(content) => {
+              setText(prev => (prev ? (prev + (prev.endsWith("\n") ? "" : "\n") + content) : content));
+              textareaRef.current?.focus();
+            }}
+          />
           <button
-            onClick={handlePaste}
-            disabled={busy}
-            className={`inline-flex items-center gap-2 px-3 py-2 rounded ${busy ? "bg-gray-200 text-gray-500" : "bg-emerald-600 text-white hover:brightness-110"}`}
-            title="클립보드에서 가져오기"
+            className="px-3 py-2 rounded-xl border shadow-sm text-sm hover:bg-gray-50 dark:hover:bg-gray-800"
+            onClick={handlePasteClick}
           >
-            <Clipboard className="h-4 w-4" /> 붙여넣기
+            붙여넣기
           </button>
-          <button
-            onClick={handleSave}
-            disabled={busy || !value.trim()}
-            className={`inline-flex items-center gap-2 px-3 py-2 rounded ${busy || !value.trim() ? "bg-gray-200 text-gray-500" : "bg-blue-600 text-white hover:brightness-110"}`}
-            title="입력한 내용 저장"
-          >
-            <SaveIcon className="h-4 w-4" /> 저장
-          </button>
-          <button
-            onClick={handleClear}
-            disabled={busy || !value}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded border bg-white hover:bg-gray-50"
-            title="지우기"
-          >
-            <Trash2 className="h-4 w-4" /> 지우기
-          </button>
+          <label className="flex items-center gap-2 px-3 py-2 rounded-xl border text-sm">
+            <input
+              type="checkbox"
+              checked={useSmartClean}
+              onChange={(e) => setUseSmartClean(e.target.checked)}
+            />
+            고급 클리닝
+          </label>
         </div>
       </header>
 
-      {/* 알림 영역 */}
-      {err && (
-        <div className="flex items-start gap-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded p-3">
-          <AlertTriangle className="h-4 w-4 mt-0.5" />
-          <div>{err}</div>
-        </div>
-      )}
-      {info && (
-        <div className="flex items-start gap-2 text-sm text-emerald-700 bg-emerald-50 border border-emerald-200 rounded p-3">
-          <Check className="h-4 w-4 mt-0.5" />
-          <div>{info}</div>
+      {status && (
+        <div className="text-sm px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800">
+          {status}
         </div>
       )}
 
-      {/* 입력 영역 */}
-      <textarea
-        id="capture-ta"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="여기에 텍스트를 붙여넣거나 작성하세요."
-        className="w-full min-h-[320px] border rounded-lg p-3 outline-none"
-      />
-
-      {/* 푸터: 글자수/도움말 */}
-      <div className="flex items-center justify-between text-xs text-gray-500">
-        <div>글자 수: {chars.toLocaleString()}</div>
-        <div>팁: 권한 거부가 뜨면 입력창에 직접 붙여넣고 ‘저장’을 누르세요.</div>
+      <div className="space-y-2">
+        <textarea
+          ref={textareaRef}
+          value={text}
+          onChange={e => setText(e.target.value)}
+          placeholder="여기에 직접 붙여넣기 하거나, 템플릿을 선택해 시작하세요."
+          className="w-full h-72 px-3 py-2 rounded-2xl border bg-transparent font-mono text-sm"
+        />
+        <div className="flex justify-end gap-2">
+          <button
+            className="px-3 py-2 rounded-xl border hover:bg-gray-50 dark:hover:bg-gray-800"
+            onClick={() => setText("")}
+          >
+            지우기
+          </button>
+          <button
+            className="px-3 py-2 rounded-xl bg-blue-600 text-white disabled:opacity-50"
+            disabled={!text.trim()}
+            onClick={() => saveNote(text)}
+          >
+            이 내용으로 저장
+          </button>
+        </div>
       </div>
+
+      <section className="text-xs text-gray-500">
+        <div className="font-semibold mb-1">고급 클리닝에 포함된 것</div>
+        <ul className="list-disc pl-5 space-y-1">
+          <li>코드 블록(<code>```</code>)은 그대로 보존</li>
+          <li>리스트 기호 통일(•, ·, -, * → <code>-</code>) 및 번호목록 정리</li>
+          <li>스마트 따옴표/숨은 공백 정리, 중복 빈 줄 축소</li>
+          <li>URL의 UTM 등 추적 파라미터 제거</li>
+        </ul>
+      </section>
     </div>
   );
 }
