@@ -3,8 +3,8 @@ import TemplatePicker from "../components/TemplatePicker";
 import { cleanPaste } from "../lib/cleanPaste";
 import { readClipboardText } from "../lib/clipboard";
 import { suggestTopics } from "../lib/topicSuggest";
-import * as Safe from "../lib/safeCreateNote";
 import { createNoteUniversal } from "../lib/createNoteAdapter";
+import { getNoteCreator } from "../lib/findCreateNote";
 
 // --- Utilities to bind our robust paste handler to an existing FAB button ---
 const MARK_ATTR = "data-robust-paste-bound";
@@ -68,6 +68,7 @@ export default function CapturePage() {
     return v ? v === "1" : true;
   });
   const [aiTopics, setAiTopics] = useState<string[]>([]);
+  const [creatorLabel, setCreatorLabel] = useState<string>("");
   const busyRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -111,8 +112,15 @@ export default function CapturePage() {
         setStatus("비어 있는 내용은 저장하지 않아요.");
         return;
       }
+      setStatus("저장 준비 중…");
+      const resolved = await getNoteCreator();
+      if (!resolved) {
+        setStatus("저장 실패: safeCreateNote를 찾을 수 없어요.");
+        return;
+      }
+      setCreatorLabel(resolved.name);
       setStatus("저장 중…");
-      const id = await createNoteUniversal(Safe as any, processed);
+      const id = await createNoteUniversal(resolved.mod as any, processed);
       if (!id) {
         setStatus("저장 실패: 반환된 ID가 비어있어요.");
         return;
@@ -145,9 +153,9 @@ export default function CapturePage() {
   }, [useSmartClean, text]);
 
   return (
-    <div className="max-w-3xl mx-auto p-4 space-y-4">
+    <div className="max-w-3xl mx-auto p-5 md:p-8 space-y-5">
       <header className="flex items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold">캡처</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">캡처</h1>
         <div className="flex items-center gap-2">
           <TemplatePicker
             onInsert={(content) => {
@@ -155,7 +163,7 @@ export default function CapturePage() {
               textareaRef.current?.focus();
             }}
           />
-          <label className="flex items-center gap-2 px-3 py-2 rounded-xl border text-sm">
+          <label className="flex items-center gap-2 px-3 py-2 rounded-xl border text-sm bg-white/70 dark:bg-gray-900/60">
             <input
               type="checkbox"
               checked={useSmartClean}
@@ -168,12 +176,12 @@ export default function CapturePage() {
 
       {status && (
         <div className="text-sm px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800">
-          {status}
+          {status} {creatorLabel ? <span className="opacity-60">({creatorLabel})</span> : null}
         </div>
       )}
 
-      <section className="rounded-2xl border p-3 bg-white/60 dark:bg-gray-900/50">
-        <div className="flex items-center justify-between">
+      <section className="rounded-2xl border p-4 bg-white/70 dark:bg-gray-900/60">
+        <div className="flex items-center justify-between mb-2">
           <div className="text-sm font-medium">AI 주제 추천</div>
           <button
             className="text-xs px-2 py-1 rounded border hover:bg-gray-50 dark:hover:bg-gray-800"
@@ -182,7 +190,7 @@ export default function CapturePage() {
             다시 분석
           </button>
         </div>
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2">
           {aiTopics.length === 0 ? (
             <span className="text-xs text-gray-500">아직 추천이 없어요. 내용을 입력하거나 붙여넣기 해보세요.</span>
           ) : (
@@ -195,13 +203,13 @@ export default function CapturePage() {
         </div>
       </section>
 
-      <div className="space-y-2">
+      <div className="space-y-3">
         <textarea
           ref={textareaRef}
           value={text}
           onChange={e => setText(e.target.value)}
           placeholder="여기에 직접 붙여넣기 하거나, 템플릿을 선택해 시작하세요."
-          className="w-full h-72 px-3 py-2 rounded-2xl border bg-transparent font-mono text-sm"
+          className="w-full h-80 px-4 py-3 rounded-2xl border bg-white/60 dark:bg-gray-900/60 backdrop-blur-sm font-mono text-sm shadow-sm"
         />
         <div className="flex flex-wrap justify-end gap-2">
           <button
@@ -220,14 +228,19 @@ export default function CapturePage() {
         </div>
       </div>
 
-      <section className="text-xs text-gray-500">
-        <div className="font-semibold mb-1">고급 클리닝에 포함된 것</div>
-        <ul className="list-disc pl-5 space-y-1">
-          <li>코드 블록(<code>```</code>)은 그대로 보존</li>
-          <li>리스트 기호 통일(•, ·, -, * → <code>-</code>) 및 번호목록 정리</li>
-          <li>스마트 따옴표/숨은 공백 정리, 중복 빈 줄 축소</li>
-          <li>URL의 UTM 등 추적 파라미터 제거</li>
+      <section className="rounded-2xl border p-4 bg-white/70 dark:bg-gray-900/60">
+        <div className="font-semibold mb-2">고급 클리닝은 이렇게 정리해요</div>
+        <ul className="list-disc pl-5 space-y-1 text-sm">
+          <li>코드 블록(<code>```</code> … <code>```</code>)은 <b>손대지 않음</b>.</li>
+          <li>글머리표 통일: <code>• · * -</code>처럼 섞여 있으면 <code>-</code>로 바꿔 깔끔하게.</li>
+          <li>번호 목록 정리: <code>1)</code>, <code>1.</code>, <code>1 -</code> → 모두 <code>1.</code> 형식.</li>
+          <li>따옴표/공백: “똑똑한 따옴표”를 일반 따옴표로 바꾸고, 보이지 않는 공백 제거.</li>
+          <li>빈 줄: 줄이 3줄 이상 연달아 나오면 <b>최대 1줄</b>만 남김.</li>
+          <li>링크 꼬리표 제거: <code>?utm_…</code>, <code>gclid</code>, <code>fbclid</code> 같은 <b>추적 파라미터</b>는 삭제해 주소를 짧게.</li>
         </ul>
+        <div className="mt-2 text-xs text-gray-500">
+          예: <code>https://example.com/page?utm_source=newsletter&amp;ref=abc</code> → <code>https://example.com/page</code>
+        </div>
       </section>
     </div>
   );

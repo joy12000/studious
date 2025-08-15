@@ -1,7 +1,4 @@
+src/lib/findCreateNote.ts
 src/pages/CapturePage.tsx
-src/lib/clipboard.ts
-src/lib/createNoteAdapter.ts
-src/lib/topicSuggest.ts
 src/components/TemplatePicker.tsx
 CHANGELOG.md
-INSTALL.md
