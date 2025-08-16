@@ -14,7 +14,8 @@ import {
   X,
   Star,
   Plus,
-  Trash2
+  Trash2,
+  Youtube // YOUTUBE_BUTTON: 아이콘 임포트
 } from 'lucide-react';
 
 export default function NotePage() {
@@ -77,6 +78,32 @@ export default function NotePage() {
       await deleteNote(id);
       navigate('/');
     }
+  };
+
+  // YOUTUBE_DEEPLINK: NoteCard에서 가져온 딥 링크 로직
+  const openSource = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (!note?.sourceUrl) return;
+    const url: string = note.sourceUrl;
+    // 유튜브 비디오 ID를 추출합니다.
+    const vidMatch = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/i);
+    const vid = vidMatch ? vidMatch[1] : null;
+    // 딥 링크 URL을 생성합니다.
+    const deep = vid ? `vnd.youtube://watch?v=${vid}` : url;
+    const fallback = () => window.open(url, '_blank');
+    let used = false;
+    
+    // 딥 링크를 시도하고, 350ms 후에 웹으로 fallback합니다.
+    const t = setTimeout(() => { if (!used) fallback(); }, 350);
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).location.href = deep;
+      used = true;
+    } catch (err) {
+      console.error('Failed to open deep link:', err);
+      fallback(); // 즉시 실패 시 바로 fallback
+    }
+    setTimeout(()=>clearTimeout(t), 2000);
   };
 
   const toggleTodo = async (todoIndex: number) => {
@@ -192,7 +219,20 @@ export default function NotePage() {
               <Calendar className="h-4 w-4" />
               <span>{formatDate(note.createdAt)}</span>
             </div>
-            {note.sourceUrl && (
+            
+            {/* YOUTUBE_BUTTON: 유튜브 링크가 있을 경우 버튼 표시 */}
+            {note.sourceType === 'youtube' && note.sourceUrl && (
+              <button 
+                onClick={openSource}
+                className="inline-flex items-center gap-1.5 text-red-600 hover:text-red-700 transition-colors font-medium"
+              >
+                <Youtube className="h-4 w-4" />
+                YouTube에서 열기
+              </button>
+            )}
+
+            {/* 그 외 웹 링크를 위한 fallback */}
+            {note.sourceType !== 'youtube' && note.sourceUrl && (
               <a 
                 href={note.sourceUrl} 
                 target="_blank" 

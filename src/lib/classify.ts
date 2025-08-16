@@ -277,38 +277,7 @@ export async function guessTopics(text: string): Promise<string[]> {
     const scores: Record<string, number> = {};
 
     // Helper to escape regex special characters
-    const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\\]/g, '\\export async function guessTopics(text: string): Promise<string[]> {
-  try {
-    const settings = await db.settings.get('default');
-    const rules = { ...DEFAULT_TOPIC_RULES, ...(settings?.topicRules || {}) };
-
-    const lc = text.toLowerCase();
-    const scores: Record<string, number> = {};
-
-    for (const [topic, keywords] of Object.entries(rules)) {
-      scores[topic] = (Array.isArray(keywords) ? keywords : []).reduce((s, kw) => s + (lc.includes(kw.toLowerCase()) ? 1 : 0), 0);
-    }
-
-    const hashtagSet = new Set<string>();
-    (text.match(/(^|\s)#([\p{L}\p{N}_-]{2,30})/gu) || []).forEach(m => {
-      const tag = m.replace(/^\s*#/, '').trim();
-      if (tag) hashtagSet.add(tag);
-    });
-
-    const ranked = Object.entries(scores)
-      .filter(([,s]) => s > 0)
-      .sort((a,b)=>b[1]-a[1])
-      .slice(0,5)
-      .map(([k])=>k);
-
-    const hashtags = Array.from(hashtagSet).slice(0,5);
-    const combined = [...new Set([ ...hashtags, ...ranked ])];
-    return combined.length ? combined : (settings?.defaultTopics?.slice(0,1) || ['Other']);
-  } catch (e) {
-    console.error('guessTopics error', e);
-    return ['Other'];
-  }
-}');
+    const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     for (const [topic, keywords] of Object.entries(rules)) {
       if (Array.isArray(keywords) && keywords.length > 0) {
