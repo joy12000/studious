@@ -82,14 +82,33 @@ export default function NotePage() {
     }
   };
 
-  // SHARE_FILE: 파일 기반 공유 기능 핸들러
+  // SHARE_FILE_FIX: 오류 처리 및 UX가 개선된 파일 공유 핸들러
   const handleShare = async () => {
     if (!note) return;
+
+    // 수동 다운로드 및 비밀번호 복사를 처리하는 함수
+    const fallbackShare = (file: File, passphrase: string) => {
+      alert('자동 공유가 차단되었거나 지원되지 않습니다.\n수동으로 파일을 다운로드하고 비밀번호를 복사해주세요.');
+      
+      // 파일 다운로드 링크 생성 및 클릭
+      const url = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      // 비밀번호 클립보드 복사
+      navigator.clipboard.writeText(passphrase);
+      alert(`파일이 다운로드되었습니다.\n비밀번호가 클립보드에 복사되었습니다.\n\n비밀번호: ${passphrase}\n\n이 비밀번호를 파일과 함께 상대방에게 전달해주세요.`);
+    };
 
     try {
       // 1. 암호화 키 생성 및 데이터 암호화
       const passphrase = generatePassphrase();
-      const payload = await encryptJSON({ 
+      const payload = await encryptJSON({
         title: note.title,
         content: note.content,
         topics: note.topics,
@@ -100,44 +119,43 @@ export default function NotePage() {
       
       // 2. 암호화된 데이터를 담은 JSON 파일 생성
       const payloadString = JSON.stringify(payload, null, 2);
-      const file = new File([payloadString], `${note.title.replace(/[\\/:\"*?<>|]/g, '')}.json`, {
+      const file = new File([payloadString], `${note.title.replace(/[\\/:"*?<>|]/g, '')}.json`, {
         type: 'application/json',
       });
 
-      // 3. Web Share API로 파일 공유 시도
+      // 3. Web Share API 지원 여부 확인
       if (navigator.share && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          title: `암호화된 노트 공유: ${note.title}`,
-          text: `이 파일을 열려면 비밀번호가 필요합니다.`,
-          files: [file],
-        });
-        
-        // 공유 창이 닫힌 후 비밀번호 안내
-        setTimeout(() => {
-          const copy = confirm(`공유가 시작되었습니다.\n\n이제 복호화 비밀번호를 클립보드에 복사하시겠습니까?\n\n비밀번호: ${passphrase}\n\n이 비밀번호를 상대방에게 안전하게 전달해주세요.`);
-          if (copy) {
-            navigator.clipboard.writeText(passphrase);
-            alert('비밀번호가 클립보드에 복사되었습니다.');
+        try {
+          // 4. 파일 공유 시도
+          await navigator.share({
+            title: `암호화된 노트 공유: ${note.title}`,
+            text: `이 파일을 열려면 비밀번호가 필요합니다.`, 
+            files: [file],
+          });
+          
+          // 공유 성공 후 비밀번호 안내
+          setTimeout(() => {
+            const copy = confirm(`공유가 시작되었습니다.\n\n이제 복호화 비밀번호를 클립보드에 복사하시겠습니까?\n\n비밀번호: ${passphrase}\n\n이 비밀번호를 상대방에게 안전하게 전달해주세요.`);
+            if (copy) {
+              navigator.clipboard.writeText(passphrase);
+              alert('비밀번호가 클립보드에 복사되었습니다.');
+            }
+          }, 500);
+
+        } catch (error: any) {
+          // 공유가 차단되었을 경우(NotAllowedError) fallback 실행
+          if (error.name === 'NotAllowedError') {
+            console.warn('Share API permission denied, falling back to manual download.');
+            fallbackShare(file, passphrase);
+          } else {
+            // 그 외 다른 공유 에러
+            throw error;
           }
-        }, 1000); // 공유 시트가 닫힐 시간을 줍니다.
-
+        }
       } else {
-        // Web Share API를 사용할 수 없는 경우, 수동 다운로드 및 비밀번호 복사 안내
-        alert('파일 공유 기능을 사용할 수 없습니다. 수동으로 다운로드하고 비밀번호를 복사해주세요.');
-        
-        // 파일 다운로드 링크 생성 및 클릭
-        const url = URL.createObjectURL(file);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = file.name;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-
-        // 비밀번호 클립보드 복사
-        navigator.clipboard.writeText(passphrase);
-        alert(`파일이 다운로드되었습니다.\n비밀번호가 클립보드에 복사되었습니다: ${passphrase}`);
+        // API를 지원하지 않는 경우 fallback 실행
+        console.log('Web Share API for files not supported, falling back.');
+        fallbackShare(file, passphrase);
       }
     } catch (error) {
       console.error('노트 공유 실패:', error);
