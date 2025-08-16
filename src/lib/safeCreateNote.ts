@@ -27,11 +27,6 @@ export async function safeCreateNoteFromText(raw: string) {
   await db.notes.put({
     id,
     content: text,
-    title,
-    topics: finalTopics,
-    favorite: false,
-    createdAt,
-    sourceType: "capture",
   } as any);
 
   return id;
