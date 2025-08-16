@@ -4,7 +4,7 @@ import { db } from '../lib/db';
 import { Note } from '../lib/types';
 import { useNotes } from '../lib/useNotes';
 import TopicBadge from '../components/TopicBadge';
-import { encryptJSON, generatePassphrase } from '../lib/crypto';
+import { encryptJSON } from '../lib/crypto';
 import { 
   ArrowLeft, 
   Heart, 
@@ -106,9 +106,24 @@ export default function NotePage() {
     };
 
     try {
-      // 1. 암호화 키 생성 및 데이터 암호화
-      const passphrase = generatePassphrase();
-      const payload = await encryptJSON({
+      // 1. 사용자에게 4자리 PIN 입력받기
+      let passphrase = '';
+      while (true) {
+        const input = prompt('공유 파일에 사용할 4자리 숫자 암호를 입력하세요:', '');
+        // 사용자가 취소한 경우
+        if (input === null) {
+          alert('공유를 취소했습니다.');
+          return;
+        }
+        // 입력값이 4자리 숫자인지 확인
+        if (/^\d{4}$/.test(input)) {
+          passphrase = input;
+          break;
+        }
+        alert('잘못된 형식입니다. 반드시 4자리 숫자를 입력해주세요.');
+      }
+
+      const payload = await encryptJSON({ 
         title: note.title,
         content: note.content,
         topics: note.topics,
