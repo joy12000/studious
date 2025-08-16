@@ -158,7 +158,7 @@ export default function CapturePage() {
 
       {status && (
         <div className="banner mb-4">
-          {status} {creatorLabel ? <span className="opacity-60">({creatorLabel})</span> : null}
+          {status}
         </div>
       )}
 

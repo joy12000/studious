@@ -1,13 +1,7 @@
+import { safeCreateNote } from './safeCreateNote';
+
 // Robust create-note adapter: tries multiple signatures and gracefully falls back to local save.
 type CreateFn = (input: any) => any;
-
-function getFn(mod: any): CreateFn | null {
-  if (!mod) return null;
-  if (typeof mod.safeCreateNote === "function") return mod.safeCreateNote as CreateFn;
-  if (typeof mod.default === "function") return mod.default as CreateFn;
-  if (typeof mod === "function") return mod as CreateFn;
-  return null;
-}
 
 function titleFrom(content: string): string {
   const first = (content || "").split(/\n+/).map(s => s.trim()).find(Boolean) || "메모";
@@ -48,7 +42,7 @@ function extractId(ret: any): string | null {
 
 function saveLocal(content: string): string {
   const title = titleFrom(content);
-  const id = `local-${Date.now()}-${title.replace(/\s+/g,"-").toLowerCase().slice(0,24) || "note"}`;
+  const id = `local-${Date.now()}-${title.replace(/\s+/g,"-“).toLowerCase().slice(0,24) || "note"}`;
   try {
     const note = { id, content, title, createdAt: Date.now(), updatedAt: Date.now() };
     localStorage.setItem(`note:${id}`, JSON.stringify(note));
@@ -57,20 +51,16 @@ function saveLocal(content: string): string {
     index.unshift({ id, title, createdAt: Date.now() });
     localStorage.setItem("note:index", JSON.stringify(index.slice(0,500)));
     localStorage.setItem("note:lastSaved", id);
-  } catch {}
+  } catch {} 
   return id;
 }
 
-export async function createNoteUniversal(moduleRef: any, contentInput: any): Promise<string> {
+export async function createNoteUniversal(contentInput: any): Promise<string> {
   const content = typeof contentInput === "string" ? contentInput : String(contentInput ?? "");
-  const fn = getFn(moduleRef);
-  if (!fn) {
-    // No server function: local fallback
-    return saveLocal(content);
-  }
+
   for (const arg of shapes(content)) {
     try {
-      const out = await Promise.resolve(fn(arg));
+      const out = await Promise.resolve(safeCreateNote(arg));
       const id = extractId(out);
       if (id) return id;
     } catch {
