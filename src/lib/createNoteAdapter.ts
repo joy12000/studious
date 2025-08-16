@@ -42,7 +42,7 @@ function extractId(ret: any): string | null {
 
 function saveLocal(content: string): string {
   const title = titleFrom(content);
-  const id = `local-${Date.now()}-${title.replace(/\s+/g,"-“).toLowerCase().slice(0,24) || "note"}`;
+  const id = `local-${Date.now()}-${title.replace(/\s+/g,"-").toLowerCase().slice(0,24) || "note"}`;
   try {
     const note = { id, content, title, createdAt: Date.now(), updatedAt: Date.now() };
     localStorage.setItem(`note:${id}`, JSON.stringify(note));
