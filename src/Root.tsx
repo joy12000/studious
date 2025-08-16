@@ -3,7 +3,7 @@ import App from './App';
 import VersionBadge from './components/VersionBadge';
 import ClipboardCaptureAgent from './components/ClipboardCaptureAgent';
 
-export default function Root(){
+export default function Root(props: { key?: string }){
   return (
     <>
       <App key={props.key} />
