@@ -64,7 +64,7 @@ export default function SettingsPage(){
   function goHome(){ location.assign('/'); }
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button onClick={goBack} className="p-2 rounded-lg border bg-white/80 hover:bg-white transition-colors" title="뒤로가기">

@@ -57,7 +57,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
       {/* 헤더: 타이틀/서브타이틀 + 우측 액션(새 노트, 설정) */}
       <header className="flex items-center justify-between">
         <div>
