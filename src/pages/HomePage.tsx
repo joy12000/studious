@@ -1,13 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useNotes, type Filters } from '../lib/useNotes';
+import { Link, useNavigate } from 'react-router-dom'; // useNavigate 추가
+import { useNotes } from '../lib/useNotes';
 import NoteCard from '../components/NoteCard';
 import FilterBar from '../components/FilterBar';
+import PasteFAB from '../components/PasteFAB'; // PasteFAB 임포트
+import ImportButton from '../components/ImportButton'; // ImportButton 임포트
 import { Settings, Pin, Plus } from 'lucide-react';
 
 // DYNAMIC_HEADER: 동적 헤더 구현
 export default function HomePage() {
-  const { notes, loading, filters, setFilters, toggleFavorite } = useNotes();
+  const { notes, loading, filters, setFilters, toggleFavorite, addNote } = useNotes(); // addNote 가져오기
+  const navigate = useNavigate(); // useNavigate 훅 사용
   const [availableTopics, setAvailableTopics] = useState<string[]>([]);
   const [pinFav, setPinFav] = useState<boolean>(() => {
     try { return localStorage.getItem('pinFavorites') !== 'false'; } catch { return true; }
@@ -32,6 +35,21 @@ export default function HomePage() {
     const rest = arr.filter(n => !n.favorite);
     return [...favs, ...rest];
   }, [notes, pinFav]);
+
+  // 붙여넣기 핸들러
+  const handlePaste = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text) {
+        navigate(`/capture?text=${encodeURIComponent(text)}`);
+      } else {
+        alert('클립보드에 텍스트가 없습니다.');
+      }
+    } catch (err) {
+      console.error('클립보드 읽기 실패:', err);
+      alert('클립보드를 읽는 데 실패했습니다. 브라우저 권한을 확인해주세요.');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -98,6 +116,10 @@ export default function HomePage() {
           ))}
         </div>
       </main>
+
+      {/* 플로팅 액션 버튼들 */}
+      <ImportButton onImport={addNote} />
+      <PasteFAB onClick={handlePaste} />
     </div>
   );
 }
