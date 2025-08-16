@@ -91,16 +91,21 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
  */
 export async function shareNote(note: Note, passphrase: string): Promise<void> {
   const fallbackShare = (file: File) => {
-    alert('자동 공유가 지원되지 않거나 차단되었습니다. 파일을 수동으로 다운로드합니다.');
     const url = URL.createObjectURL(file);
     const a = document.createElement('a');
     a.href = url;
     a.download = file.name;
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    alert(`파일이 다운로드되었습니다. 설정한 비밀번호 "${passphrase}"를 기억하여 전달해주세요.`);
+    
+    // Clean up after a short delay to allow the download to initiate
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+
+    // Inform the user after triggering the download
+    alert(`자동 공유가 지원되지 않아 수동 다운로드를 시작합니다.\n\n브라우저에서 다운로드 진행 상황을 확인하고, 설정한 비밀번호 "${passphrase}"를 파일과 함께 전달해주세요.`);
   };
 
   try {
