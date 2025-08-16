@@ -17,7 +17,9 @@ function saveLocal(content: string): string {
     index.unshift({ id, title, createdAt: Date.now() });
     localStorage.setItem("note:index", JSON.stringify(index.slice(0,500)));
     localStorage.setItem("note:lastSaved", id);
-  } catch {} 
+  } catch (e) {
+    console.error("saveLocal failed:", e);
+  } 
   return id;
 }
 
@@ -26,10 +28,14 @@ export async function createNoteUniversal(contentInput: any): Promise<string> {
 
   try {
     const id = await safeCreateNote(content);
+    console.log("createNoteUniversal: safeCreateNote returned", id);
     if (id) return id;
-  } catch {
+  } catch (e) {
+    console.error("createNoteUniversal: safeCreateNote failed", e);
     // Fallback to local save if safeCreateNote fails
   }
   // As a last resort, local save
-  return saveLocal(content);
+  const localId = saveLocal(content);
+  console.log("createNoteUniversal: saveLocal returned", localId);
+  return localId;
 }
