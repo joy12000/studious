@@ -61,27 +61,27 @@ export default function HomePage() {
       {/* 헤더: 타이틀/서브타이틀 + 우측 액션(새 노트, 설정) */}
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">SelfDev Notes</h1>
-          <p className="text-sm text-gray-500">자기계발 요약 &amp; 기록</p>
+          <h1 className="text-3xl font-bold tracking-tight">SelfDev Notes</h1>
+          <p className="text-sm text-gray-500 mt-1">자기계발 요약 &amp; 기록</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link to="/capture" className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded bg-blue-600 text-white shadow-sm">
+          <Link to="/capture" className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-teal-600 text-white shadow-sm hover:bg-teal-700 transition-colors">
             <Plus className="h-4 w-4" /> 새 노트
           </Link>
-          <Link to="/settings" className="inline-flex items-center gap-2 text-sm px-3 py-2 rounded border border-gray-200 bg-white hover:bg-gray-50 text-gray-700">
+          <Link to="/settings" className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 transition-colors">
             <Settings className="h-4 w-4" /> 설정
           </Link>
         </div>
       </header>
 
       {/* 필터 영역 */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 space-y-3">
+      <div className="bg-white/60 backdrop-blur-lg rounded-2xl shadow-lg border border-white/20 p-4 space-y-4">
         <FilterBar filters={filters} onFiltersChange={setFilters} availableTopics={availableTopics} />
         <div className="flex items-center justify-between">
           <QuickRange value={filters?.dateRange ?? 'all'} onChange={onRangeChange} />
           <button
             onClick={()=>setPinFav(v=>!v)}
-            className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded border ${pinFav ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : 'bg-white border-gray-200 text-gray-600'}`}
+            className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full border transition-colors ${pinFav ? 'bg-teal-100 border-teal-200 text-teal-800' : 'bg-white/70 border-gray-200 text-gray-600 hover:bg-gray-50'}`}
             title="즐겨찾기 상단 고정"
           >
             <Pin className="h-3 w-3" /> 즐겨찾기 우선: {pinFav ? 'ON' : 'OFF'}

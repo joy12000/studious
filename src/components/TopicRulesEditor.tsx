@@ -89,14 +89,14 @@ export default function TopicRulesEditor(){
   const topics = useMemo(()=>Object.keys(rules).sort(), [rules]);
 
   return (
-    <div className="space-y-4">
+    <div className="p-6 bg-white/60 backdrop-blur-lg rounded-2xl shadow-lg border border-white/20 space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-medium">토픽 규칙</h3>
+        <h3 className="font-medium text-lg">토픽 규칙</h3>
         <div className="flex items-center gap-2">
-          <button onClick={resetToDefault} className="inline-flex items-center gap-2 px-3 py-2 rounded border text-sm">
+          <button onClick={resetToDefault} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300/50 bg-white/50 hover:bg-white/80 text-sm transition-colors">
             <RefreshCcw className="h-4 w-4" /> 기본값
           </button>
-          <button onClick={save} className="inline-flex items-center gap-2 px-3 py-2 rounded bg-blue-600 text-white text-sm">
+          <button onClick={save} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-teal-600 text-white text-sm font-semibold hover:bg-teal-700 transition-colors">
             <Save className="h-4 w-4" /> 저장
           </button>
         </div>
@@ -107,9 +107,9 @@ export default function TopicRulesEditor(){
           value={newTopic}
           onChange={e=>setNewTopic(e.target.value)}
           placeholder="새 토픽 이름(예: Research)"
-          className="flex-1 text-sm border rounded px-2 py-2"
+          className="flex-1 text-sm border border-gray-300/50 bg-white/50 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors"
         />
-        <button onClick={addTopic} className="px-3 py-2 rounded bg-emerald-600 text-white text-sm">
+        <button onClick={addTopic} className="px-3 py-2 rounded-lg bg-teal-500 text-white hover:bg-teal-600 transition-colors">
           <Plus className="h-4 w-4" />
         </button>
       </div>
@@ -132,13 +132,13 @@ export default function TopicRulesEditor(){
         ))}
       </div>
 
-      <div className="rounded-xl border p-3 space-y-2 bg-gray-50">
+      <div className="rounded-xl bg-white/60 border border-white/20 p-4 space-y-3">
         <div className="flex items-center gap-2 text-gray-700">
           <FlaskConical className="h-4 w-4" />
           <span className="text-sm font-medium">테스트</span>
         </div>
         <textarea value={testText} onChange={e=>setTestText(e.target.value)} placeholder="여기에 텍스트를 붙여넣으면 추론된 토픽을 미리봅니다."
-          className="w-full min-h-[140px] border rounded p-2" />
+          className="w-full min-h-[140px] border border-gray-300/50 bg-white/50 rounded-lg p-3 text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors" />
         {!!preview.length && (
           <div className="flex flex-wrap gap-2">
             {preview.map(t => <Chip key={t}>{t}</Chip>)}
@@ -158,14 +158,14 @@ function TopicKeywords({topic, values, onAdd, onRemove}:{topic:string; values:st
     setV('');
   }
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
         {values.map((kw) => <Chip key={kw} onRemove={()=>onRemove(kw)}>{kw}</Chip>)}
       </div>
       <div className="flex items-center gap-2">
         <input value={v} onChange={e=>setV(e.target.value)} placeholder="키워드 추가(쉼표로 여러 개)"
-          className="flex-1 text-sm border rounded px-2 py-2" />
-        <button onClick={submit} className="px-3 py-2 rounded border text-sm">추가</button>
+          className="flex-1 text-sm border border-gray-300/50 bg-white/50 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors" />
+        <button onClick={submit} className="px-3 py-2 rounded-lg border border-gray-300/50 bg-white/50 hover:bg-white/80 text-sm transition-colors">추가</button>
       </div>
     </div>
   );

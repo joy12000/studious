@@ -142,41 +142,37 @@ export default function NotePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 py-4">
+      <header className="sticky top-0 z-10 bg-gray-50/80 backdrop-blur-lg border-b border-gray-200/80">
+        <div className="max-w-4xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link
                 to="/"
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 text-gray-600 hover:bg-gray-200/70 rounded-lg transition-colors"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Link>
               <div>
-                <h1 className="text-xl font-semibold text-gray-900">노트 상세</h1>
+                <h1 className="text-lg font-semibold text-gray-800">노트 상세</h1>
               </div>
             </div>
             
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setEditing(!editing)}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 text-gray-600 hover:bg-gray-200/70 rounded-lg transition-colors"
               >
                 <Edit2 className="h-5 w-5" />
               </button>
               <button
                 onClick={() => toggleFavorite(note.id)}
-                className={`p-2 rounded-lg transition-colors ${
-                  note.favorite 
-                    ? 'text-red-500 hover:bg-red-50' 
-                    : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-                }`}
+                className={`p-2 rounded-lg transition-colors ${note.favorite ? 'text-red-500 hover:bg-red-100/50' : 'text-gray-400 hover:text-red-500 hover:bg-red-100/50'}`}
               >
                 {note.favorite ? <Heart className="h-5 w-5 fill-current" /> : <Heart className="h-5 w-5" />}
               </button>
               <button
                 onClick={handleDelete}
-                className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-100/50 rounded-lg transition-colors"
               >
                 <Trash2 className="h-5 w-5" />
               </button>
@@ -186,7 +182,7 @@ export default function NotePage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <div className="bg-white/60 backdrop-blur-lg rounded-2xl shadow-lg border border-white/20 p-8">
           {/* Meta Info */}
           <div className="flex items-center gap-4 mb-6 text-sm text-gray-500">
             <div className="flex items-center gap-2">
@@ -198,7 +194,7 @@ export default function NotePage() {
                 href={note.sourceUrl} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1 hover:text-blue-600 transition-colors"
+                className="inline-flex items-center gap-1.5 hover:text-teal-600 transition-colors font-medium"
               >
                 <ExternalLink className="h-4 w-4" />
                 원문 보기
@@ -213,17 +209,17 @@ export default function NotePage() {
                 type="text"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="w-full text-2xl font-bold text-gray-900 border border-gray-200 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full text-3xl font-bold text-gray-900 bg-white/60 border border-gray-300/50 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors"
               />
             ) : (
-              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
                 {getSourceIcon(note.sourceType)} {note.title}
               </h1>
             )}
           </div>
 
           {/* Topics */}
-          <div className="flex flex-wrap gap-2 mb-6">
+          <div className="flex flex-wrap gap-2 mb-8">
             {note.topics.map((topic) => (
               <TopicBadge key={topic} topic={topic} />
             ))}
@@ -237,19 +233,19 @@ export default function NotePage() {
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                   rows={15}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-3 border border-gray-300/50 bg-white/60 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-y transition-colors"
                 />
-                <div className="flex justify-end gap-2 mt-4">
+                <div className="flex justify-end gap-3 mt-4">
                   <button
                     onClick={handleCancelEdit}
-                    className="inline-flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300/50 bg-white/50 hover:bg-white/80 rounded-lg transition-colors text-sm"
                   >
                     <X className="h-4 w-4" />
                     취소
                   </button>
                   <button
                     onClick={handleSaveEdit}
-                    className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    className="inline-flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors text-sm font-semibold"
                   >
                     <Check className="h-4 w-4" />
                     저장
@@ -274,8 +270,8 @@ export default function NotePage() {
               </h3>
               <div className="space-y-2">
                 {note.highlights.map((highlight, index) => (
-                  <div key={index} className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <div className="text-gray-700">{highlight.text}</div>
+                  <div key={index} className="bg-yellow-100/50 border border-yellow-200/50 rounded-lg p-3">
+                    <div className="text-yellow-900/80">{highlight.text}</div>
                   </div>
                 ))}
               </div>
@@ -293,18 +289,14 @@ export default function NotePage() {
               </h3>
               <div className="space-y-2">
                 {note.todo.map((todo, index) => (
-                  <div key={index} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                  <div key={index} className="flex items-start gap-3 p-3 bg-white/60 rounded-lg">
                     <button
                       onClick={() => toggleTodo(index)}
-                      className={`mt-1 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
-                        todo.done
-                          ? 'bg-green-500 border-green-500 text-white'
-                          : 'border-gray-300 hover:border-green-400'
-                      }`}
+                      className={`mt-1 w-4 h-4 rounded-sm border-2 flex-shrink-0 flex items-center justify-center transition-colors ${todo.done ? 'bg-teal-500 border-teal-500 text-white' : 'border-gray-400/80 hover:border-teal-500'}`}
                     >
                       {todo.done && <Check className="h-3 w-3" />}
                     </button>
-                    <span className={`flex-1 ${todo.done ? 'line-through text-gray-500' : 'text-gray-700'}`}>
+                    <span className={`flex-1 ${todo.done ? 'line-through text-gray-500' : 'text-gray-800'}`}>
                       {todo.text}
                     </span>
                   </div>
