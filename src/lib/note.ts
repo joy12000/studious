@@ -114,7 +114,9 @@ export async function shareNote(note: Note, passphrase: string): Promise<void> {
       labels: note.labels, sourceUrl: note.sourceUrl, sourceType: note.sourceType 
     }, passphrase);
     
-    const file = new File([JSON.stringify(payload, null, 2)], `${note.title.replace(/[\\/:\"*?<>|]/g, '')}.json`, { type: 'application/json' });
+    // SHARE_COMPATIBILITY: .json 대신 .txt 확장자와 text/plain 타입을 사용하여 모바일 공유 호환성을 높입니다.
+    // 내용은 여전히 JSON 형식이므로 가져오기 기능은 정상적으로 작동합니다.
+    const file = new File([JSON.stringify(payload, null, 2)], `${note.title.replace(/[\/:\"*?<>|]/g, '')}.txt`, { type: 'text/plain' });
 
     if (navigator.share && navigator.canShare({ files: [file] })) {
       try {
