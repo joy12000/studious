@@ -1,3 +1,6 @@
+import { createNoteUniversal } from "../lib/createNoteAdapter";
+import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import TemplatePicker from "../components/TemplatePicker";
 import TopicBadge from "../components/TopicBadge";
@@ -102,15 +105,7 @@ export default function CapturePage() {
     try {
       const processed = useSmartClean ? cleanPaste(input) : input;
       setStatus("저장 준비 중…");
-      const resolved = await getNoteCreator();
-      if (!resolved) {
-        setStatus("저장 실패: safeCreateNote를 찾을 수 없어요.");
-        busyRef.current = false;
-        return;
-      }
-      setCreatorLabel(resolved.name);
-      setStatus("저장 중…");
-      const id = await createNoteUniversal(resolved.mod as any, processed);
+      const id = await createNoteUniversal(processed);
       if (!id) {
         setStatus("저장 실패: 반환된 ID가 비어있어요.");
         busyRef.current = false;
