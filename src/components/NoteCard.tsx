@@ -19,9 +19,9 @@ export default function NoteCard({ note, onToggleFavorite }: {note:any; onToggle
 
   return (
     <Link to={`/note/${note.id}`} className="block bg-white rounded-2xl p-6 shadow-md hover:shadow-xl transition-shadow duration-300">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1">
-          <div className="font-bold text-lg text-gray-900">{note.title || '제목 없음'}</div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex-1 min-w-0">
+          <div className="font-bold text-lg text-gray-900 line-clamp-2">{note.title || '제목 없음'}</div>
           <div className="text-sm text-gray-700 whitespace-pre-wrap mt-2 line-clamp-3">{note.content}</div>
           {note.sourceUrl && (
             <button

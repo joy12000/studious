@@ -13,12 +13,12 @@ function QuickRange({ value, onChange }:{ value: Filters['dateRange']; onChange:
     { key: 'all', label: '전체' },
   ];
   return (
-    <div className="flex items-center gap-2 text-xs">
+    <div className="flex flex-wrap items-center gap-2 text-xs">
       <CalendarDays className="h-4 w-4 text-gray-400" />
       {opts.map(o => (
         <button key={o.key}
           onClick={()=>onChange(o.key)}
-          className={`px-2 py-1 rounded-full border ${value===o.key ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'}`}>
+          className={`px-2 py-1 rounded-full border transition-colors ${value===o.key ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'}`}>
           {o.label}
         </button>
       ))}
