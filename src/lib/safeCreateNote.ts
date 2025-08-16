@@ -29,9 +29,6 @@ export async function safeCreateNoteFromText(raw: string) {
     favorite: false,
     createdAt,
     sourceType: "capture",
-    todo: [],
-    labels: [],
-    highlights: [],
   } as any);
 
   return id;
