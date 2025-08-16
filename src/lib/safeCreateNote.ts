@@ -22,9 +22,7 @@ export async function safeCreateNoteFromText(raw: string) {
   // Explicitly ensure all elements in topics are strings
   const finalTopics = topics.map(t => String(t));
 
-  const createdAt = Date.now();
-
-  const createdAt = Date.now();
+  
 
   await db.notes.put({
     id,
