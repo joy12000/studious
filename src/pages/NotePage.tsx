@@ -4,6 +4,7 @@ import { db } from '../lib/db';
 import { Note } from '../lib/types';
 import { useNotes } from '../lib/useNotes';
 import TopicBadge from '../components/TopicBadge';
+import { encryptJSON, generatePassphrase, b64encode } from '../lib/crypto';
 import { 
   ArrowLeft, 
   Heart, 
@@ -15,6 +16,7 @@ import {
   Star,
   Plus,
   Trash2,
+  Share2, // SHARE_BUTTON: 아이콘 임포트
   Youtube // YOUTUBE_BUTTON: 아이콘 임포트
 } from 'lucide-react';
 
@@ -77,6 +79,40 @@ export default function NotePage() {
     if (confirm('이 노트를 정말 삭제하시겠습니까?')) {
       await deleteNote(id);
       navigate('/');
+    }
+  };
+
+  // SHARE_BUTTON: 공유 기능 핸들러 추가
+  const handleShare = async () => {
+    if (!note) return;
+
+    try {
+      const passphrase = generatePassphrase();
+      const payload = await encryptJSON({ content: note.content }, passphrase);
+      
+      // URL-safe Base64로 페이로드 인코딩
+      const payloadString = JSON.stringify(payload);
+      const payloadB64 = b64encode(new TextEncoder().encode(payloadString));
+
+      const shareUrl = new URL(`${window.location.origin}/shared-note`);
+      shareUrl.searchParams.set('p', payloadB64);
+      shareUrl.hash = passphrase;
+
+      const fullUrl = shareUrl.toString();
+
+      if (navigator.share) {
+        await navigator.share({
+          title: `공유된 노트: ${note.title}`,
+          text: '암호화된 노트를 확인하세요.',
+          url: fullUrl,
+        });
+      } else {
+        navigator.clipboard.writeText(fullUrl);
+        alert('공유 링크가 클립보드에 복사되었습니다.');
+      }
+    } catch (error) {
+      console.error('Failed to share note:', error);
+      alert('노트를 공유하는 데 실패했습니다.');
     }
   };
 
@@ -204,6 +240,13 @@ export default function NotePage() {
             </div>
             
             <div className="flex items-center gap-2">
+              {/* SHARE_BUTTON: 공유 버튼 추가 */}
+              <button
+                onClick={handleShare}
+                className="p-2 text-foreground hover:bg-muted rounded-lg transition-colors"
+              >
+                <Share2 className="h-5 w-5" />
+              </button>
               <button
                 onClick={() => setEditing(!editing)}
                 className="p-2 text-foreground hover:bg-muted rounded-lg transition-colors"

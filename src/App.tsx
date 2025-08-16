@@ -4,6 +4,7 @@ import HomePage from './pages/HomePage';
 import CapturePage from './pages/CapturePage';
 import NotePage from './pages/NotePage';
 import SettingsPage from './pages/SettingsPage';
+import SharedNotePage from './pages/SharedNotePage';
 import ShareHandler from './components/ShareHandler';
 
 function App() {
@@ -17,6 +18,7 @@ function App() {
           <Route path="/note/:id" element={<NotePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/share" element={<ShareHandler />} />
+          <Route path="/shared-note" element={<SharedNotePage />} />
         </Routes>
       </div>
     </Router>
