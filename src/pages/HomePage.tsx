@@ -64,11 +64,11 @@ export default function HomePage() {
           <h1 className="text-3xl font-bold tracking-tight">SelfDev Notes</h1>
           <p className="text-sm text-gray-500 mt-1">자기계발 요약 &amp; 기록</p>
         </div>
-        <div className="flex flex-wrap items-center gap-2 gap-y-2">
-          <Link to="/capture" className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-teal-600 text-white shadow-sm hover:bg-teal-700 transition-colors">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
+          <Link to="/capture" className="inline-flex items-center justify-center gap-2 text-sm px-3 py-1 sm:px-4 sm:py-2 rounded-lg bg-teal-600 text-white shadow-sm hover:bg-teal-700 transition-colors w-full sm:w-auto">
             <Plus className="h-4 w-4" /> 새 노트
           </Link>
-          <Link to="/settings" className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 transition-colors">
+          <Link to="/settings" className="inline-flex items-center justify-center gap-2 text-sm px-3 py-1 sm:px-4 sm:py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 transition-colors w-full sm:w-auto">
             <Settings className="h-4 w-4" /> 설정
           </Link>
         </div>

@@ -143,7 +143,7 @@ export default function SettingsPage(){
       {tab==='app' && (
         <div className="space-y-4">
           <section className="p-6 bg-white/60 backdrop-blur-lg rounded-2xl shadow-lg border border-white/20 space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-y-2 sm:gap-x-4">
               <div className="flex items-center gap-3">
                 <Smartphone className="h-5 w-5 text-gray-600" />
                 <div>
@@ -154,7 +154,7 @@ export default function SettingsPage(){
               <button
                 disabled={!installable}
                 onClick={promptInstall}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${installable ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
+                className={`px-3 py-1 sm:px-4 sm:py-2 rounded-lg text-sm font-semibold transition-colors w-full sm:w-auto ${installable ? 'bg-teal-600 text-white hover:bg-teal-700' : 'bg-gray-200 text-gray-500 cursor-not-allowed'}`}
               >
                 설치하기
               </button>
