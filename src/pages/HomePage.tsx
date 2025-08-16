@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useNotes, type Filters } from '../lib/useNotes';
 import NoteCard from '../components/NoteCard';
 import FilterBar from '../components/FilterBar';
-import { Settings, Pin } from 'lucide-react';
+import { Settings, Pin, Plus } from 'lucide-react';
 
 // UI_IMPROVEMENT: 홈 화면 UI 개선
 export default function HomePage() {
@@ -43,13 +43,19 @@ export default function HomePage() {
           <div className="flex items-center justify-between mb-3">
             <h1 className="text-xl font-bold text-foreground">내 노트</h1>
             <div className="flex items-center gap-2">
+              <Link
+                to="/capture"
+                className="p-2 text-foreground hover:bg-muted rounded-lg transition-colors"
+                title="새 노트"
+              >
+                <Plus className="h-5 w-5" />
+              </Link>
               <button
                 onClick={()=>setPinFav(v=>!v)}
-                className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border transition-colors ${pinFav ? 'bg-primary/10 border-primary/20 text-primary' : 'bg-card/70 border text-muted-foreground hover:bg-muted'}`}
+                className={`p-2 rounded-lg transition-colors ${pinFav ? 'text-primary bg-primary/10' : 'text-foreground hover:bg-muted'}`}
                 title="즐겨찾기 상단 고정"
               >
-                <Pin className="h-4 w-4" />
-                <span>즐겨찾기 고정</span>
+                <Pin className={`h-5 w-5 ${pinFav ? 'fill-current' : ''}`} />
               </button>
               <Link
                 to="/settings"
