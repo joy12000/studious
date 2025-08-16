@@ -5,7 +5,7 @@ import { Note } from '../lib/types';
 import { useNotes } from '../lib/useNotes';
 import TopicBadge from '../components/TopicBadge';
 import ShareModal from '../components/ShareModal'; // ShareModal 임포트
-import { encryptJSON } from '../lib/crypto';
+import { shareNote } from '../lib/note';
 import { 
   ArrowLeft, 
   Heart, 
@@ -84,116 +84,12 @@ export default function NotePage() {
     }
   };
 
-  // SHARE_MODAL: 실제 공유 로직 (모달에서 PIN과 함께 호출됨)
-  const executeShare = async (passphrase: string) => {
+  // SHARE_REFACTOR: 공유 로직을 lib/note.ts로 분리
+  const handleConfirmShare = async (passphrase: string) => {
     if (!note) return;
-    setIsShareModalOpen(false); // 모달 닫기
-
-    const fallbackShare = (file: File) => {
-      alert('자동 공유가 지원되지 않거나 차단되었습니다. 파일을 수동으로 다운로드합니다.');
-      const url = URL.createObjectURL(file);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = file.name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      alert(`파일이 다운로드되었습니다. 설정한 비밀번호 "${passphrase}"를 기억하여 전달해주세요.`);
-    };
-
-    try {
-      const payload = await encryptJSON({
-        title: note.title, content: note.content, topics: note.topics, 
-        labels: note.labels, sourceUrl: note.sourceUrl, sourceType: note.sourceType 
-      }, passphrase);
-      
-      const file = new File([JSON.stringify(payload, null, 2)], `${note.title.replace(/[\\/:"*?<>|]/g, '')}.json`, { type: 'application/json' });
-
-      if (navigator.share && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({
-            title: `암호화된 노트: ${note.title}`,
-            text: `이 파일을 열려면 비밀번호가 필요합니다.`, 
-            files: [file],
-          });
-          alert(`공유가 시작되었습니다. 설정한 비밀번호 "${passphrase}"를 상대방에게 알려주세요.`);
-        } catch (error: any) {
-          if (error.name === 'NotAllowedError') {
-            fallbackShare(file);
-          } else { throw error; }
-        }
-      } else {
-        fallbackShare(file);
-      }
-    } catch (error) {
-      console.error('노트 공유 실패:', error);
-      alert('노트를 공유하는 데 실패했습니다.');
-    }
+    setIsShareModalOpen(false);
+    await shareNote(note, passphrase);
   };
-
-  // SHARE_MODAL: 실제 공유 로직을 실행하는 함수 (모달에서 호출됨)
-const executeShare = async (passphrase: string) => {
-  if (!note) return;
-  setIsShareModalOpen(false); // 로직 시작 시 모달 닫기
-
-  // 수동 다운로드 및 비밀번호 안내를 처리하는 함수
-  const fallbackShare = (file: File) => {
-    alert('자동 공유가 차단되었거나 지원되지 않습니다.\n수동으로 파일을 다운로드하고 비밀번호를 기억해주세요.');
-    
-    const url = URL.createObjectURL(file);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = file.name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-
-    alert(`파일이 다운로드되었습니다.\n\n설정한 비밀번호 "${passphrase}"를 파일과 함께 상대방에게 전달해주세요.`);
-  };
-
-  try {
-    // 1. 입력받은 PIN으로 데이터 암호화
-    const payload = await encryptJSON({
-      title: note.title,
-      content: note.content,
-      topics: note.topics,
-      labels: note.labels,
-      sourceUrl: note.sourceUrl,
-      sourceType: note.sourceType,
-     }, passphrase);
-    
-    // 2. 암호화된 데이터를 담은 JSON 파일 생성
-    const payloadString = JSON.stringify(payload, null, 2);
-    const file = new File([payloadString], `${note.title.replace(/[\\/:"*?<>|]/g, '')}.json`, {
-      type: 'application/json',
-    });
-
-    // 3. Web Share API 지원 여부 확인
-    if (navigator.share && navigator.canShare({ files: [file] })) {
-      try {
-        await navigator.share({
-          title: `암호화된 노트 공유: ${note.title}`,
-          text: `이 파일을 열려면 비밀번호가 필요합니다.`,
-          files: [file],
-        });
-        alert(`공유가 시작되었습니다.\n\n설정한 비밀번호 "${passpassphrase}"를 상대방에게 알려주세요.`);
-      } catch (error: any) {
-        if (error.name === 'NotAllowedError') {
-          fallbackShare(file);
-        } else {
-          throw error;
-        }
-      }
-    } else {
-      fallbackShare(file);
-    }
-  } catch (error) {
-    console.error('노트 공유 실패:', error);
-    alert('노트를 공유하는 데 실패했습니다.');
-  }
-};
 
   // DEEPLINK_FIX: PC 환경에서도 안정적으로 동작하도록 딥 링크 로직 수정
   const openSource = (e?: React.MouseEvent) => {
@@ -506,8 +402,9 @@ const executeShare = async (passphrase: string) => {
       <ShareModal
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
-        onConfirm={executeShare}
+        onConfirm={handleConfirmShare}
         noteTitle={note.title}
       />
     </>
   );
+}

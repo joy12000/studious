@@ -2,6 +2,7 @@
 import { db } from "./db";
 import { generateTitle, guessTopics } from "./classify";
 import { Note, SourceType } from "./types";
+import { encryptJSON } from './crypto';
 
 export interface CreateNotePayload {
   content: string;
@@ -24,7 +25,7 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
 
   // YOUTUBE_LINK_EXTRACTION: 유튜브 링크 추출 및 처리 로직 시작
   // 유튜브 URL을 찾기 위한 정규식입니다. (standard, short, shorts, live, embed)
-  const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/g;
+  const youtubeRegex = /(?:https?://)?(?:www\.)?(?:youtube\.com/(?:watch\?v=|embed/|v/|shorts/|live/)|youtu\.be/)([a-zA-Z0-9_-]{11})/g;
   
   let cleanedContent = content;
   let extractedUrl: string | null = null;
@@ -81,4 +82,53 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
 
   await db.notes.add(newNote);
   return newNote;
+}
+
+/**
+ * Encrypts a note and shares it as a file.
+ * @param note The note to share.
+ * @param passphrase The 4-digit PIN to encrypt the note.
+ */
+export async function shareNote(note: Note, passphrase: string): Promise<void> {
+  const fallbackShare = (file: File) => {
+    alert('자동 공유가 지원되지 않거나 차단되었습니다. 파일을 수동으로 다운로드합니다.');
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    alert(`파일이 다운로드되었습니다. 설정한 비밀번호 "${passphrase}"를 기억하여 전달해주세요.`);
+  };
+
+  try {
+    const payload = await encryptJSON({
+      title: note.title, content: note.content, topics: note.topics, 
+      labels: note.labels, sourceUrl: note.sourceUrl, sourceType: note.sourceType 
+    }, passphrase);
+    
+    const file = new File([JSON.stringify(payload, null, 2)], `${note.title.replace(/[\\/:\"*?<>|]/g, '')}.json`, { type: 'application/json' });
+
+    if (navigator.share && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          title: `암호화된 노트: ${note.title}`,
+          text: `이 파일을 열려면 비밀번호가 필요합니다.`, 
+          files: [file],
+        });
+        alert(`공유가 시작되었습니다. 설정한 비밀번호 "${passphrase}"를 상대방에게 알려주세요.`);
+      } catch (error: any) {
+        if (error.name === 'NotAllowedError') {
+          fallbackShare(file);
+        } else { throw error; }
+      }
+    } else {
+      fallbackShare(file);
+    }
+  } catch (error) {
+    console.error('노트 공유 실패:', error);
+    alert('노트를 공유하는 데 실패했습니다.');
+  }
 }
