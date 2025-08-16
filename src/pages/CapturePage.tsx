@@ -127,9 +127,9 @@ export default function CapturePage() {
   }
 
   return (
-    <div className="container-readable p-safe pb-24">
-      <header className="flex items-center gap-2 justify-between mb-4">
-        <h1 className="text-2xl font-semibold">캡처</h1>
+    <div className="max-w-2xl mx-auto px-4 py-8 pb-24">
+      <header className="flex items-center gap-4 justify-between mb-6">
+        <h1 className="text-3xl font-bold tracking-tight">캡처</h1>
         <div className="flex items-center gap-2">
           <TemplatePicker
             onInsert={(tpl) => {
@@ -141,7 +141,7 @@ export default function CapturePage() {
               refreshAiTopics(filled);
             }}
           />
-          <label className="text-xs flex items-center gap-2 px-3 py-2 rounded-xl card">
+          <label className="text-xs flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300/50 bg-white/50 hover:bg-white/80 transition-colors">
             <input
               type="checkbox"
               checked={useSmartClean}
@@ -157,14 +157,14 @@ export default function CapturePage() {
       </header>
 
       {status && (
-        <div className="banner mb-3">
+        <div className="banner mb-4">
           {status} {creatorLabel ? <span className="opacity-60">({creatorLabel})</span> : null}
         </div>
       )}
 
-      <section className="card mb-3">
-        <div className="text-xs mb-2 opacity-70">AI 주제 추천</div>
-        <div className="flex flex-wrap gap-2">
+      <section className="p-6 bg-white/60 backdrop-blur-lg rounded-2xl shadow-lg border border-white/20 mb-6">
+        <div className="text-xs mb-3 opacity-70">AI 주제 추천</div>
+        <div className="flex flex-wrap gap-3">
           {aiTopics.length === 0 ? (
             <span className="text-xs text-gray-500">내용을 입력하거나 붙여넣기 하면 추천이 보여요.</span>
           ) : (
@@ -173,10 +173,10 @@ export default function CapturePage() {
         </div>
       </section>
 
-      <section className="card mb-3">
+      <section className="p-6 bg-white/60 backdrop-blur-lg rounded-2xl shadow-lg border border-white/20 mb-6">
         <textarea
           ref={textareaRef}
-          className="input w-full min-h-[40vh]"
+          className="w-full min-h-[40vh] px-4 py-3 border border-gray-300/50 bg-white/60 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-y transition-colors"
           placeholder="여기에 붙여넣기 또는 직접 입력…"
           value={text}
           onChange={(e) => {
@@ -184,14 +184,14 @@ export default function CapturePage() {
             refreshAiTopics(e.target.value);
           }}
         />
-        <div className="mt-3 text-right">
-          <button className="btn btn-primary" onClick={onSave}>이 내용으로 저장</button>
+        <div className="mt-4 text-right">
+          <button className="inline-flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors text-sm font-semibold" onClick={onSave}>이 내용으로 저장</button>
         </div>
       </section>
 
-      <section className="rounded-2xl border p-4 bg-white/70 dark:bg-gray-900/60">
-        <div className="text-sm font-medium mb-2">고급 클리닝은 이렇게 정리해요</div>
-        <ul className="text-sm leading-6 list-disc pl-5">
+      <section className="p-6 bg-white/60 backdrop-blur-lg rounded-2xl shadow-lg border border-white/20">
+        <div className="text-sm font-medium mb-3">고급 클리닝은 이렇게 정리해요</div>
+        <ul className="text-sm leading-relaxed list-disc pl-5 text-gray-700">
           <li><b>코드블록</b>(``` … ```)은 건드리지 않아요.</li>
           <li>글머리표는 제각각이면 <code>-</code> 하나로 통일해요.</li>
           <li>번호목록은 <code>1)</code>/<code>1 -</code>도 <code>1.</code>로 맞춰요.</li>
