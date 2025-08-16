@@ -118,8 +118,10 @@ export default function HomePage() {
       </main>
 
       {/* 플로팅 액션 버튼들 */}
-      <ImportButton onImport={addNote} />
-      <PasteFAB onClick={handlePaste} />
+      <div className="fixed bottom-4 right-4 flex flex-row items-center gap-3">
+        <ImportButton onImport={addNote} />
+        <PasteFAB onClick={handlePaste} />
+      </div>
     </div>
   );
 }
