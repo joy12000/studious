@@ -25,7 +25,7 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
 
   // YOUTUBE_LINK_EXTRACTION: 유튜브 링크 추출 및 처리 로직 시작
   // 유튜브 URL을 찾기 위한 정규식입니다. (standard, short, shorts, live, embed)
-  const youtubeRegex = /(?:https?://)?(?:www\.)?(?:youtube\.com/(?:watch\?v=|embed/|v/|shorts/|live/)|youtu\.be/)([a-zA-Z0-9_-]{11})/g;
+  const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/g;
   
   let cleanedContent = content;
   let extractedUrl: string | null = null;
