@@ -273,6 +273,15 @@ export async function guessTopics(text: string): Promise<string[]> {
     const settings = await db.settings.get('default');
     const rules = { ...DEFAULT_TOPIC_RULES, ...(settings?.topicRules || {}) };
 
+    const scores: Record<string, number> = {};
+    const cleanedText = text.toLowerCase();
+
+    // Helper to escape regex special characters
+    const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\\]/g, '\export async function guessTopics(text: string): Promise<string[]> {
+  try {
+    const settings = await db.settings.get('default');
+    const rules = { ...DEFAULT_TOPIC_RULES, ...(settings?.topicRules || {}) };
+
     const lc = text.toLowerCase();
     const scores: Record<string, number> = {};
 
@@ -299,88 +308,167 @@ export async function guessTopics(text: string): Promise<string[]> {
     console.error('guessTopics error', e);
     return ['Other'];
   }
-}
+}');
 
-export function generateTitle(content: string): string {
-  const text = content.trim();
-  const firstLine = text.split('\n').find(s=>s.trim().length>0) || '';
-  if (firstLine.length <= 50) return firstLine;
-  const cleaned = text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ');
-  const tokens = cleaned.split(/\s+/).filter(Boolean);
-  const stop = new Set(['the','is','are','a','an','to','of','and','or','for','in','on','at','it','this','that','은','는','이','가','을','를','에','와','과','로','으로','하다','했다','합니다']);
-  const freq: Record<string, number> = {};
-  for (const t of tokens) if (!stop.has(t)) freq[t] = (freq[t]||0)+1;
-  const top = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([w])=>w as string);
-  const cap = (s:string)=>s.charAt(0).toUpperCase()+s.slice(1);
-  const draft = top.map(cap).join(' · ') || firstLine;
-  return draft.length <= 80 ? draft : draft.slice(0,79)+'…';
-}
-
-export function extractHighlights(content: string): { text: string; index: number }[] {
-  const lines = content.split('\n');
-  const out: { text: string; index: number }[] = [];
-  lines.forEach((line, i) => {
-    const trimmed = line.trim();
-    if (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.length > 4) {
-      out.push({ text: trimmed.replace(/^\*\*|\*\*$/g,''), index: i });
+    for (const [topic, keywords] of Object.entries(rules)) {
+      if (Array.isArray(keywords) && keywords.length > 0) {
+        // Create a single regex for all keywords of a topic for efficiency
+        const pattern = `\b(${keywords.map(kw => escapeRegExp(kw.toLowerCase())).join('|')})\b`;
+        const regex = new RegExp(pattern, 'g');
+        const matches = cleanedText.match(regex);
+        scores[topic] = matches ? matches.length : 0;
+      } else {
+        scores[topic] = 0;
+      }
     }
-  });
-  return out.slice(0, 10);
+
+    const hashtagSet = new Set<string>();
+    (text.match(/(^|\s)#([\p{L}\p{N}_-]{2,30})/gu) || []).forEach(m => {
+      const tag = m.replace(/^\s*#/, '').trim();
+      if (tag) hashtagSet.add(tag);
+    });
+
+    const ranked = Object.entries(scores)
+      .filter(([,s]) => s > 0)
+      .sort((a,b)=>b[1]-a[1])
+      .slice(0,5)
+      .map(([k])=>k);
+
+    const hashtags = Array.from(hashtagSet).slice(0,5);
+    const combined = [...new Set([ ...hashtags, ...ranked ])];
+    return combined.length ? combined : (settings?.defaultTopics?.slice(0,1) || ['Other']);
+  } catch (e) {
+    console.error('guessTopics error', e);
+    return ['Other'];
+  }
+}
+
+
+// A set of common English and Korean stop words to be excluded from title generation.
+const STOP_WORDS = new Set([
+  'the','is','are','a','an','to','of','and','or','for','in','on','at','it','this','that',
+  '은','는','이','가','을','를','에','와','과','로','으로','하다','했다','합니다'
+]);
+
+/**
+ * Generates a title from the note content.
+ * It first tries to use the first line if it's short enough.
+ * Otherwise, it extracts the most frequent keywords (excluding stop words)
+ * to create a keyword-based title.
+ * @param content The full content of the note.
+ * @returns A generated title string.
+ */
+export function generateTitle(content: string): string {
+  // Define configuration constants for clarity and easy maintenance.
+  const FIRST_LINE_MAX_LENGTH = 50; // Use the first line if it's shorter than this.
+  const TOP_KEYWORD_COUNT = 3;      // Number of top keywords to use for the title.
+  const TITLE_MAX_LENGTH = 80;      // The maximum allowed length for the final title.
+
+  const text = content.trim();
+  const firstLine = text.split('\n').find(s => s.trim().length > 0) || '';
+
+  // If the first line is short and descriptive, use it directly as the title.
+  if (firstLine.length > 0 && firstLine.length <= FIRST_LINE_MAX_LENGTH) {
+    return firstLine;
+  }
+
+  // If the first line is too long, generate a title from keywords.
+  // 1. Clean the text: convert to lowercase and remove special characters.
+  const cleanedText = text.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ');
+  const tokens = cleanedText.split(/\s+/).filter(Boolean);
+
+  // 2. Calculate the frequency of each word, excluding stop words.
+  const wordFrequencies: Record<string, number> = {};
+  for (const token of tokens) {
+    if (!STOP_WORDS.has(token)) {
+      wordFrequencies[token] = (wordFrequencies[token] || 0) + 1;
+    }
+  }
+
+  // 3. Get the top N most frequent keywords.
+  const topKeywords = Object.entries(wordFrequencies)
+    .sort(([, freqA], [, freqB]) => freqB - freqA)
+    .slice(0, TOP_KEYWORD_COUNT)
+    .map(([word]) => word);
+
+  // 4. Capitalize and join the keywords to form a draft title.
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  // Fallback to the first line if no keywords were found
+  const draftTitle = topKeywords.map(capitalize).join(' · ') || firstLine;
+
+  // 5. Truncate the title if it exceeds the maximum length.
+  if (draftTitle.length <= TITLE_MAX_LENGTH) {
+    return draftTitle;
+  }
+  return draftTitle.slice(0, TITLE_MAX_LENGTH - 1) + '…';
+}
+
+
+/**
+ * Extracts highlighted sections from the content.
+ * Highlights are identified by lines wrapped in double asterisks (e.g., **highlighted text**).
+ * @param content The text content to parse.
+ * @returns An array of objects, each containing the highlighted text and its line index.
+ */
+export function extractHighlights(content: string): { text: string; index: number } {
+  // This regex captures text between double asterisks on a single line.
+  const highlightRegex = /^	*	*(.+?)	*	*$/;
+  
+  return content
+    .split('\n')
+    .map((line, index) => {
+      const match = line.match(highlightRegex);
+      // If a match is found, return the captured text and its original line index.
+      return match ? { text: match[1].trim(), index } : null;
+    })
+    // Filter out any lines that didn't match the highlight format.
+    .filter((item): item is { text: string; index: number } => item !== null)
+    // Limit the results to the first 10 highlights found.
+    .slice(0, 10);
 }
 
 export function extractTodos(content: string): { text: string; done: boolean }[] {
   const todos: { text: string; done: boolean }[] = [];
-  const text = content.replace(/\r/g,'');
-
-  const sectionNames = [
-    'Action Items','Next Steps','Tasks','To-Do','Todo','To Do','Recommendations','Key Takeaways','핵심 정리','다음 단계','할 일','권장 사항'
-  ];
-  const headingRe = new RegExp(`^(?:\s*)(?:${sectionNames.map(s=>s.replace(/[-/\\^$*+?.()|[\]{}]/g,'\\$&')).join('|')})\s*:?\s*$`, 'im');
-
+  const text = content.replace(/\r/g, "");
   const lines = text.split('\n');
-  for (let i=0; i<lines.length; i++) {
-    if (headingRe.test(lines[i])) {
-      let block: string[] = [];
-      let blanks = 0;
-      for (let j=i+1; j<lines.length; j++) {
-        const L = lines[j];
-        if (headingRe.test(L)) break;
-        if (!L.trim()) { blanks++; if (blanks>=2) break; else continue; } else blanks=0;
-        block.push(L);
+
+  // Regex to capture various todo list formats, pre-compiled for efficiency.
+  const todoLineRegex = /^\s*(?:-\s*\[( |x)\]|[-*•·–—]|[\][\d]+[.)]|(?:🔹|✅|▶️|→|➤|•))\s*(.+)$/i;
+
+  for (const line of lines) {
+    const match = line.match(todoLineRegex);
+    if (match && match[2]) {
+      const taskText = match[2].trim();
+      if (taskText) {
+        const isChecked = (match[1] || '').toLowerCase() === 'x';
+        const hasDoneMarker = /(?:✅|done[:\s])/i.test(line);
+        todos.push({ text: taskText, done: isChecked || hasDoneMarker });
       }
-      block.forEach(L => {
-        const m = L.match(/^\s*(?:-\s*\[( |x)\]|[-*•·–—]|[\d]+[.)]|(?:🔹|✅|▶️|→|➤|•))\s*(.+)$/i);
-        if (m && m[2]) {
-          const done = (m[1]||'').toLowerCase()==='x' || /(?:✅|done[:\s])/i.test(L);
-          const t = m[2].trim();
-          if (t) todos.push({ text: t, done });
-        }
-      });
     }
   }
 
-  text.split('\n').forEach(L => {
-    const m = L.match(/^\s*(?:-\s*\[( |x)\]|[-*•·–—]|[\d]+[.)])\s*(.+)$/i);
-    if (m && m[2]) {
-      const done = (m[1]||'').toLowerCase()==='x' || /(?:✅|done[:\s])/i.test(L);
-      const t = m[2].trim();
-      if (t) todos.push({ text: t, done });
-    }
-  });
-
-  const inline = text.match(/(?:해야 할 일|To-?do|Action Items|Next Steps)[:\s]+([\s\S]{0,600})/i);
-  if (inline) {
-    inline[1].split(/[,;\n]+/).forEach(seg => {
-      const t = seg.trim();
-      if (t.length>4 && !/^(?:요약|핵심|참고)/.test(t)) todos.push({ text: t, done: false });
+  // Inline todo detection (e.g., "To-do: buy milk, call mom")
+  const inlineMatch = text.match(/(?:해야 할 일|To-?do|Action Items|Next Steps)[:\s]+([\s\S]{0,600})/i);
+  if (inlineMatch && inlineMatch[1]) {
+    inlineMatch[1].split(/[,;\n]+/).forEach(segment => {
+      const trimmedSegment = segment.trim();
+      // Avoid matching section summaries
+      if (trimmedSegment.length > 4 && !/^(?:요약|핵심|참고)/.test(trimmedSegment)) {
+        todos.push({ text: trimmedSegment, done: false });
+      }
     });
   }
 
+  // Deduplicate results and limit the count
   const seen = new Set<string>();
-  const out: { text: string; done: boolean }[] = [];
-  for (const td of todos) {
-    const key = td.text.toLowerCase();
-    if (!seen.has(key)) { seen.add(key); out.push(td); }
+  const uniqueTodos: { text: string; done: boolean }[] = [];
+  for (const todo of todos) {
+    const key = todo.text.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      uniqueTodos.push(todo);
+    }
   }
-  return out.slice(0, 20);
+  
+  return uniqueTodos.slice(0, 20);
 }
