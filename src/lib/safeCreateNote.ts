@@ -24,9 +24,16 @@ export async function safeCreateNoteFromText(raw: string) {
 
   const createdAt = Date.now();
 
+  const createdAt = Date.now();
+
   await db.notes.put({
     id,
     content: text,
+    title,
+    topics: finalTopics,
+    favorite: false,
+    createdAt,
+    sourceType: "capture",
   } as any);
 
   return id;

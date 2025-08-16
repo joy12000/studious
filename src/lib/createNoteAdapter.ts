@@ -26,8 +26,16 @@ function saveLocal(content: string): string {
 export async function createNoteUniversal(contentInput: any): Promise<string> {
   const content = typeof contentInput === "string" ? contentInput : String(contentInput ?? "");
 
-  // Temporarily force local save to isolate db.notes.put issue
+  try {
+    const id = await safeCreateNote(content);
+    console.log("createNoteUniversal: safeCreateNote returned", id);
+    if (id) return id;
+  } catch (e) {
+    console.error("createNoteUniversal: safeCreateNote failed", e);
+    // Fallback to local save if safeCreateNote fails
+  }
+  // As a last resort, local save
   const localId = saveLocal(content);
-  console.log("createNoteUniversal: FORCED saveLocal returned", localId);
+  console.log("createNoteUniversal: saveLocal returned", localId);
   return localId;
 }

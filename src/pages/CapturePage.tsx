@@ -129,7 +129,16 @@ export default function CapturePage() {
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 pb-24">
       <header className="flex items-center gap-4 justify-between mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">캡처</h1>
+        <div className="flex items-center gap-4">
+          <Link
+            to="/"
+            className="p-2 rounded-lg border bg-white/80 hover:bg-white transition-colors"
+            title="뒤로가기"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+          <h1 className="text-3xl font-bold tracking-tight">캡처</h1>
+        </div>
         <div className="flex items-center gap-2">
           <TemplatePicker
             onInsert={(tpl) => {
