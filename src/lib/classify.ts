@@ -277,7 +277,7 @@ export async function guessTopics(text: string): Promise<string[]> {
     const scores: Record<string, number> = {};
 
     for (const [topic, keywords] of Object.entries(rules)) {
-      scores[topic] = keywords.reduce((s, kw) => s + (lc.includes(kw.toLowerCase()) ? 1 : 0), 0);
+      scores[topic] = (Array.isArray(keywords) ? keywords : []).reduce((s, kw) => s + (lc.includes(kw.toLowerCase()) ? 1 : 0), 0);
     }
 
     const hashtagSet = new Set<string>();
