@@ -5,14 +5,14 @@ import { cleanPaste } from "../lib/cleanPaste";
 import { readClipboardText } from "../lib/clipboard";
 import { suggestTopics } from "../lib/topicSuggest";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
+import { ArrowLeft } from "lucide-react";
 import TemplatePicker from "../components/TemplatePicker";
 import TopicBadge from "../components/TopicBadge";
 import { cleanPaste } from "../lib/cleanPaste";
 import { readClipboardText } from "../lib/clipboard";
 import { suggestTopics } from "../lib/topicSuggest";
 import { createNoteUniversal } from "../lib/createNoteAdapter";
-import { Link } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom"; // Added Link import
 import { ArrowLeft } from "lucide-react"; // Added ArrowLeft import
 
