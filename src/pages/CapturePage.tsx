@@ -5,7 +5,6 @@ import { cleanPaste } from "../lib/cleanPaste";
 import { readClipboardText } from "../lib/clipboard";
 import { suggestTopics } from "../lib/topicSuggest";
 import { createNoteUniversal } from "../lib/createNoteAdapter";
-import { getNoteCreator } from "../lib/findCreateNote";
 
 // ---------- Robust Paste binding to existing FAB labeled '붙여넣기' ----------
 const MARK_ATTR = "data-robust-paste-bound";
@@ -102,15 +101,9 @@ export default function CapturePage() {
     try {
       const processed = useSmartClean ? cleanPaste(input) : input;
       setStatus("저장 준비 중…");
-      const resolved = await getNoteCreator();
-      if (!resolved) {
-        setStatus("저장 실패: safeCreateNote를 찾을 수 없어요.");
-        busyRef.current = false;
-        return;
-      }
-      setCreatorLabel(resolved.name);
+      setCreatorLabel("내장 저장(safeCreateNote)");
       setStatus("저장 중…");
-      const id = await createNoteUniversal(resolved.mod as any, processed);
+      const id = await createNoteUniversal(processed);
       if (!id) {
         setStatus("저장 실패: 반환된 ID가 비어있어요.");
         busyRef.current = false;
