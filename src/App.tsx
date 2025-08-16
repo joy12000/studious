@@ -13,7 +13,8 @@ function ServiceWorkerMessageHandler() {
 
   useEffect(() => {
     const handleServiceWorkerMessage = async (event: MessageEvent) => {
-      if (event.data && event.data.file) {
+      if (event.data && event.data.type === 'shared-file') {
+        alert('DEBUG: App.tsx received a file from the Service Worker.');
         const file = event.data.file as File;
         try {
           const content = await file.text();

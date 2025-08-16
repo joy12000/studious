@@ -18,7 +18,8 @@ self.addEventListener('fetch', (event) => {
         if (clients.length > 0) {
           // Focus the client and then send the message
           await clients[0].focus();
-          clients[0].postMessage({ file });
+          clients[0].postMessage({ file, type: 'shared-file' }); // Add type for clarity
+          alert('DEBUG: Service Worker received a file and sent it to the app.');
         }
       }
       
