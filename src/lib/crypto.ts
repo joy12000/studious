@@ -112,3 +112,15 @@ export async function decryptJSON<T>(payload: EncryptedPayload, passphrase: stri
   const jsonString = dec.decode(plain);
   return JSON.parse(jsonString) as T;
 }
+
+
+/**
+ * Generates a secure, random passphrase.
+ * @param length The desired length of the passphrase.
+ * @returns A random string suitable for use as a passphrase.
+ */
+export function generatePassphrase(length = 32): string {
+  const arr = new Uint8Array(length);
+  crypto.getRandomValues(arr);
+  return b64encode(arr).slice(0, length);
+}
