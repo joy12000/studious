@@ -120,9 +120,8 @@ export async function shareNote(note: Note, passphrase: string): Promise<void> {
 
     if (navigator.share && navigator.canShare({ files: [file] })) {
       try {
+        // FILE_ONLY_SHARE: 파일 공유의 안정성을 높이기 위해 title과 text를 제거하고 파일만 단독으로 공유합니다.
         await navigator.share({
-          title: `암호화된 노트: ${note.title}`,
-          text: `이 파일을 열려면 비밀번호가 필요합니다.`, 
           files: [file],
         });
         alert(`공유가 시작되었습니다. 설정한 비밀번호 "${passphrase}"를 상대방에게 알려주세요.`);
