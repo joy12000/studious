@@ -6,7 +6,7 @@ import ClipboardCaptureAgent from './components/ClipboardCaptureAgent';
 export default function Root(){
   return (
     <>
-      <App />
+      <App key={props.key} />
       <VersionBadge />
       <ClipboardCaptureAgent />
     </>

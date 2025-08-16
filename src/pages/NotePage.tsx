@@ -93,13 +93,16 @@ export default function NotePage() {
   };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    if (!dateStr) return '날짜 없음';
+    try {
+      return new Date(dateStr).toLocaleDateString('ko-KR', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch { return '날짜 오류'; }
   };
 
   const getSourceIcon = (sourceType: Note['sourceType']) => {
