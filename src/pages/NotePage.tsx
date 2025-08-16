@@ -80,30 +80,46 @@ export default function NotePage() {
     }
   };
 
-  // YOUTUBE_DEEPLINK: NoteCard에서 가져온 딥 링크 로직
+  // DEEPLINK_FIX: PC 환경에서도 안정적으로 동작하도록 딥 링크 로직 수정
   const openSource = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!note?.sourceUrl) return;
+
     const url: string = note.sourceUrl;
-    // 유튜브 비디오 ID를 추출합니다.
+    const fallback = () => window.open(url, '_blank', 'noopener,noreferrer');
+
+    // 사용자 기기 정보 확인 (User Agent)
+    const ua = navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    const isAndroid = /android/.test(ua);
+
+    // 모바일 환경이 아닐 경우(PC 등) 즉시 웹으로 열기
+    if (!isIOS && !isAndroid) {
+      fallback();
+      return;
+    }
+
+    // 모바일 환경일 경우 앱으로 열기 시도
     const vidMatch = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/i);
     const vid = vidMatch ? vidMatch[1] : null;
-    // 딥 링크 URL을 생성합니다.
-    const deep = vid ? `vnd.youtube://watch?v=${vid}` : url;
-    const fallback = () => window.open(url, '_blank');
-    let used = false;
     
-    // 딥 링크를 시도하고, 350ms 후에 웹으로 fallback합니다.
-    const t = setTimeout(() => { if (!used) fallback(); }, 350);
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).location.href = deep;
-      used = true;
-    } catch (err) {
-      console.error('Failed to open deep link:', err);
-      fallback(); // 즉시 실패 시 바로 fallback
-    }
-    setTimeout(()=>clearTimeout(t), 2000);
+    // iOS는 universal link를 위해 일반 https 주소를 사용하고, Android는 custom scheme을 사용합니다.
+    const deepLink = isAndroid && vid ? `vnd.youtube://watch?v=${vid}` : url;
+
+    // 앱이 없을 때를 대비하여 일정 시간 후 웹으로 fallback 실행
+    const timer = setTimeout(fallback, 500);
+
+    // 페이지가 숨겨지면(앱으로 전환 성공 시) fallback을 취소
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        clearTimeout(timer);
+        window.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+    };
+    window.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // 딥 링크 실행
+    window.location.href = deepLink;
   };
 
   const toggleTodo = async (todoIndex: number) => {
