@@ -1,0 +1,4 @@
+src/lib/findCreateNote.ts
+src/pages/CapturePage.tsx
+src/components/TemplatePicker.tsx
+CHANGELOG.md
