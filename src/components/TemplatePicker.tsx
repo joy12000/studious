@@ -7,8 +7,24 @@ const LS_KEY = "userTemplates";
 
 function nowISODate() { const d = new Date(); const pad = (n: number) => n.toString().padStart(2, "0"); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 function renderTemplate(src: string) { return src.replace(/\{\{date\}\}/g, nowISODate()).replace(/\{\{time\}\}/g, new Date().toLocaleTimeString()); }
-function loadTemplates(): UserTemplate[] { try { const raw = localStorage.getItem(LS_KEY); if (!raw) return []; const arr = JSON.parse(raw); if (Array.isArray(arr)) return arr; } catch {} return []; }
-function saveTemplates(data: UserTemplate[]) { try { localStorage.setItem(LS_KEY, JSON.stringify(data)); } catch {} }
+function loadTemplates(): UserTemplate[] {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (Array.isArray(arr)) return arr;
+  } catch (err) {
+    console.error('Failed to load templates:', err);
+  }
+  return [];
+}
+function saveTemplates(data: UserTemplate[]) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(data));
+  } catch (err) {
+    console.error('Failed to save templates:', err);
+  }
+}
 
 const defaults: UserTemplate[] = [
   { id: "default-meeting", name: "회의 메모", content: "# 회의 메모 — {{date}}\n\n## 안건\n- \n\n## 핵심 결론\n- \n\n## 할 일(To-Do)\n- [ ] 담당자:  / 마감: \n\n## 참고\n- \n" },
@@ -21,7 +37,7 @@ export default function TemplatePicker({ onInsert }: Props) {
   const [isOpen, setOpen] = useState(false);
   const [editing, setEditing] = useState<UserTemplate | null>(null);
 
-  const all = useMemo(() => [...defaults, ...userTemplates], [userTemplates]);
+  useMemo(() => [...defaults, ...userTemplates], [userTemplates]);
 
   function addOrUpdate(t: UserTemplate) {
     setUserTemplates(prev => { const next = prev.some(x => x.id === t.id) ? prev.map(x => x.id === t.id ? t : x) : [...prev, t]; saveTemplates(next); return next; });

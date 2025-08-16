@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Clipboard, Check, AlertCircle, X, Save } from 'lucide-react';
+import { Clipboard, Check, AlertCircle, X } from 'lucide-react';
 import { db } from '../lib/db';
 import { guessTopics, generateTitle } from '../lib/classify';
 
@@ -14,18 +14,21 @@ function getPath(): string {
 
 // locationchange wiring (for SPA awareness)
 (function setupLocationChangeEvent(){
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if ((window as any).__locationChangePatched) return;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).__locationChangePatched = true;
   const _push = history.pushState;
   const _replace = history.replaceState;
   function fire(){ window.dispatchEvent(new Event('locationchange')); }
-  history.pushState = function(...args: any[]){ _push.apply(this, args as any); fire(); } as any;
-  history.replaceState = function(...args: any[]){ _replace.apply(this, args as any); fire(); } as any;
+  history.pushState = function(...args: Parameters<typeof history.pushState>){ _push.apply(this, args); fire(); }
+  history.replaceState = function(...args: Parameters<typeof history.replaceState>){ _replace.apply(this, args); fire(); }
   window.addEventListener('popstate', fire);
   window.addEventListener('hashchange', fire);
 })();
 
 function genId(): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const g = (crypto as any)?.randomUUID?.();
   if (g) return g;
   const r = Math.random().toString(36).slice(2, 8);
@@ -41,7 +44,7 @@ async function saveRawNote(text: string) {
     id, content: text, topics,
     favorite: false, createdAt: now,
     title, sourceType: 'share', todo: []
-  } as any);
+  });
   return id;
 }
 
@@ -98,7 +101,7 @@ export default function ClipboardCaptureAgent() {
     try {
       setBusy(true);
       const supported = !!navigator.clipboard?.readText;
-      const secure = (window as any).isSecureContext !== false;
+      const secure = window.isSecureContext;
 
       if (supported && secure) {
         try {
@@ -113,9 +116,9 @@ export default function ClipboardCaptureAgent() {
             openFallback('클립보드가 비어 있어요. 직접 붙여넣기 해주세요.');
             return;
           }
-        } catch (e: any) {
+        } catch (e) {
           console.warn('[ClipboardAgent] readText failed:', e);
-          const msg = (e?.message || e || '').toString().toLowerCase();
+          const msg = String(e instanceof Error ? e.message : e).toLowerCase();
           if (msg.includes('denied') || msg.includes('allow') || msg.includes('permission') || msg.includes('notallowed')) {
             openFallback('클립보드 권한이 차단되어 있어요. 직접 붙여넣기 해주세요.');
             return;

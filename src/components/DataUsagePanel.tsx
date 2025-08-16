@@ -14,9 +14,11 @@ export default function DataUsagePanel(){
   useEffect(()=>{
     (async () => {
       try {
-        const e = await (navigator as any).storage?.estimate?.() || {};
+        const e: StorageEstimate = await navigator.storage?.estimate?.() || { usage: 0, quota: 0 };
         setEst({ usage: e.usage || 0, quota: e.quota || 0 });
-      } catch {}
+      } catch (err) {
+        console.error('Failed to estimate storage:', err);
+      }
       try {
         const notes = await db.notes.toArray();
         setCounts({ notes: notes.length, settings: await db.settings.count() });
@@ -24,7 +26,9 @@ export default function DataUsagePanel(){
           try { return sum + new Blob([JSON.stringify(n)]).size; } catch { return sum + (n?.content?.length||0); }
         }, 0);
         setNoteBytes(total);
-      } catch {}
+      } catch (err) {
+        console.error('Failed to calculate note size:', err);
+      }
     })();
   }, []);
 
@@ -34,7 +38,7 @@ export default function DataUsagePanel(){
     if (!empties.length) { alert('삭제할 빈 노트가 없습니다.'); return; }
     if (!confirm(`빈 노트 ${empties.length}개를 삭제할까요?`)) return;
     await db.transaction('rw', db.notes, async () => {
-      for (const n of empties) await db.notes.delete(n.id as any);
+      for (const n of empties) await db.notes.delete(n.id);
     });
     location.reload();
   }

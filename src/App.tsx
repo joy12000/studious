@@ -9,7 +9,7 @@ import ShareHandler from './components/ShareHandler';
 function App() {
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-background text-foreground">
         <ShareHandler />
         <Routes>
           <Route path="/" element={<HomePage />} />

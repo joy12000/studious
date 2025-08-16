@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Save, Trash2, RefreshCcw, FlaskConical } from 'lucide-react';
 import { db } from '../lib/db';
 import { guessTopics } from '../lib/classify';
+import type { Setting } from '../lib/types';
 
 type Rules = Record<string, string[]>;
 
@@ -39,7 +40,7 @@ export default function TopicRulesEditor(){
 
   async function save(){
     const s = await db.settings.get('default');
-    await db.settings.put({ id: 'default', ...(s||{}), topicRules: rules } as any);
+    await db.settings.put({ id: 'default', ...(s||{}), topicRules: rules } as Setting);
     alert('규칙을 저장했어요.');
   }
 
@@ -81,7 +82,9 @@ export default function TopicRulesEditor(){
       try {
         const p = await guessTopics(testText);
         setPreview(p.slice(0,5));
-      } catch {}
+      } catch (err) {
+        console.error('Failed to guess topics:', err);
+      }
     }, 200);
     return () => clearTimeout(id);
   }, [testText]);
@@ -127,7 +130,7 @@ export default function TopicRulesEditor(){
                 <Trash2 className="h-3 w-3" /> 삭제
               </button>
             </div>
-            <TopicKeywords topic={t} values={rules[t]||[]} onAdd={(s)=>addKeyword(t, s)} onRemove={(kw)=>removeKw(t, kw)} />
+            <TopicKeywords values={rules[t]||[]} onAdd={(s)=>addKeyword(t, s)} onRemove={(kw)=>removeKw(t, kw)} />
           </div>
         ))}
       </div>
@@ -149,7 +152,7 @@ export default function TopicRulesEditor(){
   );
 }
 
-function TopicKeywords({topic, values, onAdd, onRemove}:{topic:string; values:string[]; onAdd:(s:string)=>void; onRemove:(kw:string)=>void}){
+function TopicKeywords({ values, onAdd, onRemove }: { values: string[]; onAdd: (s: string) => void; onRemove: (kw: string) => void }) {
   const [v, setV] = useState('');
   function submit(){
     const s = v.trim();

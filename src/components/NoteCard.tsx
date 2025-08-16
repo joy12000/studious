@@ -1,8 +1,9 @@
 import React from 'react';
 import { Star } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import type { Note } from '../lib/types';
 
-export default function NoteCard({ note, onToggleFavorite }: {note:any; onToggleFavorite?:(id:any)=>void;}) {
+export default function NoteCard({ note, onToggleFavorite }: {note: Note; onToggleFavorite?:(id: string)=>void;}) {
   const openSource = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!note.sourceUrl) return;
@@ -13,20 +14,26 @@ export default function NoteCard({ note, onToggleFavorite }: {note:any; onToggle
     const fallback = () => window.open(url, '_blank');
     let used = false;
     const t = setTimeout(() => { if (!used) fallback(); }, 350);
-    try { (window as any).location.href = deep; used = true; } catch {}
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window as any).location.href = deep;
+      used = true;
+    } catch (err) {
+      console.error('Failed to open deep link:', err);
+    }
     setTimeout(()=>clearTimeout(t), 2000);
   };
 
   return (
-    <Link to={`/note/${note.id}`} className="block bg-white rounded-2xl p-6 shadow-md hover:shadow-xl transition-shadow duration-300">
+    <Link to={`/note/${note.id}`} className="block bg-card rounded-2xl p-6 border hover:border-primary/50 transition-colors duration-300">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
-          <div className="font-bold text-lg text-gray-900 line-clamp-2">{note.title || '제목 없음'}</div>
-          <div className="text-sm text-gray-700 whitespace-pre-wrap mt-2 line-clamp-3">{note.content}</div>
+          <div className="font-bold text-lg text-card-foreground line-clamp-2">{note.title || '제목 없음'}</div>
+          <div className="text-sm text-muted-foreground whitespace-pre-wrap mt-2 line-clamp-3">{note.content}</div>
           {note.sourceUrl && (
             <button
               onClick={openSource}
-              className="text-teal-600 hover:text-teal-700 text-sm font-medium mt-4"
+              className="text-primary hover:text-primary/80 text-sm font-medium mt-4"
               title="원본 열기"
             >
               원본 열기
@@ -36,7 +43,7 @@ export default function NoteCard({ note, onToggleFavorite }: {note:any; onToggle
         {onToggleFavorite && (
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }}
-            className="text-gray-300 hover:text-yellow-400 transition-colors"
+            className="text-muted-foreground hover:text-yellow-400 transition-colors"
             title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
           >
             <Star className={`w-6 h-6 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : ''}`} />
@@ -46,7 +53,7 @@ export default function NoteCard({ note, onToggleFavorite }: {note:any; onToggle
       {Array.isArray(note.topics) && note.topics.length > 0 && (
         <div className="mt-4 flex flex-wrap gap-2">
           {note.topics.map((t: string) => (
-            <div key={t} className="bg-gray-100 text-gray-600 rounded-full px-3 py-1 text-xs font-medium">{t}</div>
+            <div key={t} className="bg-muted text-muted-foreground rounded-full px-3 py-1 text-xs font-medium">{t}</div>
           ))}
         </div>
       )}

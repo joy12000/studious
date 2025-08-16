@@ -273,53 +273,11 @@ export async function guessTopics(text: string): Promise<string[]> {
     const settings = await db.settings.get('default');
     const rules = { ...DEFAULT_TOPIC_RULES, ...(settings?.topicRules || {}) };
 
-    const scores: Record<string, number> = {};
-    const cleanedText = text.toLowerCase();
-
-    // Helper to escape regex special characters
-    const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\\]/g, '\export async function guessTopics(text: string): Promise<string[]> {
-  try {
-    const settings = await db.settings.get('default');
-    const rules = { ...DEFAULT_TOPIC_RULES, ...(settings?.topicRules || {}) };
-
     const lc = text.toLowerCase();
     const scores: Record<string, number> = {};
 
     for (const [topic, keywords] of Object.entries(rules)) {
       scores[topic] = (Array.isArray(keywords) ? keywords : []).reduce((s, kw) => s + (lc.includes(kw.toLowerCase()) ? 1 : 0), 0);
-    }
-
-    const hashtagSet = new Set<string>();
-    (text.match(/(^|\s)#([\p{L}\p{N}_-]{2,30})/gu) || []).forEach(m => {
-      const tag = m.replace(/^\s*#/, '').trim();
-      if (tag) hashtagSet.add(tag);
-    });
-
-    const ranked = Object.entries(scores)
-      .filter(([,s]) => s > 0)
-      .sort((a,b)=>b[1]-a[1])
-      .slice(0,5)
-      .map(([k])=>k);
-
-    const hashtags = Array.from(hashtagSet).slice(0,5);
-    const combined = [...new Set([ ...hashtags, ...ranked ])];
-    return combined.length ? combined : (settings?.defaultTopics?.slice(0,1) || ['Other']);
-  } catch (e) {
-    console.error('guessTopics error', e);
-    return ['Other'];
-  }
-}');
-
-    for (const [topic, keywords] of Object.entries(rules)) {
-      if (Array.isArray(keywords) && keywords.length > 0) {
-        // Create a single regex for all keywords of a topic for efficiency
-        const pattern = `\b(${keywords.map(kw => escapeRegExp(kw.toLowerCase())).join('|')})\b`;
-        const regex = new RegExp(pattern, 'g');
-        const matches = cleanedText.match(regex);
-        scores[topic] = matches ? matches.length : 0;
-      } else {
-        scores[topic] = 0;
-      }
     }
 
     const hashtagSet = new Set<string>();
@@ -410,9 +368,9 @@ export function generateTitle(content: string): string {
  * @param content The text content to parse.
  * @returns An array of objects, each containing the highlighted text and its line index.
  */
-export function extractHighlights(content: string): { text: string; index: number } {
+export function extractHighlights(content: string): { text: string; index: number }[] {
   // This regex captures text between double asterisks on a single line.
-  const highlightRegex = /^	*	*(.+?)	*	*$/;
+  const highlightRegex = /^\t*\t*(.+?)\t*\t*$/;
   
   return content
     .split('\n')
@@ -433,7 +391,7 @@ export function extractTodos(content: string): { text: string; done: boolean }[]
   const lines = text.split('\n');
 
   // Regex to capture various todo list formats, pre-compiled for efficiency.
-  const todoLineRegex = /^\s*(?:-\s*\[( |x)\]|[-*•·–—]|[\][\d]+[.)]|(?:🔹|✅|▶️|→|➤|•))\s*(.+)$/i;
+  const todoLineRegex = /^\s*(?:-\s*\[( |x)\]|[-*•·–—]|[\\\\][\d]+[.)]|(?:🔹|✅|▶️|→|➤|•))\s*(.+)$/i;
 
   for (const line of lines) {
     const match = line.match(todoLineRegex);

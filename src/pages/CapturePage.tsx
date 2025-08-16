@@ -1,20 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import TemplatePicker from "../components/TemplatePicker";
-import TopicBadge from "../components/TopicBadge";
-import { cleanPaste } from "../lib/cleanPaste";
-import { readClipboardText } from "../lib/clipboard";
-import { suggestTopics } from "../lib/topicSuggest";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import TemplatePicker from "../components/TemplatePicker";
 import TopicBadge from "../components/TopicBadge";
 import { cleanPaste } from "../lib/cleanPaste";
 import { readClipboardText } from "../lib/clipboard";
-import { suggestTopics } from "../lib/topicSuggest";
-import { createNoteUniversal } from "../lib/createNoteAdapter";
-import { Link } from "react-router-dom"; // Added Link import
-import { ArrowLeft } from "lucide-react"; // Added ArrowLeft import
+import { useNotes } from "../lib/useNotes";
+import { guessTopics } from "../lib/classify";
 
 // ---------- Robust Paste binding to existing FAB labeled '붙여넣기' ----------
 const MARK_ATTR = "data-robust-paste-bound";
@@ -59,9 +51,10 @@ function useBindPasteFab(handler: () => void) {
 
 // ------------------------------- Page --------------------------------
 export default function CapturePage() {
+  // MOD: useNotes 훅을 직접 호출하여 addNote 함수를 가져옵니다.
+  const { addNote } = useNotes();
   const [text, setText] = useState<string>("");
   const [status, setStatus] = useState<string>("");
-  const [creatorLabel, setCreatorLabel] = useState<string>("");
   const [aiTopics, setAiTopics] = useState<string[]>([]);
   const [useSmartClean, setUseSmartClean] = useState<boolean>(() => {
     const v = localStorage.getItem("smartPaste.enabled");
@@ -70,35 +63,40 @@ export default function CapturePage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const busyRef = useRef(false);
 
-  const handleFabPaste = useCallback(async () => {
-    try {
-      const res = await readClipboardText();
-      if (!res.ok) {
-        setStatus(res.message || "클립보드에서 읽을 수 없어요.");
-        return;
-      }
-      const input = res.text || "";
-      const cleaned = useSmartClean ? cleanPaste(input) : input;
-      setText(prev => (prev ? prev + "\n" + (prev.endsWith("\n") ? "" : "\n") + cleaned : cleaned)); // Fixed newline handling
-      setStatus("붙여넣기 완료");
-      textareaRef.current?.focus();
-      refreshAiTopics(cleaned);
-    } catch {
-      setStatus("붙여넣기에 실패했어요.");
-    }
-  }, [useSmartClean]);
-
-  useBindPasteFab(handleFabPaste);
-
-  function refreshAiTopics(src: string) {
+  const refreshAiTopics = useCallback(async (src: string) => {
     try {
       const s = (text ? text + "\n" : "") + src;
-      const top = suggestTopics(s);
+      if (s.trim().length < 20) { // Don't run for very short text
+        setAiTopics([]);
+        return;
+      }
+      const top = await guessTopics(s);
       setAiTopics(top.slice(0, 6));
     } catch {
       /* noop */
     }
-  }
+  }, [text]);
+
+  const handleFabPaste = useCallback(async () => {
+    try {
+      const res = await readClipboardText();
+      if (!res.ok) {
+        setStatus('클립보드에서 읽을 수 없어요.');
+        return;
+      }
+      const input = res.text || "";
+      const cleaned = useSmartClean ? cleanPaste(input) : input;
+      const newText = text ? text + "\n\n" + cleaned : cleaned;
+      setText(newText);
+      setStatus("붙여넣기 완료");
+      textareaRef.current?.focus();
+      refreshAiTopics(newText); // No await needed, let it run in background
+    } catch {
+      setStatus("붙여넣기에 실패했어요.");
+    }
+  }, [useSmartClean, text, refreshAiTopics]);
+
+  useBindPasteFab(handleFabPaste);
 
   async function onSave() {
     if (busyRef.current) return;
@@ -111,15 +109,15 @@ export default function CapturePage() {
     try {
       const processed = useSmartClean ? cleanPaste(input) : input;
       setStatus("저장 준비 중…");
-      // Removed getNoteCreator and related logic
-      const id = await createNoteUniversal(processed); // Direct call
-      if (!id) {
+      // MOD: createNoteUniversal 대신 useNotes의 addNote를 사용합니다.
+      const newNote = await addNote({ content: processed });
+      if (!newNote?.id) {
         setStatus("저장 실패: 반환된 ID가 비어있어요.");
         busyRef.current = false;
         return;
       }
       setStatus("저장 완료");
-      window.location.assign(`/note/${encodeURIComponent(String(id))}`);
+      window.location.assign(`/note/${encodeURIComponent(String(newNote.id))}`);
     } catch (e) {
       console.error(e);
       setStatus("저장 중 오류가 발생했어요.");
@@ -128,13 +126,14 @@ export default function CapturePage() {
     }
   }
 
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 pb-24">
       <header className="flex items-center gap-4 justify-between mb-6">
         <div className="flex items-center gap-4">
           <Link
             to="/"
-            className="p-2 rounded-lg border bg-white/80 hover:bg-white transition-colors"
+            className="p-2 rounded-lg border bg-card/80 hover:bg-card transition-colors"
             title="뒤로가기"
           >
             <ArrowLeft className="h-5 w-5" />
@@ -148,11 +147,12 @@ export default function CapturePage() {
               const filled = content
                 .replaceAll("{{date}}", new Date().toISOString().slice(0,10))
                 .replaceAll("{{time}}", new Date().toTimeString().slice(0,5));
-              setText(prev => (prev ? prev + "\n\n" + filled : filled));
-              refreshAiTopics(filled);
+              const newText = text ? text + "\n\n" + filled : filled;
+              setText(newText);
+              refreshAiTopics(newText); // No await needed
             }}
           />
-          <label className="text-xs flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-300/50 bg-white/50 hover:bg-white/80 transition-colors">
+          <label className="text-xs flex items-center gap-2 px-3 py-2 rounded-lg border bg-card/50 hover:bg-card/80 transition-colors">
             <input
               type="checkbox"
               checked={useSmartClean}
@@ -173,36 +173,37 @@ export default function CapturePage() {
         </div>
       )}
 
-      <section className="p-6 bg-white/60 backdrop-blur-lg rounded-2xl shadow-lg border border-white/20 mb-6">
+      <section className="p-6 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20 mb-6">
         <div className="text-xs mb-3 opacity-70">AI 주제 추천</div>
         <div className="flex flex-wrap gap-3">
           {aiTopics.length === 0 ? (
-            <span className="text-xs text-gray-500">내용을 입력하거나 붙여넣기 하면 추천이 보여요.</span>
+            <span className="text-xs text-muted-foreground">내용을 입력하거나 붙여넣기 하면 추천이 보여요.</span>
           ) : (
             aiTopics.map((t) => <TopicBadge key={t} topic={t} variant="small" />)
           )}
         </div>
       </section>
 
-      <section className="p-6 bg-white/60 backdrop-blur-lg rounded-2xl shadow-lg border border-white/20 mb-6">
+      <section className="p-6 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20 mb-6">
         <textarea
           ref={textareaRef}
-          className="w-full min-h-[40vh] px-4 py-3 border border-gray-300/50 bg-white/60 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-y transition-colors"
+          className="w-full min-h-[40vh] px-4 py-3 border bg-card/60 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent resize-y transition-colors"
           placeholder="여기에 붙여넣기 또는 직접 입력…"
           value={text}
           onChange={(e) => {
-            setText(e.target.value);
-            refreshAiTopics(e.target.value);
+            const newText = e.target.value;
+            setText(newText);
+            refreshAiTopics(newText); // No await needed
           }}
         />
         <div className="mt-4 text-right">
-          <button className="inline-flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors text-sm font-semibold" onClick={onSave}>이 내용으로 저장</button>
+          <button className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm font-semibold" onClick={onSave}>이 내용으로 저장</button>
         </div>
       </section>
 
-      <section className="p-6 bg-white/60 backdrop-blur-lg rounded-2xl shadow-lg border border-white/20">
+      <section className="p-6 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20">
         <div className="text-sm font-medium mb-3">고급 클리닝은 이렇게 정리해요</div>
-        <ul className="text-sm leading-relaxed list-disc pl-5 text-gray-700">
+        <ul className="text-sm leading-relaxed list-disc pl-5 text-muted-foreground">
           <li><b>코드블록</b>(``` … ```)은 건드리지 않아요.</li>
           <li>글머리표는 제각각이면 <code>-</code> 하나로 통일해요.</li>
           <li>번호목록은 <code>1)</code>/<code>1 -</code>도 <code>1.</code>로 맞춰요.</li>

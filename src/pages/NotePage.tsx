@@ -120,10 +120,10 @@ export default function NotePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">노트를 불러오는 중...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">노트를 불러오는 중...</p>
         </div>
       </div>
     );
@@ -131,10 +131,10 @@ export default function NotePage() {
 
   if (!note) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <p className="text-gray-600 mb-4">노트를 찾을 수 없습니다.</p>
-          <Link to="/" className="text-blue-600 hover:text-blue-700">
+          <p className="text-muted-foreground mb-4">노트를 찾을 수 없습니다.</p>
+          <Link to="/" className="text-primary hover:text-primary/80">
             홈으로 돌아가기
           </Link>
         </div>
@@ -143,39 +143,39 @@ export default function NotePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-10 bg-gray-50/80 backdrop-blur-lg border-b border-gray-200/80">
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border">
         <div className="max-w-4xl mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link
                 to="/"
-                className="p-2 text-gray-600 hover:bg-gray-200/70 rounded-lg transition-colors"
+                className="p-2 text-foreground hover:bg-muted rounded-lg transition-colors"
               >
                 <ArrowLeft className="h-5 w-5" />
               </Link>
               <div>
-                <h1 className="text-lg font-semibold text-gray-800">노트 상세</h1>
+                <h1 className="text-lg font-semibold text-foreground">노트 상세</h1>
               </div>
             </div>
             
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setEditing(!editing)}
-                className="p-2 text-gray-600 hover:bg-gray-200/70 rounded-lg transition-colors"
+                className="p-2 text-foreground hover:bg-muted rounded-lg transition-colors"
               >
                 <Edit2 className="h-5 w-5" />
               </button>
               <button
                 onClick={() => toggleFavorite(note.id)}
-                className={`p-2 rounded-lg transition-colors ${note.favorite ? 'text-red-500 hover:bg-red-100/50' : 'text-gray-400 hover:text-red-500 hover:bg-red-100/50'}`}
+                className={`p-2 rounded-lg transition-colors ${note.favorite ? 'text-destructive hover:bg-destructive/10' : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10'}`}
               >
                 {note.favorite ? <Heart className="h-5 w-5 fill-current" /> : <Heart className="h-5 w-5" />}
               </button>
               <button
                 onClick={handleDelete}
-                className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-100/50 rounded-lg transition-colors"
+                className="p-2 text-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
               >
                 <Trash2 className="h-5 w-5" />
               </button>
@@ -185,9 +185,9 @@ export default function NotePage() {
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white/60 backdrop-blur-lg rounded-2xl shadow-lg border border-white/20 p-8">
+        <div className="bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20 p-8">
           {/* Meta Info */}
-          <div className="flex items-center gap-4 mb-6 text-sm text-gray-500">
+          <div className="flex items-center gap-4 mb-6 text-sm text-muted-foreground">
             <div className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               <span>{formatDate(note.createdAt)}</span>
@@ -197,7 +197,7 @@ export default function NotePage() {
                 href={note.sourceUrl} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 hover:text-teal-600 transition-colors font-medium"
+                className="inline-flex items-center gap-1.5 hover:text-primary transition-colors font-medium"
               >
                 <ExternalLink className="h-4 w-4" />
                 원문 보기
@@ -212,10 +212,10 @@ export default function NotePage() {
                 type="text"
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
-                className="w-full text-3xl font-bold text-gray-900 bg-white/60 border border-gray-300/50 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors"
+                className="w-full text-3xl font-bold text-card-foreground bg-card/60 border rounded-lg px-3 py-2 focus:ring-2 focus:ring-ring focus:border-transparent transition-colors"
               />
             ) : (
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              <h1 className="text-3xl font-bold text-card-foreground mb-2">
                 {getSourceIcon(note.sourceType)} {note.title}
               </h1>
             )}
@@ -236,19 +236,19 @@ export default function NotePage() {
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
                   rows={15}
-                  className="w-full px-4 py-3 border border-gray-300/50 bg-white/60 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent resize-y transition-colors"
+                  className="w-full px-4 py-3 border bg-card/60 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent resize-y transition-colors"
                 />
                 <div className="flex justify-end gap-3 mt-4">
                   <button
                     onClick={handleCancelEdit}
-                    className="inline-flex items-center gap-2 px-4 py-2 border border-gray-300/50 bg-white/50 hover:bg-white/80 rounded-lg transition-colors text-sm"
+                    className="inline-flex items-center gap-2 px-4 py-2 border bg-card/50 hover:bg-card/80 rounded-lg transition-colors text-sm"
                   >
                     <X className="h-4 w-4" />
                     취소
                   </button>
                   <button
                     onClick={handleSaveEdit}
-                    className="inline-flex items-center gap-2 bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 transition-colors text-sm font-semibold"
+                    className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm font-semibold"
                   >
                     <Check className="h-4 w-4" />
                     저장
@@ -257,7 +257,7 @@ export default function NotePage() {
               </div>
             ) : (
               <div className="prose max-w-none">
-                <div className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                <div className="text-card-foreground whitespace-pre-wrap leading-relaxed">
                   {note.content}
                 </div>
               </div>
@@ -267,14 +267,14 @@ export default function NotePage() {
           {/* Highlights */}
           {note.highlights.length > 0 && (
             <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-card-foreground mb-4 flex items-center gap-2">
                 <Star className="h-5 w-5 text-yellow-500" />
                 하이라이트
               </h3>
               <div className="space-y-2">
                 {note.highlights.map((highlight, index) => (
-                  <div key={index} className="bg-yellow-100/50 border border-yellow-200/50 rounded-lg p-3">
-                    <div className="text-yellow-900/80">{highlight.text}</div>
+                  <div key={index} className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
+                    <div className="text-yellow-700 dark:text-yellow-300">{highlight.text}</div>
                   </div>
                 ))}
               </div>
@@ -284,22 +284,22 @@ export default function NotePage() {
           {/* Todo List */}
           {note.todo.length > 0 && (
             <div className="mb-8">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+              <h3 className="text-lg font-semibold text-card-foreground mb-4 flex items-center gap-2">
                 ✅ 할 일
-                <span className="text-sm text-gray-500 font-normal">
+                <span className="text-sm text-muted-foreground font-normal">
                   ({note.todo.filter(t => t.done).length}/{note.todo.length} 완료)
                 </span>
               </h3>
               <div className="space-y-2">
                 {note.todo.map((todo, index) => (
-                  <div key={index} className="flex items-start gap-3 p-3 bg-white/60 rounded-lg">
+                  <div key={index} className="flex items-start gap-3 p-3 bg-card/60 rounded-lg">
                     <button
                       onClick={() => toggleTodo(index)}
-                      className={`mt-1 w-4 h-4 rounded-sm border-2 flex-shrink-0 flex items-center justify-center transition-colors ${todo.done ? 'bg-teal-500 border-teal-500 text-white' : 'border-gray-400/80 hover:border-teal-500'}`}
+                      className={`mt-1 w-4 h-4 rounded-sm border-2 flex-shrink-0 flex items-center justify-center transition-colors ${todo.done ? 'bg-primary border-primary text-primary-foreground' : 'border hover:border-primary'}`}
                     >
                       {todo.done && <Check className="h-3 w-3" />}
                     </button>
-                    <span className={`flex-1 ${todo.done ? 'line-through text-gray-500' : 'text-gray-800'}`}>
+                    <span className={`flex-1 ${todo.done ? 'line-through text-muted-foreground' : 'text-card-foreground'}`}>
                       {todo.text}
                     </span>
                   </div>
@@ -311,12 +311,12 @@ export default function NotePage() {
           {/* Labels */}
           {note.labels.length > 0 && (
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">라벨</h3>
+              <h3 className="text-lg font-semibold text-card-foreground mb-4">라벨</h3>
               <div className="flex flex-wrap gap-2">
                 {note.labels.map((label) => (
                   <span
                     key={label}
-                    className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm"
+                    className="px-3 py-1 bg-muted text-muted-foreground rounded-full text-sm"
                   >
                     #{label}
                   </span>

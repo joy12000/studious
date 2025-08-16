@@ -11,7 +11,6 @@ type Props = {
 export default function FilterBar({ filters, onFiltersChange, availableTopics = [] }: Props) {
   const [localSearch, setLocalSearch] = useState(filters?.search ?? '');
   const [selectedTopics, setSelectedTopics] = useState<string[]>(filters?.topics ?? []);
-  const [isComposing, setIsComposing] = useState(false);
   const timerRef = useRef<number | null>(null);
 
   // propagate local search/topics (debounced)
@@ -40,8 +39,6 @@ export default function FilterBar({ filters, onFiltersChange, availableTopics = 
         <input
           value={localSearch}
           onChange={e => setLocalSearch(e.target.value)}
-          onCompositionStart={() => setIsComposing(true)}
-          onCompositionEnd={() => setIsComposing(false)}
           placeholder="노트 검색..."
           className="flex-1 outline-none bg-transparent text-base placeholder-gray-500"
         />

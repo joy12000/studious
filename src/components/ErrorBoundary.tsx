@@ -11,7 +11,13 @@ export default class ErrorBoundary extends React.Component<Props, State> {
   static getDerivedStateFromError(error: Error) { return { hasError: true, error, resetKey: 0 }; }
   componentDidCatch(error: Error, info: React.ErrorInfo) { console.error('[ErrorBoundary]', error, info); }
   hardReload = () => {
-    try { if (navigator.serviceWorker?.controller) { navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.update())); } } catch {}
+    try {
+      if (navigator.serviceWorker?.controller) {
+        navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.update()));
+      }
+    } catch (err) {
+      console.error('Failed to update service worker:', err);
+    }
     location.reload();
   };
   render() {

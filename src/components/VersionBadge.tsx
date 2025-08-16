@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 function getBuildVersion(): string {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const w: any = window as any;
   const fromWindow = w.BUILD_VERSION;
-  const fromEnv = (import.meta as any).env?.VITE_APP_VERSION || (import.meta as any).env?.VITE_COMMIT_SHA;
+  const fromEnv = (import.meta.env as { VITE_APP_VERSION?: string; VITE_COMMIT_SHA?: string })?.VITE_APP_VERSION || (import.meta.env as { VITE_APP_VERSION?: string; VITE_COMMIT_SHA?: string })?.VITE_COMMIT_SHA;
   const fallback = new Date().toISOString().slice(0,10);
   const v = (fromWindow || fromEnv || '').toString().trim();
   if (!v) return fallback;

@@ -38,8 +38,9 @@ export default function BackupPanel(){
       if (fileRef.current) fileRef.current.value = '';
       // 바로 새로고침
       location.reload();
-    } catch (err:any) {
-      alert(`복원 실패: ${err?.message || err}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      alert(`복원 실패: ${message}`);
     } finally {
       setBusy(false);
       // 이벤트가 null이더라도 안전하게 처리
