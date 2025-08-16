@@ -5,7 +5,7 @@ import NoteCard from '../components/NoteCard';
 import FilterBar from '../components/FilterBar';
 import { Settings, Pin, Plus } from 'lucide-react';
 
-// UI_IMPROVEMENT: 홈 화면 UI 개선
+// DYNAMIC_HEADER: 동적 헤더 구현
 export default function HomePage() {
   const { notes, loading, filters, setFilters, toggleFavorite } = useNotes();
   const [availableTopics, setAvailableTopics] = useState<string[]>([]);
@@ -25,11 +25,9 @@ export default function HomePage() {
 
   const sortedNotes = useMemo(() => {
     const arr = [...notes];
-    // 최신순으로 먼저 정렬
     arr.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     if (!pinFav) return arr;
     
-    // 즐겨찾기 상단 고정 로직
     const favs = arr.filter(n => n.favorite);
     const rest = arr.filter(n => !n.favorite);
     return [...favs, ...rest];
@@ -37,11 +35,21 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* UI_IMPROVEMENT: NotePage와 일관성을 맞춘 고정 헤더 추가 */}
+      {/* DYNAMIC_HEADER: 1. 스크롤하면 사라지는 대형 제목 영역 */}
+      <div className="max-w-7xl mx-auto px-4 pt-16 pb-8">
+        <h1 className="text-5xl font-bold tracking-tighter text-foreground">AIBRARY</h1>
+        <p className="text-lg text-muted-foreground mt-2">AI로 요약하고, 지식을 보관하세요.</p>
+      </div>
+
+      {/* DYNAMIC_HEADER: 2. 스크롤 시 상단에 고정되는 헤더 바 */}
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b">
         <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between mb-3">
-            <h1 className="text-xl font-bold text-foreground">내 노트</h1>
+          <div className="flex items-center gap-4">
+            {/* 필터 바가 헤더의 주요 공간을 차지하도록 설정 */}
+            <div className="flex-grow">
+              <FilterBar filters={filters} onFiltersChange={setFilters} availableTopics={availableTopics} />
+            </div>
+            {/* 액션 버튼들을 오른쪽에 배치 */}
             <div className="flex items-center gap-2">
               <Link
                 to="/capture"
@@ -66,12 +74,10 @@ export default function HomePage() {
               </Link>
             </div>
           </div>
-          {/* UI_IMPROVEMENT: 필터 바를 헤더 안으로 이동 */}
-          <FilterBar filters={filters} onFiltersChange={setFilters} availableTopics={availableTopics} />
         </div>
       </header>
 
-      {/* UI_IMPROVEMENT: NotePage와 일관성을 맞춘 메인 콘텐츠 영역 */}
+      {/* 메인 콘텐츠 영역 */}
       <main className="max-w-7xl mx-auto px-4 py-8">
         {loading && (
           <div className="text-center text-muted-foreground py-20">
@@ -86,7 +92,6 @@ export default function HomePage() {
           </div>
         )}
         
-        {/* UI_IMPROVEMENT: 반응형 그리드 레이아웃으로 노트 목록 표시 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {sortedNotes.map(n => (
             <NoteCard key={n.id} note={n} onToggleFavorite={toggleFavorite} />
