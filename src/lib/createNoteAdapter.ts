@@ -28,14 +28,10 @@ export async function createNoteUniversal(contentInput: any): Promise<string> {
 
   try {
     const id = await safeCreateNote(content);
-    console.log("createNoteUniversal: safeCreateNote returned", id);
     if (id) return id;
-  } catch (e) {
-    console.error("createNoteUniversal: safeCreateNote failed", e);
+  } catch {
     // Fallback to local save if safeCreateNote fails
   }
   // As a last resort, local save
-  const localId = saveLocal(content);
-  console.log("createNoteUniversal: saveLocal returned", localId);
-  return localId;
+  return saveLocal(content);
 }
