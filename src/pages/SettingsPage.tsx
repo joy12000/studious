@@ -65,19 +65,21 @@ export default function SettingsPage(){
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-      <header className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <button onClick={goBack} className="p-2 rounded-lg border bg-white/80 hover:bg-white transition-colors" title="뒤로가기">
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">설정</h1>
-            <p className="text-sm text-gray-500">백업/복원, 데이터, 분류 규칙, PWA 설치</p>
+            <header className="sticky top-0 z-10 bg-gray-50/80 backdrop-blur-lg border-b border-gray-200/80 px-4 py-3">
+        <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-y-3">
+          <div className="flex items-center gap-4">
+            <button onClick={goBack} className="p-2 rounded-lg border bg-white/80 hover:bg-white transition-colors" title="뒤로가기">
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight">설정</h1>
+              <p className="text-sm text-gray-500">백업/복원, 데이터, 분류 규칙, PWA 설치</p>
+            </div>
           </div>
+          <button onClick={goHome} className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 transition-colors" title="홈으로">
+            <Home className="h-4 w-4" /> 홈으로
+          </button>
         </div>
-        <button onClick={goHome} className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-100 text-gray-700 transition-colors" title="홈으로">
-          <Home className="h-4 w-4" /> 홈으로
-        </button>
       </header>
 
       {/* Tabs */}

@@ -64,7 +64,7 @@ export default function HomePage() {
           <h1 className="text-3xl font-bold tracking-tight">SelfDev Notes</h1>
           <p className="text-sm text-gray-500 mt-1">자기계발 요약 &amp; 기록</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 gap-y-2">
           <Link to="/capture" className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg bg-teal-600 text-white shadow-sm hover:bg-teal-700 transition-colors">
             <Plus className="h-4 w-4" /> 새 노트
           </Link>
