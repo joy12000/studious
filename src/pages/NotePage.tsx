@@ -4,7 +4,7 @@ import { db } from '../lib/db';
 import { Note } from '../lib/types';
 import { useNotes } from '../lib/useNotes';
 import TopicBadge from '../components/TopicBadge';
-import { encryptJSON, generatePassphrase, b64encode } from '../lib/crypto';
+import { encryptJSON, generatePassphrase } from '../lib/crypto';
 import { 
   ArrowLeft, 
   Heart, 
@@ -82,36 +82,65 @@ export default function NotePage() {
     }
   };
 
-  // SHARE_BUTTON: 공유 기능 핸들러 추가
+  // SHARE_FILE: 파일 기반 공유 기능 핸들러
   const handleShare = async () => {
     if (!note) return;
 
     try {
+      // 1. 암호화 키 생성 및 데이터 암호화
       const passphrase = generatePassphrase();
-      const payload = await encryptJSON({ content: note.content }, passphrase);
+      const payload = await encryptJSON({ 
+        title: note.title,
+        content: note.content,
+        topics: note.topics,
+        labels: note.labels,
+        sourceUrl: note.sourceUrl,
+        sourceType: note.sourceType,
+       }, passphrase);
       
-      // URL-safe Base64로 페이로드 인코딩
-      const payloadString = JSON.stringify(payload);
-      const payloadB64 = b64encode(new TextEncoder().encode(payloadString));
+      // 2. 암호화된 데이터를 담은 JSON 파일 생성
+      const payloadString = JSON.stringify(payload, null, 2);
+      const file = new File([payloadString], `${note.title.replace(/[\\/:\"*?<>|]/g, '')}.json`, {
+        type: 'application/json',
+      });
 
-      const shareUrl = new URL(`${window.location.origin}/shared-note`);
-      shareUrl.searchParams.set('p', payloadB64);
-      shareUrl.hash = passphrase;
-
-      const fullUrl = shareUrl.toString();
-
-      if (navigator.share) {
+      // 3. Web Share API로 파일 공유 시도
+      if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({
-          title: `공유된 노트: ${note.title}`,
-          text: '암호화된 노트를 확인하세요.',
-          url: fullUrl,
+          title: `암호화된 노트 공유: ${note.title}`,
+          text: `이 파일을 열려면 비밀번호가 필요합니다.`,
+          files: [file],
         });
+        
+        // 공유 창이 닫힌 후 비밀번호 안내
+        setTimeout(() => {
+          const copy = confirm(`공유가 시작되었습니다.\n\n이제 복호화 비밀번호를 클립보드에 복사하시겠습니까?\n\n비밀번호: ${passphrase}\n\n이 비밀번호를 상대방에게 안전하게 전달해주세요.`);
+          if (copy) {
+            navigator.clipboard.writeText(passphrase);
+            alert('비밀번호가 클립보드에 복사되었습니다.');
+          }
+        }, 1000); // 공유 시트가 닫힐 시간을 줍니다.
+
       } else {
-        navigator.clipboard.writeText(fullUrl);
-        alert('공유 링크가 클립보드에 복사되었습니다.');
+        // Web Share API를 사용할 수 없는 경우, 수동 다운로드 및 비밀번호 복사 안내
+        alert('파일 공유 기능을 사용할 수 없습니다. 수동으로 다운로드하고 비밀번호를 복사해주세요.');
+        
+        // 파일 다운로드 링크 생성 및 클릭
+        const url = URL.createObjectURL(file);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        // 비밀번호 클립보드 복사
+        navigator.clipboard.writeText(passphrase);
+        alert(`파일이 다운로드되었습니다.\n비밀번호가 클립보드에 복사되었습니다: ${passphrase}`);
       }
     } catch (error) {
-      console.error('Failed to share note:', error);
+      console.error('노트 공유 실패:', error);
       alert('노트를 공유하는 데 실패했습니다.');
     }
   };

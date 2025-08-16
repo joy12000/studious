@@ -2,24 +2,33 @@
 import React, { useRef } from 'react';
 import { FilePlus } from 'lucide-react';
 import { Note } from '../lib/types';
+import { decryptJSON, EncryptedPayload } from '../lib/crypto'; // decryptJSON 임포트
 
 // COMMENT: 노트 가져오기 버튼 컴포넌트
-// 홈 화면에 플로팅 버튼 형태로 표시되며, JSON 파일을 읽어 새 노트로 추가하는 기능을 담당합니다.
+// 홈 화면에 플로팅 버튼 형태로 표시되며, 암호화되거나 일반 JSON 파일을 읽어 새 노트로 추가하는 기능을 담당합니다.
 
 interface ImportButtonProps {
-  // onImport: 노트를 추가하는 함수. useNotes 훅의 addNote 함수가 전달됩니다.
   onImport: (note: Partial<Note>) => Promise<void>;
 }
 
+// COMMENT: 주어진 데이터가 EncryptedPayload 형식인지 확인하는 타입 가드
+function isEncryptedPayload(data: any): data is EncryptedPayload {
+  return (
+    data &&
+    typeof data.v === 'number' &&
+    data.alg === 'AES-GCM' &&
+    typeof data.salt === 'string' &&
+    typeof data.iv === 'string' &&
+    typeof data.data === 'string'
+  );
+}
+
 export default function ImportButton({ onImport }: ImportButtonProps) {
-  // COMMENT: 숨겨진 file input 엘리먼트에 접근하기 위한 ref
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   /**
    * COMMENT: 파일 선택 시 실행되는 핸들러
-   * - 선택된 파일의 유효성을 검사합니다.
-   * - FileReader를 사용해 파일 내용을 텍스트로 읽습니다.
-   * - 읽기가 완료되면 onload 핸들러가 실행됩니다.
+   * - 암호화된 파일과 일반 JSON 파일을 모두 처리합니다.
    */
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -34,21 +43,46 @@ export default function ImportButton({ onImport }: ImportButtonProps) {
         }
         const data = JSON.parse(text);
 
-        // COMMENT: 가져온 데이터에 content 필드가 있는지 최소한의 유효성 검사를 수행합니다.
-        if (!data.content) {
-          alert('가져오기 실패: JSON 파일에 "content" 필드가 필요합니다.');
-          return;
-        }
+        let noteToImport: Partial<Note>;
 
-        // COMMENT: 새 노트 객체를 생성합니다. title이 없으면 기본값을 사용합니다.
-        const noteToImport: Partial<Note> = {
-          title: data.title || '가져온 노트',
-          content: data.content,
-          topics: data.topics || [],
-          labels: data.labels || [],
-          sourceUrl: data.sourceUrl || '',
-          sourceType: data.sourceType || 'web',
-        };
+        // COMMENT: 파일이 암호화된 형식인지 확인
+        if (isEncryptedPayload(data)) {
+          const passphrase = prompt('이 노트는 암호화되어 있습니다. 복호화 비밀번호를 입력하세요:');
+          if (!passphrase) {
+            alert('비밀번호가 입력되지 않아 가져오기를 취소합니다.');
+            return;
+          }
+          try {
+            // COMMENT: 입력받은 비밀번호로 복호화 시도
+            const decryptedData = await decryptJSON<Partial<Note>>(data, passphrase);
+            noteToImport = {
+              title: decryptedData.title || '가져온 노트',
+              content: decryptedData.content || '',
+              topics: decryptedData.topics || [],
+              labels: decryptedData.labels || [],
+              sourceUrl: decryptedData.sourceUrl || '',
+              sourceType: decryptedData.sourceType || 'web',
+            };
+          } catch (decryptError) {
+            console.error('복호화 실패:', decryptError);
+            alert('복호화에 실패했습니다. 비밀번호가 정확한지 확인해주세요.');
+            return;
+          }
+        } else {
+          // COMMENT: 일반 JSON 파일 처리 로직
+          if (!data.content) {
+            alert('가져오기 실패: JSON 파일에 "content" 필드가 필요합니다.');
+            return;
+          }
+          noteToImport = {
+            title: data.title || '가져온 노트',
+            content: data.content,
+            topics: data.topics || [],
+            labels: data.labels || [],
+            sourceUrl: data.sourceUrl || '',
+            sourceType: data.sourceType || 'web',
+          };
+        }
 
         await onImport(noteToImport);
         alert('노트를 성공적으로 가져왔습니다!');
@@ -57,7 +91,6 @@ export default function ImportButton({ onImport }: ImportButtonProps) {
         console.error('노트 가져오기 오류:', error);
         alert('노트를 가져오는 데 실패했습니다. 유효한 JSON 파일인지 확인해주세요.');
       } finally {
-        // COMMENT: 같은 파일을 다시 선택해도 onChange 이벤트가 발생하도록 값을 초기화합니다.
         if(fileInputRef.current) {
           fileInputRef.current.value = '';
         }
@@ -66,16 +99,12 @@ export default function ImportButton({ onImport }: ImportButtonProps) {
     reader.readAsText(file);
   };
 
-  /**
-   * COMMENT: 버튼 클릭 시 숨겨진 file input을 클릭하여 파일 선택창을 엽니다.
-   */
   const handleClick = () => {
     fileInputRef.current?.click();
   };
 
   return (
     <>
-      {/* COMMENT: 실제 파일 선택 로직을 처리하는 숨겨진 input 엘리먼트 */}
       <input
         type="file"
         ref={fileInputRef}
@@ -83,7 +112,6 @@ export default function ImportButton({ onImport }: ImportButtonProps) {
         accept=".json"
         className="hidden"
       />
-      {/* COMMENT: 사용자에게 보여지는 플로팅 액션 버튼 */}
       <button
         onClick={handleClick}
         className="fixed bottom-28 right-6 bg-secondary text-secondary-foreground rounded-full p-4 shadow-lg hover:bg-secondary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 transition-transform duration-200 ease-in-out hover:scale-105"
