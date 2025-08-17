@@ -130,9 +130,18 @@ export default function TopicRulesEditor(){
           <div key={rule.topic} className="rounded-lg border p-3">
             <div className="flex items-center justify-between mb-2">
               <div className="font-medium">{rule.topic}</div>
-              <button onClick={()=>removeTopic(rule.topic)} className="text-red-600 text-xs inline-flex items-center gap-1">
-                <Trash2 className="h-3 w-3" /> 삭제
-              </button>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={rule.weight}
+                  onChange={(e) => setRules(prev => prev.map(r => r.topic === rule.topic ? { ...r, weight: parseInt(e.target.value, 10) || 1 } : r))}
+                  className="w-16 text-sm text-right border border-gray-300/50 bg-white/50 rounded-lg px-2 py-1 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors"
+                  title="가중치 (높을수록 우선순위가 높음)"
+                />
+                <button onClick={()=>removeTopic(rule.topic)} className="text-red-600 text-xs inline-flex items-center gap-1">
+                  <Trash2 className="h-3 w-3" /> 삭제
+                </button>
+              </div>
             </div>
             <TopicKeywords values={rule.keywords||[]} onAdd={(s)=>addKeyword(rule.topic, s)} onRemove={(kw)=>removeKw(rule.topic, kw)} />
           </div>

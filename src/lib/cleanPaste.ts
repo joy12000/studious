@@ -42,7 +42,7 @@ function splitByCodeFences(text: string): Array<{ isCode: boolean; text: string 
  */
 function stripTrackingParamsInText(text: string): string {
   // A more robust regex to find URLs, handling various trailing characters.
-  const urlRegex = /(https?:\/\/[^\s"'<>`()\[\]{}]+)/g;
+  const urlRegex = /(https?:\/\/[^\s"'<>`()[]{}]+)/g;
   
   return text.replace(urlRegex, (url) => {
     try {

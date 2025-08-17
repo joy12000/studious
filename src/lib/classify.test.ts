@@ -4,7 +4,7 @@ import { escapeRegExp } from './classify';
 describe('escapeRegExp', () => {
   it('should escape special regular expression characters', () => {
     const specialChars = '.*+?^${}()|[]\';
-    const expected = '\.\*\+\?\^\$\{\}\(\)\|\[\]\\';
+    const expected = '\.\*\+\\\?\^\$\{\}\(\)\|\[\]\\';
     expect(escapeRegExp(specialChars)).toBe(expected);
   });
 
