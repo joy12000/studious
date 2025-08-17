@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
+import { X, Download } from 'lucide-react';
 
 // COMMENT: 공유 시 4자리 PIN을 입력받기 위한 모달 컴포넌트
 
@@ -8,10 +8,11 @@ interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (pin: string) => void;
+  onDownload: (pin: string) => void; // 다운로드 핸들러 추가
   noteTitle: string;
 }
 
-export default function ShareModal({ isOpen, onClose, onConfirm, noteTitle }: ShareModalProps) {
+export default function ShareModal({ isOpen, onClose, onConfirm, onDownload, noteTitle }: ShareModalProps) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -26,17 +27,27 @@ export default function ShareModal({ isOpen, onClose, onConfirm, noteTitle }: Sh
     }
   }, [isOpen]);
 
-  // COMMENT: 사용자가 '공유 시작' 버튼을 눌렀을 때 실행됩니다.
-  const handleSubmit = () => {
+  // COMMENT: PIN 유효성을 검사하는 공통 함수
+  const validateAndProceed = (action: (pin: string) => void) => {
     if (/^\d{4}$/.test(pin)) {
-      onConfirm(pin);
+      action(pin);
     } else {
       setError('반드시 4자리 숫자를 입력해야 합니다.');
       inputRef.current?.focus();
     }
   };
 
-  // COMMENT: Enter 키를 눌렀을 때도 공유가 시작되도록 합니다.
+  // COMMENT: 사용자가 '공유 시작' 버튼을 눌렀을 때 실행됩니다.
+  const handleSubmit = () => {
+    validateAndProceed(onConfirm);
+  };
+
+  // COMMENT: 사용자가 '파일만 다운로드' 버튼을 눌렀을 때 실행됩니다.
+  const handleDownload = () => {
+    validateAndProceed(onDownload);
+  };
+
+  // COMMENT: Enter 키를 눌렀을 때 기본 동작인 '공유 시작'이 실행되도록 합니다.
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter') {
       handleSubmit();
@@ -60,14 +71,14 @@ export default function ShareModal({ isOpen, onClose, onConfirm, noteTitle }: Sh
         onClick={(e) => e.stopPropagation()} // 모달 내부 클릭 시 닫히지 않도록 함
       >
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-800">노트 공유 암호 설정</h2>
+          <h2 className="text-xl font-bold text-gray-800">노트 공유 및 내보내기</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
             <X size={24} />
           </button>
         </div>
         
         <p className="text-gray-600 mb-2">
-          공유할 노트 "<strong className="truncate max-w-xs inline-block align-bottom">{noteTitle}</strong>"를 암호화할 4자리 숫자 PIN을 입력하세요.
+          공유 또는 다운로드할 노트 "<strong className="truncate max-w-xs inline-block align-bottom">{noteTitle}</strong>"를 암호화할 4자리 숫자 PIN을 입력하세요.
         </p>
         
         <input
@@ -83,12 +94,21 @@ export default function ShareModal({ isOpen, onClose, onConfirm, noteTitle }: Sh
         
         {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
 
-        <button
-          onClick={handleSubmit}
-          className="w-full mt-6 bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-transform active:scale-[0.98]"
-        >
-          공유 시작
-        </button>
+        <div className="mt-6 space-y-3">
+          <button
+            onClick={handleSubmit}
+            className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-transform active:scale-[0.98] flex items-center justify-center gap-2"
+          >
+            공유 시작
+          </button>
+          <button
+            onClick={handleDownload}
+            className="w-full bg-gray-600 text-white font-bold py-3 rounded-lg hover:bg-gray-700 transition-transform active:scale-[0.98] flex items-center justify-center gap-2"
+          >
+            <Download size={18} />
+            파일만 다운로드
+          </button>
+        </div>
       </div>
     </div>
   );

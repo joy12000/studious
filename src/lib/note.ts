@@ -25,7 +25,7 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
 
   // YOUTUBE_LINK_EXTRACTION: 유튜브 링크 추출 및 처리 로직 시작
   // 유튜브 URL을 찾기 위한 정규식입니다. (standard, short, shorts, live, embed)
-  const youtubeRegex = /(?:https?://)?(?:www\.)?(?:youtube\.com/(?:watch\?v=|embed/|v/|shorts/|live/)|youtu\.be/)([a-zA-Z0-9_-]{11})/g;
+  const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/g;
   
   let cleanedContent = content;
   let extractedUrl: string | null = null;
@@ -140,22 +140,23 @@ export async function shareNote(note: Note, passphrase: string): Promise<void> {
 }
 
 /**
- * Downloads a note as a plain .aibook file.
+ * Encrypts and downloads a note as an .aibook file.
  * @param note The note to download.
+ * @param passphrase The 4-digit PIN to encrypt the note.
  */
-export async function downloadNote(note: Note): Promise<void> {
+export async function downloadEncryptedNote(note: Note, passphrase: string): Promise<void> {
   try {
-    const noteData = {
+    const payload = await encryptJSON({
       title: note.title,
       content: note.content,
       topics: note.topics,
       labels: note.labels,
       sourceUrl: note.sourceUrl,
       sourceType: note.sourceType,
-    };
+    }, passphrase);
 
     const file = new File(
-      [JSON.stringify(noteData, null, 2)],
+      [JSON.stringify(payload, null, 2)],
       `${note.title.replace(/[\\/:*?"<>|]/g, '')}.aibook`,
       { type: 'text/plain' }
     );
@@ -172,7 +173,7 @@ export async function downloadNote(note: Note): Promise<void> {
       URL.revokeObjectURL(url);
     }, 100);
   } catch (error) {
-    console.error('노트 다운로드 실패:', error);
-    alert('노트를 다운로드하는 데 실패했습니다.');
+    console.error('암호화된 노트 다운로드 실패:', error);
+    alert('암호화된 노트를 다운로드하는 데 실패했습니다.');
   }
 }
