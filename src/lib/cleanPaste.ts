@@ -65,20 +65,35 @@ function stripTrackingParamsInText(text: string): string {
 }
 
 /**
- * Removes all URLs and citation-like patterns (e.g., [1] http://...) from the text.
+ * Removes all URLs and citation-like patterns from the text, but preserves the first YouTube link.
  * @param text The text to process.
- * @returns Text with links removed.
+ * @returns Text with links removed, except for the first YouTube link.
  */
 function removeAllLinks(text: string): string {
-  // Regex to find [number] followed by an optional space and a URL.
+  const youtubeRegex = /(https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[^\s]+)/;
+  const youtubeMatch = text.match(youtubeRegex);
+  const firstYoutubeLink = youtubeMatch ? youtubeMatch[0] : null;
+
+  const placeholder = '___YOUTUBE_LINK_PLACEHOLDER___';
+  let processedText = text;
+
+  if (firstYoutubeLink) {
+    processedText = processedText.replace(firstYoutubeLink, placeholder);
+  }
+
+  // Remove citation links like [1], [2], etc.
   const citationRegex = /\[\d+\]\s*https?:\/\/[^\s]+/g;
-  text = text.replace(citationRegex, '');
+  processedText = processedText.replace(citationRegex, '');
 
-  // Regex to find any remaining URLs.
+  // Remove any other remaining URLs
   const urlRegex = /https?:\/\/[^\s]+/g;
-  text = text.replace(urlRegex, '');
+  processedText = processedText.replace(urlRegex, '');
 
-  return text;
+  if (firstYoutubeLink) {
+    processedText = processedText.replace(placeholder, firstYoutubeLink);
+  }
+
+  return processedText;
 }
 
 /**
