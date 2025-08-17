@@ -25,7 +25,7 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
 
   // YOUTUBE_LINK_EXTRACTION: 유튜브 링크 추출 및 처리 로직 시작
   // 유튜브 URL을 찾기 위한 정규식입니다. (standard, short, shorts, live, embed)
-  const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/g;
+  const youtubeRegex = /(?:https?://)?(?:www\.)?(?:youtube\.com/(?:watch\?v=|embed/|v/|shorts/|live/)|youtu\.be/)([a-zA-Z0-9_-]{11})/g;
   
   let cleanedContent = content;
   let extractedUrl: string | null = null;
@@ -116,7 +116,7 @@ export async function shareNote(note: Note, passphrase: string): Promise<void> {
     
     // SHARE_COMPATIBILITY: .json 대신 .aibook 확장자와 text/plain 타입을 사용하여 모바일 공유 호-환성을 높입니다.
     // 내용은 여전히 JSON 형식이므로 가져오기 기능은 정상적으로 작동합니다.
-    const file = new File([JSON.stringify(payload, null, 2)], `${note.title.replace(/[\/:\
+    const file = new File([JSON.stringify(payload, null, 2)], `${note.title.replace(/[\/:*?"<>|]/g, '')}.aibook`, { type: 'text/plain' });
 
     if (navigator.share && navigator.canShare({ files: [file] })) {
       try {
@@ -136,5 +136,43 @@ export async function shareNote(note: Note, passphrase: string): Promise<void> {
   } catch (error) {
     console.error('노트 공유 실패:', error);
     alert('노트를 공유하는 데 실패했습니다.');
+  }
+}
+
+/**
+ * Downloads a note as a plain .aibook file.
+ * @param note The note to download.
+ */
+export async function downloadNote(note: Note): Promise<void> {
+  try {
+    const noteData = {
+      title: note.title,
+      content: note.content,
+      topics: note.topics,
+      labels: note.labels,
+      sourceUrl: note.sourceUrl,
+      sourceType: note.sourceType,
+    };
+
+    const file = new File(
+      [JSON.stringify(noteData, null, 2)],
+      `${note.title.replace(/[\\/:*?"<>|]/g, '')}.aibook`,
+      { type: 'text/plain' }
+    );
+
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = file.name;
+    document.body.appendChild(a);
+    a.click();
+
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 100);
+  } catch (error) {
+    console.error('노트 다운로드 실패:', error);
+    alert('노트를 다운로드하는 데 실패했습니다.');
   }
 }

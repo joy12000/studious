@@ -5,7 +5,7 @@ import { Note } from '../lib/types';
 import { useNotes } from '../lib/useNotes';
 import TopicBadge from '../components/TopicBadge';
 import ShareModal from '../components/ShareModal'; // ShareModal 임포트
-import { shareNote } from '../lib/note';
+import { shareNote, downloadNote } from '../lib/note';
 import { 
   ArrowLeft, 
   Heart, 
@@ -18,6 +18,7 @@ import {
   Plus,
   Trash2,
   Share2, // SHARE_BUTTON: 아이콘 임포트
+  Download, // DOWNLOAD_BUTTON: 아이콘 임포트
   Youtube // YOUTUBE_BUTTON: 아이콘 임포트
 } from 'lucide-react';
 
@@ -89,6 +90,12 @@ export default function NotePage() {
     if (!note) return;
     setIsShareModalOpen(false);
     await shareNote(note, passphrase);
+  };
+
+  // DOWNLOAD_BUTTON: 다운로드 로직 추가
+  const handleDownload = async () => {
+    if (!note) return;
+    await downloadNote(note); 
   };
 
   // DEEPLINK_FIX: PC 환경에서도 안정적으로 동작하도록 딥 링크 로직 수정
@@ -221,6 +228,12 @@ export default function NotePage() {
                   className="p-2 text-foreground hover:bg-muted rounded-lg transition-colors"
                 >
                   <Share2 className="h-5 w-5" />
+                </button>
+                <button
+                  onClick={handleDownload}
+                  className="p-2 text-foreground hover:bg-muted rounded-lg transition-colors"
+                >
+                  <Download className="h-5 w-5" />
                 </button>
                 <button
                   onClick={() => setEditing(!editing)}
