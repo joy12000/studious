@@ -2,7 +2,7 @@ import { db } from './db';
 import type { TopicRule } from './types';
 
 // 1. 강화된 내장 규칙: 다양한 토픽과 가중치(1점 또는 2점)를 가진 키워드들
-const builtInRules: Record<string, Record<string, number>> = {
+export const DEFAULT_TOPIC_RULES: Record<string, Record<string, number>> = {
   '프로그래밍': { 'javascript': 2, 'typescript': 2, 'python': 2, 'react': 2, 'node.js': 2, '알고리즘': 2, '데이터베이스': 2, 'API': 1, '라이브러리': 1, '프레임워크': 1, '코딩': 1, '개발': 1, '디버깅': 1, '서버': 1, '클라이언트': 1 },
   '경제/금융': { '주식': 2, '부동산': 2, '투자': 2, '금리': 2, '인플레이션': 2, '환율': 2, '채권': 2, '세금': 1, '은행': 1, '대출': 1, '펀드': 1, '시장': 1, '경제': 1, '금융': 1, '자산': 1 },
   '건강/운동': { '헬스': 2, '다이어트': 2, '영양': 2, '스트레칭': 1, '칼로리': 1, '단백질': 1, '수면': 1, '명상': 1, '요가': 1, '필라테스': 1, '러닝': 1, '근력': 1, '유산소': 1 },
@@ -26,11 +26,19 @@ export async function guessTopics(text: string): Promise<string[]> {
     const cleanedText = text.toLowerCase();
     const scores: Record<string, number> = {};
 
-    const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\\\]/g, '\\$&');
+    // esbuild의 정규식 해석 오류를 피하기 위해 new RegExp()를 사용하는 방식으로 변경
+    const escapeRegExp = (str: string) => {
+      // 정규식에서 특별한 의미를 갖는 문자들의 리스트
+      const charsToEscape = ['\\', '[', ']', '{', '}', '(', ')', '*', '+', '?', '.', '^', '$', '|'];
+      // 이스케이프된 문자들로 정규식 패턴 생성 (e.g., \\|\\[|\\]|...)
+      const pattern = charsToEscape.map(char => `\\${char}`).join('|');
+      const regex = new RegExp(pattern, 'g');
+      return str.replace(regex, '\\$&');
+    };
 
     // 헬퍼 함수: 텍스트에서 키워드를 찾아 점수 추가
     const addScore = (topic: string, keyword: string, weight: number) => {
-      const pattern = `\\b${escapeRegExp(keyword.toLowerCase())}\\b`;
+      const pattern = `\\b${escapeRegExp(keyword.toLowerCase())}\b`;
       const regex = new RegExp(pattern, 'g');
       const matches = cleanedText.match(regex);
       if (matches) {
@@ -46,7 +54,7 @@ export async function guessTopics(text: string): Promise<string[]> {
     }
 
     // 2순위: 내장 규칙 적용 (가중치 1~2점)
-    for (const [topic, keywordsWithWeights] of Object.entries(builtInRules)) {
+    for (const [topic, keywordsWithWeights] of Object.entries(DEFAULT_TOPIC_RULES)) {
       for (const [keyword, weight] of Object.entries(keywordsWithWeights)) {
         addScore(topic, keyword, weight);
       }
@@ -173,7 +181,7 @@ export function extractTodos(content: string): { text: string; done: boolean }[]
   const lines = text.split('\n');
 
   // Regex to capture various todo list formats, pre-compiled for efficiency.
-  const todoLineRegex = /^\s*(?:-\s*\[( |x)\]|[-*•·–—]|[\\\\][\d]+[.)]|(?:🔹|✅|▶️|→|➤|•))\s*(.+)$/i;
+  const todoLineRegex = /^\s*(?:-\s*\[( |x)\]|[-*•·–—]|\d+[.)]|(?:🔹|✅|▶️|→|➤|•))\s*(.+)$/i;
 
   for (const line of lines) {
     const match = line.match(todoLineRegex);
