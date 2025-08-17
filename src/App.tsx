@@ -38,22 +38,51 @@ function ServiceWorkerMessageHandler() {
 }
 
 function App() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if ('launchQueue' in window) {
+      window.launchQueue.setConsumer(async (launchParams) => {
+        if (!launchParams.files || launchParams.files.length === 0) {
+          return;
+        }
+        
+        const fileHandle = launchParams.files[0];
+        const file = await fileHandle.getFile();
+        
+        try {
+          const content = await file.text();
+          navigate('/shared-note', { state: { sharedContent: content } });
+        } catch (error) {
+          console.error('Error reading launched file:', error);
+          alert('파일을 여는 데 실패했습니다.');
+        }
+      });
+    }
+  }, [navigate]);
+
+  return (
+    <div className="min-h-screen bg-background text-foreground">
+      <ShareHandler />
+      <ServiceWorkerMessageHandler />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/capture" element={<CapturePage />} />
+        <Route path="/note/:id" element={<NotePage />} />
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/share" element={<ShareHandler />} />
+        <Route path="/shared-note" element={<SharedNotePage />} />
+      </Routes>
+    </div>
+  );
+}
+
+function Root() {
   return (
     <Router>
-      <div className="min-h-screen bg-background text-foreground">
-        <ShareHandler />
-        <ServiceWorkerMessageHandler />
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/capture" element={<CapturePage />} />
-          <Route path="/note/:id" element={<NotePage />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/share" element={<ShareHandler />} />
-          <Route path="/shared-note" element={<SharedNotePage />} />
-        </Routes>
-      </div>
+      <App />
     </Router>
   );
 }
 
-export default App;
+export default Root;

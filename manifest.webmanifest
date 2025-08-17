@@ -33,5 +33,14 @@
         }
       ]
     }
-  }
+  },
+  "file_handlers": [
+    {
+      "action": "/",
+      "accept": {
+        "text/plain": [".aibook"]
+      },
+      "launch_type": "single-client"
+    }
+  ]
 }
