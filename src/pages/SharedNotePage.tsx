@@ -1,9 +1,8 @@
 
 import { useEffect, useState } from 'react';
-import { useSearchParams, useLocation } from 'react-router-dom';
-import { decryptJSON, EncryptedPayload, b64decode } from '../lib/crypto';
+import { useLocation } from 'react-router-dom';
+import { decryptJSON, EncryptedPayload } from '../lib/crypto';
 import { Note } from '../lib/types';
-import { useNotes } from '../lib/useNotes';
 import { createNote } from '../lib/note';
 
 // DECRYPT_VIEW: 복호화된 내용을 보여주는 뷰 컴포넌트
@@ -93,7 +92,6 @@ function PassphraseView({ onConfirm }: { onConfirm: (pass: string) => void }) {
 
 export default function SharedNotePage() {
   const location = useLocation();
-  const { addNote } = useNotes();
   
   const [encryptedPayload, setEncryptedPayload] = useState<EncryptedPayload | null>(null);
   const [decryptedNote, setDecryptedNote] = useState<Partial<Note> | null>(null);

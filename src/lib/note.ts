@@ -116,7 +116,7 @@ export async function shareNote(note: Note, passphrase: string): Promise<void> {
     
     // SHARE_COMPATIBILITY: API 막힘 방지를 위해 공유 시에는 .txt 확장자를 사용합니다.
     // 내용은 여전히 JSON 형식이므로 가져오기 기능은 정상적으로 작동합니다.
-    const file = new File([JSON.stringify(payload, null, 2)], `${note.title.replace(/[\/:*?"<>|]/g, '')}.txt`, { type: 'text/plain' });
+    const file = new File([JSON.stringify(payload, null, 2)], `${note.title.replace(/[/:*?"<>|]/g, '')}.txt`, { type: 'text/plain' });
 
     if (navigator.share && navigator.canShare({ files: [file] })) {
       try {
@@ -125,8 +125,8 @@ export async function shareNote(note: Note, passphrase: string): Promise<void> {
           files: [file],
         });
         alert(`공유가 시작되었습니다. 설정한 비밀번호 "${passphrase}"를 상대방에게 알려주세요.`);
-      } catch (error: any) {
-        if (error.name === 'NotAllowedError') {
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'NotAllowedError') {
           fallbackShare(file);
         } else { throw error; }
       }

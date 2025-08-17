@@ -44,13 +44,16 @@ export default function SettingsPage(){
     if (!settings) return;
     const next = settings.theme === 'dark' ? 'light' : 'dark';
     const updated = { ...settings, theme: next };
-    await db.settings.put({ id: 'default', ...updated } as any);
+    await db.settings.put({ id: 'default', ...updated });
     setSettings(updated);
     try {
       const root = document.documentElement;
       if (next === 'dark') root.classList.add('dark'); else root.classList.remove('dark');
       localStorage.setItem('pref-theme', next);
-    } catch {}
+    } catch {
+      // localStorage can be unavailable in some browser environments (e.g., private mode).
+      // This is not a critical failure, so we can safely ignore the error.
+    }
   }
 
   async function wipeAll(){
@@ -191,7 +194,7 @@ export default function SettingsPage(){
           </section>
 
           <section className="text-xs text-muted-foreground px-1">
-            <div>버전: <code>v{(window as any).BUILD_VERSION || (import.meta as any).env?.VITE_APP_VERSION || 'local'}</code></div>
+            <div>버전: <code>v{window.BUILD_VERSION || import.meta.env?.VITE_APP_VERSION || 'local'}</code></div>
           </section>
         </div>
       )}

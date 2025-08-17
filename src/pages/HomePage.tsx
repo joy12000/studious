@@ -23,7 +23,10 @@ export default function HomePage() {
   }, [notes]);
 
   useEffect(()=>{
-    try { localStorage.setItem('pinFavorites', String(pinFav)); } catch {}
+    try { localStorage.setItem('pinFavorites', String(pinFav)); } catch {
+      // localStorage may be unavailable in private browsing, etc.
+      // This is not a critical error, so we can ignore it.
+    }
   }, [pinFav]);
 
   const sortedNotes = useMemo(() => {

@@ -4,7 +4,7 @@ import { escapeRegExp } from './classify';
 describe('escapeRegExp', () => {
   it('정규식 특수 문자를 올바르게 이스케이프해야 합니다', () => {
     const specialChars = '.*+?^${}()|[]\\';
-    const expected = '\.\*\+\?\^\$\{\}\(\)\|\[\]\\';
+    const expected = '\\.\\*\\+\\?\\^\\$\\{\\\\)\\|\\[\\\\]\\\\';
     expect(escapeRegExp(specialChars)).toBe(expected);
   });
 
@@ -14,7 +14,7 @@ describe('escapeRegExp', () => {
   });
 
   it('특수 문자와 일반 문자가 섞인 문자열도 올바르게 처리해야 합니다', () => {
-    const mixedString = 'a.b*c+d?e^f${g}(h)|i[j]\\k';
+    const mixedString = 'a.b*c+d?e^f${g}(h)|i[j]\k';
     const expected = 'a\.b\*c\+d\?e\^f\$\{g\}\(h\)\|i\[j\]\\k';
     expect(escapeRegExp(mixedString)).toBe(expected);
   });

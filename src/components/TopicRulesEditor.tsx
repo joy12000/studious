@@ -1,18 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Plus, Save, Trash2, RefreshCcw, FlaskConical } from 'lucide-react';
 import { db } from '../lib/db';
-import { guessTopics } from '../lib/classify';
-import type { Setting } from '../lib/types';
-
-type Rules = Record<string, string[]>;
-
-const DEFAULTS_FALLBACK: Rules = {
-  Productivity: ['todo','task','schedule','routine','workflow','focus','deep work','pomodoro','habit'],
-  Learning: ['study','learn','course','lecture','note-taking','flashcard',' spaced','anki','memory'],
-  Mindset: ['mindset','motivation','discipline','reflection','journal','grit','growth'],
-  Health: ['workout','fitness','sleep','diet','nutrition','meditation','yoga','steps'],
-  Career: ['career','job','interview','portfolio','resume','networking','leadership'],
-};
+import { guessTopics, DEFAULT_TOPIC_RULES } from '../lib/classify';
+import type { TopicRule } from '../lib/types';
 
 function Chip({children, onRemove}:{children:React.ReactNode; onRemove?:()=>void}){
   return (
@@ -26,53 +16,64 @@ function Chip({children, onRemove}:{children:React.ReactNode; onRemove?:()=>void
 }
 
 export default function TopicRulesEditor(){
-  const [rules, setRules] = useState<Rules>({});
+  const [rules, setRules] = useState<TopicRule[]>([]);
   const [newTopic, setNewTopic] = useState('');
   const [testText, setTestText] = useState('');
   const [preview, setPreview] = useState<string[]>([]);
 
   useEffect(()=>{
     (async () => {
-      const s = await db.settings.get('default');
-      setRules({ ...(s?.topicRules || {}) });
+      const userRules = await db.topicRules.toArray();
+      setRules(userRules);
     })();
   }, []);
 
   async function save(){
-    const s = await db.settings.get('default');
-    await db.settings.put({ id: 'default', ...(s||{}), topicRules: rules } as Setting);
+    await db.topicRules.bulkPut(rules);
     alert('규칙을 저장했어요.');
   }
 
   function addTopic(){
-    const t = newTopic.trim();
-    if (!t || rules[t]) return;
-    setRules(prev => ({ ...prev, [t]: [] }));
+    const topicName = newTopic.trim();
+    if (!topicName || rules.some(r => r.topic === topicName)) return;
+    // GEMINI: 사용자가 토픽을 추가하면, 키워드는 비어있고 가중치는 3으로 설정합니다.
+    const newRule: TopicRule = { topic: topicName, keywords: [], weight: 3 };
+    setRules(prev => [...prev, newRule]);
     setNewTopic('');
   }
 
-  function addKeyword(topic: string, kwStr: string){
-    const kws = kwStr.split(/[,;]/).map(s=>s.trim()).filter(Boolean);
-    setRules(prev => {
-      const cur = new Set([...(prev[topic]||[])]);
-      kws.forEach(k => cur.add(k));
-      return { ...prev, [topic]: Array.from(cur) };
-    });
+  function addKeyword(topicName: string, kwStr: string){
+    const keywordsToAdd = kwStr.split(/[,;]/).map(s=>s.trim().toLowerCase()).filter(Boolean);
+    setRules(prev => prev.map(rule => {
+      if (rule.topic === topicName) {
+        const newKeywords = Array.from(new Set([...rule.keywords, ...keywordsToAdd]));
+        return { ...rule, keywords: newKeywords };
+      }
+      return rule;
+    }));
   }
 
-  function removeTopic(topic: string){
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { [topic]:_, ...rest } = rules;
-    setRules(rest);
+  function removeTopic(topicName: string){
+    setRules(prev => prev.filter(r => r.topic !== topicName));
   }
 
-  function removeKw(topic: string, kw: string){
-    setRules(prev => ({ ...prev, [topic]: (prev[topic]||[]).filter(k => k !== kw) }));
+  function removeKw(topicName: string, kw: string){
+    setRules(prev => prev.map(rule => {
+      if (rule.topic === topicName) {
+        return { ...rule, keywords: rule.keywords.filter(k => k !== kw) };
+      }
+      return rule;
+    }));
   }
 
   function resetToDefault(){
     if (!confirm('기본 추천 규칙으로 되돌릴까요? 현재 규칙은 덮어써집니다.')) return;
-    setRules({ ...DEFAULTS_FALLBACK });
+    const defaultRules: TopicRule[] = Object.entries(DEFAULT_TOPIC_RULES).map(([topic, keywordsWithWeights]) => ({
+      topic,
+      keywords: Object.keys(keywordsWithWeights),
+      weight: 1, // 기본 규칙의 가중치는 1로 설정
+    }));
+    setRules(defaultRules);
   }
 
   // Test preview
@@ -80,16 +81,19 @@ export default function TopicRulesEditor(){
     const id = setTimeout(async () => {
       if (!testText.trim()) { setPreview([]); return; }
       try {
-        const p = await guessTopics(testText);
-        setPreview(p.slice(0,5));
+        // 임시 규칙을 DB에 저장하지 않고 테스트
+        await db.transaction('r', db.topicRules, async () => {
+          const p = await guessTopics(testText);
+          setPreview(p.slice(0,5));
+        });
       } catch (err) {
         console.error('Failed to guess topics:', err);
       }
     }, 200);
     return () => clearTimeout(id);
-  }, [testText]);
+  }, [testText, rules]);
 
-  const topics = useMemo(()=>Object.keys(rules).sort(), [rules]);
+  const topics = useMemo(()=>rules.map(r => r.topic).sort(), [rules]);
 
   return (
     <div className="p-6 bg-white/60 backdrop-blur-lg rounded-2xl shadow-lg border border-white/20 space-y-4">
@@ -122,15 +126,15 @@ export default function TopicRulesEditor(){
       )}
 
       <div className="space-y-3">
-        {topics.map(t => (
-          <div key={t} className="rounded-lg border p-3">
+        {rules.map(rule => (
+          <div key={rule.topic} className="rounded-lg border p-3">
             <div className="flex items-center justify-between mb-2">
-              <div className="font-medium">{t}</div>
-              <button onClick={()=>removeTopic(t)} className="text-red-600 text-xs inline-flex items-center gap-1">
+              <div className="font-medium">{rule.topic}</div>
+              <button onClick={()=>removeTopic(rule.topic)} className="text-red-600 text-xs inline-flex items-center gap-1">
                 <Trash2 className="h-3 w-3" /> 삭제
               </button>
             </div>
-            <TopicKeywords values={rules[t]||[]} onAdd={(s)=>addKeyword(t, s)} onRemove={(kw)=>removeKw(t, kw)} />
+            <TopicKeywords values={rule.keywords||[]} onAdd={(s)=>addKeyword(rule.topic, s)} onRemove={(kw)=>removeKw(rule.topic, kw)} />
           </div>
         ))}
       </div>

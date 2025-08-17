@@ -65,6 +65,23 @@ function stripTrackingParamsInText(text: string): string {
 }
 
 /**
+ * Removes all URLs and citation-like patterns (e.g., [1] http://...) from the text.
+ * @param text The text to process.
+ * @returns Text with links removed.
+ */
+function removeAllLinks(text: string): string {
+  // Regex to find [number] followed by an optional space and a URL.
+  const citationRegex = /[[]\d+]\]\s*https?:\/\/[^\s]+/g;
+  text = text.replace(citationRegex, '');
+
+  // Regex to find any remaining URLs.
+  const urlRegex = /https?:\/\/[^\s]+/g;
+  text = text.replace(urlRegex, '');
+
+  return text;
+}
+
+/**
  * Smartly cleans up pasted text while preserving code fences.
  * It normalizes lists, removes tracking parameters from URLs, and cleans up whitespace.
  * @param raw The raw input, expected to be a string.
@@ -84,6 +101,9 @@ export function cleanPaste(raw?: unknown): string {
 
     let text = segment.text;
 
+    // GEMINI: 모든 링크와 인용 스타일 링크 제거
+    text = removeAllLinks(text);
+
     // Normalize line endings to a single LF.
     text = text.replace(/\r\n?/g, "\n");
 
@@ -95,7 +115,7 @@ export function cleanPaste(raw?: unknown): string {
 
     // Normalize bullet points and numbered lists using multiline regex for efficiency.
     text = text.replace(/^\s*[•·▪◦*-]\s+/gm, "- ");
-    text = text.replace(/^\s*(\d+)[\)\.-]\s+/gm, "$1. ");
+    text = text.replace(/^\s*(\d+)[\).-]\s+/gm, "$1. ");
 
     // Collapse more than two consecutive blank lines into a single blank line.
     text = text.replace(/\n{3,}/g, "\n\n");
