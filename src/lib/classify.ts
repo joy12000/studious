@@ -15,6 +15,15 @@ export const DEFAULT_TOPIC_RULES: Record<string, Record<string, number>> = {
   '개인/일상': { '일기': 2, '회고': 2, '리뷰': 1, '후기': 1, '요리': 1, '레시피': 1, '취미': 1, '가족': 1, '친구': 1 },
 };
 
+/**
+ * 정규식 특수 문자를 이스케이프합니다.
+ * @param str 이스케이프할 문자열
+ * @returns 정규식 특수 문자가 이스케이프된 문자열
+ */
+export const escapeRegExp = (str: string): string => {
+  return str.replace(/[.*+?^${}()|[\\]/g, '\$&');
+};
+
 // 2. 새로운 guessTopics 함수: 가중치 기반 점수 시스템
 export async function guessTopics(text: string): Promise<string[]> {
   const MIN_SCORE_THRESHOLD = 3; // 토픽으로 인정받기 위한 최소 점수
@@ -26,19 +35,9 @@ export async function guessTopics(text: string): Promise<string[]> {
     const cleanedText = text.toLowerCase();
     const scores: Record<string, number> = {};
 
-    // esbuild의 정규식 해석 오류를 피하기 위해 new RegExp()를 사용하는 방식으로 변경
-    const escapeRegExp = (str: string) => {
-      // 정규식에서 특별한 의미를 갖는 문자들의 리스트
-      const charsToEscape = ['\\', '[', ']', '{', '}', '(', ')', '*', '+', '?', '.', '^', '$', '|'];
-      // 이스케이프된 문자들로 정규식 패턴 생성 (e.g., \\|\\[|\\]|...)
-      const pattern = charsToEscape.map(char => `\\${char}`).join('|');
-      const regex = new RegExp(pattern, 'g');
-      return str.replace(regex, '\\$&');
-    };
-
     // 헬퍼 함수: 텍스트에서 키워드를 찾아 점수 추가
     const addScore = (topic: string, keyword: string, weight: number) => {
-      const pattern = `\\b${escapeRegExp(keyword.toLowerCase())}\b`;
+      const pattern = `\b${escapeRegExp(keyword.toLowerCase())}\b`;
       const regex = new RegExp(pattern, 'g');
       const matches = cleanedText.match(regex);
       if (matches) {

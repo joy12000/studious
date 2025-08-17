@@ -1,10 +1,11 @@
 import Dexie, { Table } from 'dexie';
-import { Note, AppSettings } from './types';
+import { Note, AppSettings, TopicRule } from './types';
 import { DEFAULT_TOPIC_RULES } from './classify'; // Import from classify.ts
 
 class AppDB extends Dexie {
   notes!: Table<Note, string>;
   settings!: Table<AppSettings & { id: string }, string>;
+  topicRules!: Table<TopicRule, string>;
 
   constructor() {
     super('selfdev-db');
@@ -25,7 +26,8 @@ class AppDB extends Dexie {
       
       // 'settings' table:
       // 'id': Primary key, expecting a single 'default' entry
-      settings: 'id'
+      settings: 'id',
+      topicRules: 'topic',
     });
   }
 

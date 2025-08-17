@@ -1,7 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { db } from './db';
 import { Note, SourceType } from './types';
-import { generateTitle, guessTopics } from './classify';
 import { createNote } from './note';
 
 export type Filters = {
@@ -47,11 +46,11 @@ export function useNotes() {
       }
 
       // 정렬은 항상 마지막에 적용합니다.
-      let collection = await query.reverse().sortBy('createdAt');
+      let notesFromDb = await query.reverse().sortBy('createdAt');
 
-      const searchQuery = (filters.search ?? '').trim().toLowerCase();
-      if (searchQuery) {
-        collection = collection.filter(n =>
+      if (filters.search) {
+        const searchQuery = filters.search.toLowerCase();
+        notesFromDb = notesFromDb.filter(n =>
           n.title.toLowerCase().includes(searchQuery) ||
           n.content.toLowerCase().includes(searchQuery)
         );
@@ -59,14 +58,14 @@ export function useNotes() {
 
       if (filters.topics && filters.topics.length > 0) {
         const topicSet = new Set(filters.topics);
-        collection = collection.filter(n => n.topics.some(t => topicSet.has(t)));
+        notesFromDb = notesFromDb.filter(n => n.topics.some(t => topicSet.has(t)));
       }
 
       if (filters.favorite) {
-        collection = collection.filter(n => n.favorite);
+        notesFromDb = notesFromDb.filter(n => n.favorite);
       }
 
-      setNotes(collection);
+      setNotes(notesFromDb);
     } catch (error) {
       console.error("Failed to load notes:", error);
       setNotes([]);

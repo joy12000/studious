@@ -27,7 +27,10 @@ export interface Note {
  * It's a record where each key is a topic name (string)
  * and the value is an array of associated keywords (string[]).
  */
-export type TopicRule = Record<string, string[]>;
+export interface TopicRule {
+  topic: string;
+  keywords: string[];
+}
 
 /**
  * Represents the application's settings structure.
