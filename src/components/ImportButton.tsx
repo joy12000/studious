@@ -8,14 +8,17 @@ interface ImportButtonProps {
   onImport: (note: Partial<Note>) => Promise<void>;
 }
 
-function isEncryptedPayload(data: any): data is EncryptedPayload {
+function isEncryptedPayload(data: unknown): data is EncryptedPayload {
+  if (typeof data !== 'object' || data === null) {
+    return false;
+  }
+  const obj = data as Record<string, unknown>;
   return (
-    data &&
-    typeof data.v === 'number' &&
-    data.alg === 'AES-GCM' &&
-    typeof data.salt === 'string' &&
-    typeof data.iv === 'string' &&
-    typeof data.data === 'string'
+    typeof obj.v === 'number' &&
+    obj.alg === 'AES-GCM' &&
+    typeof obj.salt === 'string' &&
+    typeof obj.iv === 'string' &&
+    typeof obj.data === 'string'
   );
 }
 

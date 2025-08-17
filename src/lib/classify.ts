@@ -14,10 +14,7 @@ export const DEFAULT_TOPIC_RULES: Record<string, Record<string, number>> = {
  * @returns 정규식 특수 문자가 이스케이프된 문자열
  */
 export const escapeRegExp = (str: string): string => {
-  // GEMINI: 정규식 구문 오류를 수정하고, 대체 문자열을 명확하게 변경합니다.
-  return str.replace(/[.*+?^${}()|[\\]/g, '\\export const escapeRegExp = (str: string): string => {
-  return str.replace(/[.*+?^${}()|[\\]/g, '\$&');
-};');
+  return str.replace(/[.*+?^${}()|[\\]/g, '\\$&');
 };
 
 // 2. 새로운 guessTopics 함수: 가중치 기반 점수 시스템
@@ -33,7 +30,7 @@ export async function guessTopics(text: string): Promise<string[]> {
 
     // 헬퍼 함수: 텍스트에서 키워드를 찾아 점수 추가
     const addScore = (topic: string, keyword: string, weight: number) => {
-      const pattern = `\b${escapeRegExp(keyword.toLowerCase())}\b`;
+      const pattern = `\\b${escapeRegExp(keyword.toLowerCase())}\\b`;
       const regex = new RegExp(pattern, 'g');
       const matches = cleanedText.match(regex);
       if (matches) {

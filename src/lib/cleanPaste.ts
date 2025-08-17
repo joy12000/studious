@@ -71,7 +71,7 @@ function stripTrackingParamsInText(text: string): string {
  */
 function removeAllLinks(text: string): string {
   // Regex to find [number] followed by an optional space and a URL.
-  const citationRegex = /[[]\d+]\]\s*https?:\/\/[^\s]+/g;
+  const citationRegex = /\[\d+\]\s*https?:\/\/[^\s]+/g;
   text = text.replace(citationRegex, '');
 
   // Regex to find any remaining URLs.
@@ -115,7 +115,7 @@ export function cleanPaste(raw?: unknown): string {
 
     // Normalize bullet points and numbered lists using multiline regex for efficiency.
     text = text.replace(/^\s*[•·▪◦*-]\s+/gm, "- ");
-    text = text.replace(/^\s*(\d+)[\).-]\s+/gm, "$1. ");
+    text = text.replace(/^\s*(\d+)[).-]\s+/gm, "$1. ");
 
     // Collapse more than two consecutive blank lines into a single blank line.
     text = text.replace(/\n{3,}/g, "\n\n");
