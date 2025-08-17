@@ -1,21 +1,39 @@
-import React, { useEffect, useState } from 'react';
-function getBuildVersion(): string {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const w: any = window as any;
-  const fromWindow = w.BUILD_VERSION;
-  const fromEnv = (import.meta.env as { VITE_APP_VERSION?: string; VITE_COMMIT_SHA?: string })?.VITE_APP_VERSION || (import.meta.env as { VITE_APP_VERSION?: string; VITE_COMMIT_SHA?: string })?.VITE_COMMIT_SHA;
-  const fallback = new Date().toISOString().slice(0,10);
-  const v = (fromWindow || fromEnv || '').toString().trim();
-  if (!v) return fallback;
-  return v.length > 16 ? v.slice(0,16) : v;
+import React from 'react';
+
+function formatBuildTime(): string {
+  const buildTime = import.meta.env.VITE_APP_BUILD_TIME;
+  
+  if (!buildTime) {
+    // 빌드 시간이 정의되지 않은 경우 (예: 개발 환경)
+    return 'local';
+  }
+
+  try {
+    const date = new Date(buildTime);
+    
+    // KST (UTC+9)로 시간 조정
+    const kstOffset = 9 * 60 * 60 * 1000;
+    const kstDate = new Date(date.getTime() + kstOffset);
+
+    const month = (kstDate.getUTCMonth() + 1).toString().padStart(2, '0');
+    const day = kstDate.getUTCDate().toString().padStart(2, '0');
+    const hours = kstDate.getUTCHours().toString().padStart(2, '0');
+    const minutes = kstDate.getUTCMinutes().toString().padStart(2, '0');
+
+    return `v${month}-${day}-${hours}:${minutes}`;
+  } catch (error) {
+    console.error("Error formatting build time:", error);
+    return 'unknown';
+  }
 }
+
 export default function VersionBadge() {
-  const [v,setV] = useState('');
-  useEffect(()=>{ setV(getBuildVersion()); }, []);
+  const version = formatBuildTime();
+
   return (
     <div className="fixed bottom-2 right-3 z-[9999]">
       <span className="select-none text-[10px] px-2 py-1 rounded-full bg-black/70 text-white tracking-wider">
-        v{v || 'local'}
+        {version}
       </span>
     </div>
   );

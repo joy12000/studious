@@ -12,6 +12,9 @@ export default defineConfig({
       '@/components': resolve(__dirname, './src/components')
     }
   },
+  define: {
+    'import.meta.env.VITE_APP_BUILD_TIME': JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     react(),
     VitePWA({
