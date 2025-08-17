@@ -1,314 +1,85 @@
 import { db } from './db';
+import type { TopicRule } from './types';
 
-export const DEFAULT_TOPIC_RULES: Record<string, string[]> = {
-  "Productivity": [
-    "습관",
-    "루틴",
-    "집중",
-    "시간",
-    "우선순위",
-    "체크리스트",
-    "할 일",
-    "타임블록",
-    "계획",
-    "관리",
-    "todo",
-    "task",
-    "schedule",
-    "deadline",
-    "회의",
-    "미팅"
-  ],
-  "Learning": [
-    "학습",
-    "공부",
-    "기억",
-    "복습",
-    "필기",
-    "메타인지",
-    "요약",
-    "독서",
-    "지식",
-    "스킬",
-    "강의",
-    "수업",
-    "세미나",
-    "스터디",
-    "lecture",
-    "course",
-    "study"
-  ],
-  "Mindset": [
-    "마인드",
-    "동기",
-    "자존감",
-    "감정",
-    "회복탄력성",
-    "성장",
-    "사고",
-    "긍정",
-    "마음가짐",
-    "멘탈",
-    "동기부여",
-    "인내"
-  ],
-  "Health": [
-    "수면",
-    "식단",
-    "건강",
-    "스트레스",
-    "휴식",
-    "웰빙",
-    "몸",
-    "컨디션",
-    "영양",
-    "정신건강",
-    "병원"
-  ],
-  "Fitness": [
-    "운동",
-    "웨이트",
-    "러닝",
-    "유산소",
-    "근력",
-    "체력",
-    "트레이닝",
-    "다이어트",
-    "헬스",
-    "요가",
-    "필라테스",
-    "run",
-    "workout",
-    "gym"
-  ],
-  "Finance": [
-    "투자",
-    "저축",
-    "지출",
-    "예산",
-    "수입",
-    "재무",
-    "파이낸스",
-    "돈",
-    "경제",
-    "청구",
-    "결제",
-    "부채",
-    "세금",
-    "금리",
-    "ETF",
-    "주식"
-  ],
-  "Career": [
-    "경력",
-    "업무",
-    "리더십",
-    "협업",
-    "면접",
-    "이력서",
-    "보고",
-    "직장",
-    "커리어",
-    "성과",
-    "OKR",
-    "승진",
-    "목표",
-    "feedback"
-  ],
-  "Tech": [
-    "코드",
-    "프로그래밍",
-    "개발",
-    "AI",
-    "알고리즘",
-    "데이터",
-    "기술",
-    "디지털",
-    "서버",
-    "배포",
-    "리팩터링",
-    "버그",
-    "테스트",
-    "API",
-    "프론트",
-    "백엔드"
-  ],
-  "Relationships": [
-    "소통",
-    "관계",
-    "공감",
-    "피드백",
-    "갈등",
-    "인간관계",
-    "네트워킹",
-    "팀워크",
-    "회의문화",
-    "커뮤니케이션"
-  ],
-  "Creativity": [
-    "아이디어",
-    "글쓰기",
-    "디자인",
-    "브레인스토밍",
-    "창의",
-    "예술",
-    "상상력",
-    "스케치",
-    "콘셉트",
-    "카피",
-    "콘텐츠"
-  ],
-  "Travel": [
-    "여행",
-    "항공",
-    "호텔",
-    "예약",
-    "여권",
-    "비행기",
-    "투어",
-    "여정",
-    "일정표",
-    "관광",
-    "바캉스",
-    "휴양지"
-  ],
-  "Legal": [
-    "법률",
-    "계약",
-    "약관",
-    "분쟁",
-    "저작권",
-    "라이선스",
-    "위험조항",
-    "소송",
-    "준법",
-    "컴플라이언스"
-  ],
-  "Tax": [
-    "세무",
-    "세금",
-    "부가세",
-    "원천징수",
-    "신고",
-    "환급",
-    "공제",
-    "납부",
-    "영수증",
-    "세법"
-  ],
-  "Marketing": [
-    "마케팅",
-    "브랜딩",
-    "캠페인",
-    "광고",
-    "콘텐츠",
-    "SNS",
-    "SEO",
-    "퍼포먼스",
-    "CRM",
-    "리텐션",
-    "전환",
-    "랜딩"
-  ],
-  "Sales": [
-    "영업",
-    "견적",
-    "구매",
-    "고객",
-    "리드",
-    "계약서",
-    "가격",
-    "딜",
-    "세일즈파이프라인",
-    "MQL",
-    "SQL",
-    "콜"
-  ],
-  "Education": [
-    "교육",
-    "커리큘럼",
-    "과제",
-    "시험",
-    "평가",
-    "강의안",
-    "학습계획",
-    "MOOC"
-  ],
-  "Project": [
-    "프로젝트",
-    "기획",
-    "요구사항",
-    "타임라인",
-    "마일스톤",
-    "칸반",
-    "이슈",
-    "티켓",
-    "스코프",
-    "리소스"
-  ],
-  "Research": [
-    "연구",
-    "실험",
-    "논문",
-    "데이터셋",
-    "가설",
-    "분석",
-    "리뷰",
-    "재현성",
-    "실험계획"
-  ],
-  "Personal": [
-    "일기",
-    "회고",
-    "목표",
-    "감사일기",
-    "버킷리스트",
-    "취미",
-    "생활"
-  ]
+// 1. 강화된 내장 규칙: 다양한 토픽과 가중치(1점 또는 2점)를 가진 키워드들
+const builtInRules: Record<string, Record<string, number>> = {
+  '프로그래밍': { 'javascript': 2, 'typescript': 2, 'python': 2, 'react': 2, 'node.js': 2, '알고리즘': 2, '데이터베이스': 2, 'API': 1, '라이브러리': 1, '프레임워크': 1, '코딩': 1, '개발': 1, '디버깅': 1, '서버': 1, '클라이언트': 1 },
+  '경제/금융': { '주식': 2, '부동산': 2, '투자': 2, '금리': 2, '인플레이션': 2, '환율': 2, '채권': 2, '세금': 1, '은행': 1, '대출': 1, '펀드': 1, '시장': 1, '경제': 1, '금융': 1, '자산': 1 },
+  '건강/운동': { '헬스': 2, '다이어트': 2, '영양': 2, '스트레칭': 1, '칼로리': 1, '단백질': 1, '수면': 1, '명상': 1, '요가': 1, '필라테스': 1, '러닝': 1, '근력': 1, '유산소': 1 },
+  '생산성': { '습관': 2, '루틴': 2, '집중': 2, '시간관리': 2, 'GTD': 2, '뽀모도로': 2, '우선순위': 1, '계획': 1, '목표': 1, '할일목록': 1, '노션': 1, '에버노트': 1 },
+  '학습/자기계발': { '공부': 2, '학습': 2, '독서': 2, '메타인지': 2, '강의': 1, '세미나': 1, '스터디': 1, '지식': 1, '성장': 1, '커리어': 1, '면접': 1 },
+  '마인드셋': { '심리학': 2, '뇌과학': 2, '동기부여': 2, '자존감': 2, '회복탄력성': 1, '감정': 1, '스트레스': 1, '멘탈': 1, '긍정': 1 },
+  '마케팅/비즈니스': { '마케팅': 2, '브랜딩': 2, 'SEO': 2, '콘텐츠': 2, '퍼포먼스': 2, '영업': 1, '고객': 1, '시장조사': 1, '전략': 1, '기획': 1 },
+  '창작/디자인': { '글쓰기': 2, '디자인': 2, 'UI/UX': 2, '브레인스토밍': 1, '아이디어': 1, '창의력': 1, '스토리텔링': 1, '카피라이팅': 1 },
+  '여행': { '여행': 2, '항공권': 2, '호텔': 1, '숙소': 1, '관광': 1, '배낭여행': 1, '자유여행': 1 },
+  '개인/일상': { '일기': 2, '회고': 2, '리뷰': 1, '후기': 1, '요리': 1, '레시피': 1, '취미': 1, '가족': 1, '친구': 1 },
 };
 
+// 2. 새로운 guessTopics 함수: 가중치 기반 점수 시스템
 export async function guessTopics(text: string): Promise<string[]> {
-  try {
-    const settings = await db.settings.get('default');
-    const rules = { ...DEFAULT_TOPIC_RULES, ...(settings?.topicRules || {}) };
+  const MIN_SCORE_THRESHOLD = 3; // 토픽으로 인정받기 위한 최소 점수
+  const MAX_TOPICS = 3; // 최종적으로 반환할 최대 토픽 개수
 
+  try {
+    // DB에서 사용자 정의 규칙 가져오기
+    const userRules: TopicRule[] = await db.topicRules.toArray();
     const cleanedText = text.toLowerCase();
     const scores: Record<string, number> = {};
 
-    // Helper to escape regex special characters
-    const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const escapeRegExp = (str: string) => str.replace(/[.*+?^${}()|[\\\]/g, '\\$&');
 
-    for (const [topic, keywords] of Object.entries(rules)) {
-      if (Array.isArray(keywords) && keywords.length > 0) {
-        // Create a single regex for all keywords of a topic for efficiency, matching whole words.
-        const pattern = `\\b(${keywords.map(kw => escapeRegExp(kw.toLowerCase())).join('|')})\\b`;
-        const regex = new RegExp(pattern, 'g');
-        const matches = cleanedText.match(regex);
-        scores[topic] = matches ? matches.length : 0;
-      } else {
-        scores[topic] = 0;
+    // 헬퍼 함수: 텍스트에서 키워드를 찾아 점수 추가
+    const addScore = (topic: string, keyword: string, weight: number) => {
+      const pattern = `\\b${escapeRegExp(keyword.toLowerCase())}\\b`;
+      const regex = new RegExp(pattern, 'g');
+      const matches = cleanedText.match(regex);
+      if (matches) {
+        scores[topic] = (scores[topic] || 0) + (matches.length * weight);
+      }
+    };
+
+    // 1순위: 사용자 정의 규칙 적용 (가중치 3점)
+    for (const rule of userRules) {
+      for (const keyword of rule.keywords) {
+        addScore(rule.topic, keyword, 3);
       }
     }
 
+    // 2순위: 내장 규칙 적용 (가중치 1~2점)
+    for (const [topic, keywordsWithWeights] of Object.entries(builtInRules)) {
+      for (const [keyword, weight] of Object.entries(keywordsWithWeights)) {
+        addScore(topic, keyword, weight);
+      }
+    }
+
+    // 점수가 높은 순으로 토픽 정렬 및 필터링
+    const rankedTopics = Object.entries(scores)
+      .filter(([, score]) => score >= MIN_SCORE_THRESHOLD)
+      .sort(([, scoreA], [, scoreB]) => scoreB - scoreA)
+      .map(([topic]) => topic);
+
+    // 해시태그 추출 (기존 로직 유지)
     const hashtagSet = new Set<string>();
     (text.match(/(^|\s)#([\p{L}\p{N}_-]{2,30})/gu) || []).forEach(m => {
       const tag = m.replace(/^\s*#/, '').trim();
       if (tag) hashtagSet.add(tag);
     });
+    const hashtags = Array.from(hashtagSet);
 
-    const ranked = Object.entries(scores)
-      .filter(([,s]) => s > 0)
-      .sort((a,b)=>b[1]-a[1])
-      .slice(0,5)
-      .map(([k])=>k);
+    // 결과 통합: 해시태그와 점수 기반 토픽을 합치고 중복 제거
+    const combined = [...new Set([...hashtags, ...rankedTopics])];
+    
+    if (combined.length > 0) {
+      return combined.slice(0, MAX_TOPICS);
+    }
 
-    const hashtags = Array.from(hashtagSet).slice(0,5);
-    const combined = [...new Set([ ...hashtags, ...ranked ])];
-    return combined.length ? combined : (settings?.defaultTopics?.slice(0,1) || ['Other']);
+    // 어떤 토픽도 찾지 못했을 경우 기본 토픽 반환
+    const settings = await db.settings.get('default');
+    return settings?.defaultTopics?.slice(0, 1) || ['일반'];
+
   } catch (e) {
     console.error('guessTopics error', e);
-    return ['Other'];
+    return ['일반'];
   }
 }
 
