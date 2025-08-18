@@ -58,7 +58,7 @@ export const DEFAULT_TOPIC_RULES: Record<string, Record<string, number>> = {
  * @returns 정규식 특수 문자가 이스케이프된 문자열
  */
 export const escapeRegExp = (str: string): string => {
-  return str.replace(/[.*+?^${}()|[\]/g, '\$&');
+  return str.replace(/[.*+?^${}()|[\\]/g, '\\$&');
 };
 
 // 2. 새로운 guessTopics 함수: 가중치 기반 점수 시스템

@@ -38,7 +38,7 @@ class AppDB extends Dexie {
         await this.settings.add({
           id: 'default',
           theme: 'light',
-          defaultTopics: ['Productivity', 'Learning', 'Mindset', 'Health', 'Finance', 'Career', 'Tech', 'Relationships', 'Fitness', 'Creativity', 'Other']
+          defaultTopics: ['생산성', '학습', '자기계발', '건강/운동', '경제/금융', '기술/IT', '창작/아이디어', '관계/소통', '문화/취미', '여행', '음식/요리', '일상/쇼핑']
         });
         
         // GEMINI: topicRules 테이블에 기본 규칙을 추가합니다.
