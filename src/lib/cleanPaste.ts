@@ -91,16 +91,41 @@ function getTextFromHTML(html: string): string {
  * @returns The cleaned string.
  */
 export async function cleanPaste(data: DataTransfer): Promise<string> {
-  let pastedText = '';
-
   const html = data.getData('text/html');
   
-  // Prefer HTML content if available, as it preserves structure.
+  // HTML 콘텐츠가 있으면 HTML을 우선적으로 처리합니다.
+  // GEMINI: HTML 서식을 유지하도록 수정
   if (html) {
-    pastedText = getTextFromHTML(html);
-  } else {
-    pastedText = data.getData('text/plain');
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const links = doc.querySelectorAll('a');
+    
+    links.forEach(link => {
+      const href = link.getAttribute('href');
+      if (href) {
+        try {
+          const urlObject = new URL(href, window.location.origin);
+          const paramsToDelete: string[] = [];
+
+          for (const key of urlObject.searchParams.keys()) {
+            if (TRACKING_PARAMS_TO_STRIP.some(param => key.startsWith(param))) {
+              paramsToDelete.push(key);
+            }
+          }
+
+          paramsToDelete.forEach(key => urlObject.searchParams.delete(key));
+          link.setAttribute('href', urlObject.toString());
+        } catch {
+          // 유효하지 않은 URL은 무시합니다.
+        }
+      }
+    });
+    
+    // 정리된 HTML을 반환합니다.
+    return doc.body.innerHTML;
   }
+
+  // HTML이 없으면 일반 텍스트를 처리합니다.
+  let pastedText = data.getData('text/plain');
 
   if (typeof pastedText !== 'string' || !pastedText) {
     return '';
