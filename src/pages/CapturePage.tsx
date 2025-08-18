@@ -1,8 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import { useEditor, EditorContent } from '@tiptap/react';
-import StarterKit from '@tiptap/starter-kit';
+import RichTextEditor from '../components/RichTextEditor';
 import TemplatePicker from "../components/TemplatePicker";
 import TopicBadge from "../components/TopicBadge";
 import AttachmentPanel from "../components/AttachmentPanel";
@@ -68,23 +67,18 @@ export default function CapturePage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   
   const busyRef = useRef(false);
+  const contentRef = useRef(userContent); // Ref to hold the latest content for callbacks
 
-  const editor = useEditor({
-    extensions: [StarterKit],
-    content: userContent,
-    onUpdate: ({ editor }) => {
-      setUserContent(editor.getHTML());
-    },
-    editorProps: {
-      attributes: {
-        class: 'prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg xl:prose-2xl m-5 focus:outline-none',
-      },
-    },
-  });
+  useEffect(() => {
+    contentRef.current = userContent;
+  }, [userContent]);
 
-  const refreshAiTopics = useCallback(async (src: string) => {
-    if (!editor) return;
-    const textContent = editor.state.doc.textContent;
+  const refreshAiTopics = useCallback(async (htmlContent: string) => {
+    // Create a temporary div to extract text content
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+    const textContent = tempDiv.textContent || "";
+
     if (textContent.trim().length < 20) {
       setAiTopics([]);
       return;
@@ -95,16 +89,13 @@ export default function CapturePage() {
     } catch (e) {
       console.error("Failed to guess topics:", e);
     }
-  }, [editor]);
+  }, []);
 
   useEffect(() => {
-    if (editor) {
-      refreshAiTopics(userContent);
-    }
-  }, [userContent, editor, refreshAiTopics]);
+    refreshAiTopics(userContent);
+  }, [userContent, refreshAiTopics]);
 
   const handleFabPaste = useCallback(async () => {
-    if (!editor) return;
     try {
       const res = await readClipboardText();
       if (!res.ok) {
@@ -114,34 +105,33 @@ export default function CapturePage() {
       const input = res.text || "";
       const cleaned = useSmartClean ? cleanPaste(input) : input;
       
-      // Convert plain text to HTML paragraphs
-      const htmlContent = cleaned.split('\n').map(p => `<p>${p}</p>`).join('');
-
-      editor.commands.insertContent(htmlContent);
+      // Append cleaned text as new paragraphs
+      const newHtml = cleaned.split('\n').map(p => `<p>${p}</p>`).join('');
+      
+      setUserContent(prev => prev + newHtml);
       setStatus("붙여넣기 완료");
-      editor.commands.focus();
     } catch {
       setStatus("붙여넣기에 실패했어요.");
     }
-  }, [useSmartClean, editor]);
+  }, [useSmartClean]);
 
   useBindPasteFab(handleFabPaste);
 
   async function onSave() {
-    if (busyRef.current || !editor) return;
-    const htmlContent = editor.getHTML();
-    // Check if content is empty (Tiptap may leave empty <p></p>)
-    const textContent = editor.state.doc.textContent.trim();
+    if (busyRef.current) return;
+    
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = userContent;
+    const textContent = tempDiv.textContent || "";
 
-    if (textContent.length === 0 && attachments.length === 0) {
+    if (textContent.trim().length === 0 && attachments.length === 0) {
       setStatus("내용이나 첨부파일이 비어 있어요.");
       return;
     }
     busyRef.current = true;
     try {
-      // The content is already cleaned on paste, but we can process the whole html if needed
       setStatus("저장 준비 중…");
-      const newNote = await addNote({ content: htmlContent, attachments });
+      const newNote = await addNote({ content: userContent, attachments });
       if (!newNote?.id) {
         setStatus("저장 실패: 반환된 ID가 비어있어요.");
         busyRef.current = false;
@@ -162,22 +152,14 @@ export default function CapturePage() {
     isAdding: boolean,
     contentToAdd?: { blockId: string; renderedContent: string }
   ) => {
-    if (!editor) return;
-
     if (isAdding && contentToAdd) {
-      editor.commands.insertContent(contentToAdd.renderedContent);
+      setUserContent(prev => prev + contentToAdd.renderedContent);
       setActiveTemplates(prev => ({ ...prev, [templateId]: contentToAdd.blockId }));
-      editor.commands.focus();
     } else {
       const blockId = activeTemplates[templateId];
       if (blockId) {
-        const { state, view } = editor;
-        const { from, to } = view.state.selection;
-        const blockRegex = new RegExp(String.raw`<!-- ${blockId} -->.*?<!-- /${blockId} -->`, "s");
-        
-        // This is a simplified way. A more robust solution would parse the HTML.
-        const newContent = editor.getHTML().replace(blockRegex, "");
-        editor.commands.setContent(newContent);
+        const blockRegex = new RegExp(String.raw`\s*<!-- ${blockId} -->.*?<!-- /${blockId} -->\s*`, "s");
+        setUserContent(prev => prev.replace(blockRegex, ""));
         
         setActiveTemplates(prev => {
           const newState = { ...prev };
@@ -186,7 +168,7 @@ export default function CapturePage() {
         });
       }
     }
-  }, [editor, activeTemplates]);
+  }, [activeTemplates]);
 
   // GEMINI: 첨부파일 핸들러 함수들 추가
   const handleAddLink = () => {
@@ -271,9 +253,10 @@ export default function CapturePage() {
       </section>
 
       <section className="p-6 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20 mb-6">
-        <div className="w-full min-h-[30vh] px-4 py-3 border bg-card/60 rounded-lg focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent resize-y transition-colors">
-          <EditorContent editor={editor} />
-        </div>
+        <RichTextEditor
+          content={userContent}
+          onChange={setUserContent}
+        />
         
         <AttachmentPanel
           attachments={attachments}

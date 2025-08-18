@@ -74,3 +74,22 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* TipTap Editor Styles */
+@layer components {
+  .tiptap-toolbar button {
+    @apply p-2 rounded-md transition-colors;
+  }
+  .tiptap-toolbar button:hover {
+    @apply bg-muted;
+  }
+  .tiptap-toolbar button.is-active {
+    @apply bg-primary text-primary-foreground;
+  }
+  .tiptap-toolbar button.is-active:hover {
+    @apply bg-primary/90;
+  }
+  .tiptap-toolbar button:disabled {
+    @apply opacity-50 cursor-not-allowed;
+  }
+}

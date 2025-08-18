@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { db } from '../lib/db';
-import { Note, Attachment } from '../lib/types'; // GEMINI: Attachment 타입 임포트
+import { Note, Attachment } from '../lib/types';
 import { useNotes } from '../lib/useNotes';
 import TopicBadge from '../components/TopicBadge';
 import ShareModal from '../components/ShareModal';
-import AttachmentPanel from '../components/AttachmentPanel'; // GEMINI: AttachmentPanel 임포트
+import AttachmentPanel from '../components/AttachmentPanel';
+import RichTextEditor from '../components/RichTextEditor'; // 추가
 import { shareNote, downloadEncryptedNote } from '../lib/note';
-import { v4 as uuidv4 } from 'uuid'; // GEMINI: uuid 임포트
+import { v4 as uuidv4 } from 'uuid';
 import { 
   ArrowLeft, Heart, ExternalLink, Calendar, Edit2, Check, X, Star, Trash2, Share2, Youtube
 } from 'lucide-react';
@@ -291,9 +292,11 @@ export default function NotePage() {
             <div className="mb-8">
               {editing ? (
                 <div>
-                  <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={15} className="w-full px-4 py-3 border bg-card/60 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent resize-y transition-colors" />
+                  <RichTextEditor
+                    content={editContent}
+                    onChange={setEditContent}
+                  />
                   
-                  {/* GEMINI: 수정 모드에서 AttachmentPanel 렌더링 */}
                   <AttachmentPanel
                     attachments={editAttachments}
                     onAddLink={handleAddLink}
@@ -314,10 +317,9 @@ export default function NotePage() {
                 </div>
               ) : (
                 <div>
-                  <div className="prose max-w-none">
-                    <div className="text-card-foreground whitespace-pre-wrap leading-relaxed">{note.content}</div>
-                  </div>
-                  {/* GEMINI: 읽기 모드에서 AttachmentPanel 렌더링 */}
+                  <div className="prose dark:prose-invert max-w-none"
+                       dangerouslySetInnerHTML={{ __html: note.content }} />
+                  
                   <AttachmentPanel
                     attachments={note.attachments || []}
                     readOnly
