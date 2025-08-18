@@ -38,15 +38,15 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
     }
   }
 
-  // ... (유튜브 링크 추출 로직은 변경 없음) ...
+  // GEMINI: 유튜브 링크 추출 및 본문에서 제거 기능 복원
   const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/g;
-  let tempContent = content; // 원본 content는 보존
+  let contentForSaving = content;
   let extractedUrl: string | null = null;
-  const matches = tempContent.match(youtubeRegex);
+  
+  const matches = content.match(youtubeRegex);
   if (matches && matches.length > 0) {
-    extractedUrl = matches[0];
-    // 링크 제거는 텍스트 분석용으로만 사용
-    tempContent = tempContent.replace(youtubeRegex, '').trim();
+    extractedUrl = matches[0]; // 첫 번째 링크를 소스 URL로 저장
+    contentForSaving = content.replace(youtubeRegex, '').trim(); // 본문에서는 모든 유튜브 링크 제거
   }
 
   const finalSourceUrl = extractedUrl || (sourceUrl ? String(sourceUrl).trim() : null);
@@ -63,8 +63,8 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
     }
   }
 
-  // GEMINI: 텍스트 분석은 HTML을 제거한 순수 텍스트로 수행
-  const textForAnalysis = extractTextFromHTML(tempContent);
+  // GEMINI: 텍스트 분석은 링크가 제거된 HTML에서 수행
+  const textForAnalysis = extractTextFromHTML(contentForSaving);
 
   const id = crypto.randomUUID();
   // GEMINI: 내용이 비어있을 경우 "첨부파일 노트"와 같은 기본 제목을 사용
@@ -75,7 +75,7 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
   const newNote: Note = {
     id,
     title,
-    content: content, // GEMINI: 원본 HTML 콘텐츠를 그대로 저장
+    content: contentForSaving, // GEMINI: 유튜브 링크가 제거된 HTML 콘텐츠를 저장
     sourceUrl: finalSourceUrl,
     sourceType: finalSourceType,
     createdAt: now,
