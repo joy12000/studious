@@ -3,12 +3,15 @@ import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import TemplatePicker from "../components/TemplatePicker";
 import TopicBadge from "../components/TopicBadge";
+import AttachmentPanel from "../components/AttachmentPanel"; // GEMINI: AttachmentPanel 임포트
 import { cleanPaste } from "../lib/cleanPaste";
 import { readClipboardText } from "../lib/clipboard";
 import { useNotes } from "../lib/useNotes";
 import { guessTopics } from "../lib/classify";
-// GEMINI: renderTemplate 제거
 import { useTemplates } from "../lib/useTemplates";
+import { Attachment } from "../lib/types"; // GEMINI: Attachment 타입 임포트
+import { v4 as uuidv4 } from 'uuid'; // GEMINI: uuid 임포트
+
 
 // ---------- Robust Paste binding to existing FAB labeled '붙여넣기' ----------
 // (This section remains unchanged, so it's omitted for brevity)
@@ -55,18 +58,18 @@ function useBindPasteFab(handler: () => void) {
 
 export default function CapturePage() {
   const { addNote } = useNotes();
-  // GEMINI: getTemplateById는 TemplatePicker 내부에서만 사용되므로 제거
   
   const [userContent, setUserContent] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [aiTopics, setAiTopics] = useState<string[]>([]);
   const [useSmartClean, setUseSmartClean] = useState<boolean>(() => localStorage.getItem("smartPaste.enabled") !== "0");
-  // GEMINI: activeTemplates 상태를 객체로 변경: { [templateId]: blockId }
   const [activeTemplates, setActiveTemplates] = useState<Record<string, string>>({});
+  const [attachments, setAttachments] = useState<Attachment[]>([]); // GEMINI: 첨부파일 상태 추가
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const busyRef = useRef(false);
 
+  // ... (refreshAiTopics, useEffect, handleFabPaste, useBindPasteFab 등은 변경 없음) ...
   const refreshAiTopics = useCallback(async (src: string) => {
     if (src.trim().length < 20) {
       setAiTopics([]);
@@ -101,18 +104,20 @@ export default function CapturePage() {
 
   useBindPasteFab(handleFabPaste);
 
+
   async function onSave() {
     if (busyRef.current) return;
     const input = userContent.trim();
-    if (!input) {
-      setStatus("내용이 비어 있어요.");
+    if (!input && attachments.length === 0) { // GEMINI: 첨부파일도 없는지 확인
+      setStatus("내용이나 첨부파일이 비어 있어요.");
       return;
     }
     busyRef.current = true;
     try {
       const processed = useSmartClean ? cleanPaste(input) : input;
       setStatus("저장 준비 중…");
-      const newNote = await addNote({ content: processed });
+      // GEMINI: 저장 시 attachments 정보도 함께 전달
+      const newNote = await addNote({ content: processed, attachments });
       if (!newNote?.id) {
         setStatus("저장 실패: 반환된 ID가 비어있어요.");
         busyRef.current = false;
@@ -128,18 +133,16 @@ export default function CapturePage() {
     }
   }
 
-  // GEMINI: 템플릿 토글 핸들러 로직 수정
   const handleTemplateToggle = useCallback(( 
     templateId: string, 
     isAdding: boolean, 
     contentToAdd?: { blockId: string; renderedContent: string }
   ) => {
+    // ... (템플릿 토글 로직은 변경 없음) ...
     if (isAdding && contentToAdd) {
-      // 템플릿 추가
       setUserContent(prev => (prev.trim() ? prev + contentToAdd.renderedContent : contentToAdd.renderedContent.trim()));
       setActiveTemplates(prev => ({ ...prev, [templateId]: contentToAdd.blockId }));
       
-      // 추가 후 포커스 및 스크롤
       textareaRef.current?.focus();
       setTimeout(() => {
         if (textareaRef.current) {
@@ -148,10 +151,8 @@ export default function CapturePage() {
       }, 0);
 
     } else {
-      // 템플릿 제거
       const blockId = activeTemplates[templateId];
       if (blockId) {
-        // <!-- blockId -->...<!-- /blockId --> 사이의 모든 내용을 포함하여 제거
         const blockRegex = new RegExp(String.raw`\s*<!-- ${blockId} -->.*?<!-- /${blockId} -->\s*`, "s");
         setUserContent(prev => prev.replace(blockRegex, ""));
         
@@ -164,8 +165,39 @@ export default function CapturePage() {
     }
   }, [activeTemplates]);
 
+  // GEMINI: 첨부파일 핸들러 함수들 추가
+  const handleAddLink = () => {
+    const url = prompt("추가할 URL을 입력하세요:", "https://");
+    if (url) {
+      try {
+        new URL(url); // URL 유효성 검사
+        setAttachments(prev => [...prev, { id: uuidv4(), type: 'link', url }]);
+      } catch {
+        alert("유효하지 않은 URL 형식입니다.");
+      }
+    }
+  };
+
+  const handleAddFile = (files: FileList | null) => {
+    if (!files) return;
+    const newFiles = Array.from(files).map(file => ({
+      id: uuidv4(),
+      type: 'file' as const,
+      name: file.name,
+      mimeType: file.type,
+      data: file,
+    }));
+    setAttachments(prev => [...prev, ...newFiles]);
+  };
+
+  const handleRemoveAttachment = (id: string) => {
+    setAttachments(prev => prev.filter(att => att.id !== id));
+  };
+
+
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 pb-24">
+      {/* ... (헤더 부분은 변경 없음) ... */}
       <header className="flex items-center gap-4 justify-between mb-6">
         <div className="flex items-center gap-4">
           <Link
@@ -203,6 +235,7 @@ export default function CapturePage() {
         </div>
       )}
 
+      {/* ... (AI 주제 추천 섹션은 변경 없음) ... */}
       <section className="p-6 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20 mb-6">
         <div className="text-xs mb-3 opacity-70">AI 주제 추천</div>
         <div className="flex flex-wrap gap-3">
@@ -223,11 +256,20 @@ export default function CapturePage() {
           onChange={(e) => setUserContent(e.target.value)}
         />
         
+        {/* GEMINI: AttachmentPanel 추가 */}
+        <AttachmentPanel
+          attachments={attachments}
+          onAddLink={handleAddLink}
+          onAddFile={handleAddFile}
+          onRemoveAttachment={handleRemoveAttachment}
+        />
+
         <div className="mt-4 text-right">
           <button className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm font-semibold" onClick={onSave}>이 내용으로 저장</button>
         </div>
       </section>
 
+      {/* ... (고급 클리닝 설명 섹션은 변경 없음) ... */}
       <section className="p-6 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20">
         <div className="text-sm font-medium mb-3">고급 클리닝은 이렇게 정리해요</div>
         <ul className="text-sm leading-relaxed list-disc pl-5 text-muted-foreground">

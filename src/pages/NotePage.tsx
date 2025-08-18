@@ -1,23 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { db } from '../lib/db';
-import { Note } from '../lib/types';
+import { Note, Attachment } from '../lib/types'; // GEMINI: Attachment 타입 임포트
 import { useNotes } from '../lib/useNotes';
 import TopicBadge from '../components/TopicBadge';
 import ShareModal from '../components/ShareModal';
+import AttachmentPanel from '../components/AttachmentPanel'; // GEMINI: AttachmentPanel 임포트
 import { shareNote, downloadEncryptedNote } from '../lib/note';
+import { v4 as uuidv4 } from 'uuid'; // GEMINI: uuid 임포트
 import { 
-  ArrowLeft, 
-  Heart, 
-  ExternalLink, 
-  Calendar, 
-  Edit2, 
-  Check, 
-  X,
-  Star,
-  Trash2,
-  Share2,
-  Youtube
+  ArrowLeft, Heart, ExternalLink, Calendar, Edit2, Check, X, Star, Trash2, Share2, Youtube
 } from 'lucide-react';
 
 export default function NotePage() {
@@ -30,6 +22,7 @@ export default function NotePage() {
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [editTitle, setEditTitle] = useState('');
+  const [editAttachments, setEditAttachments] = useState<Attachment[]>([]); // GEMINI: 수정용 첨부파일 상태
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   useEffect(() => {
@@ -42,6 +35,7 @@ export default function NotePage() {
           setNote(foundNote);
           setEditContent(foundNote.content);
           setEditTitle(foundNote.title);
+          setEditAttachments(foundNote.attachments || []); // GEMINI: 첨부파일 상태 초기화
         } else {
           navigate('/');
         }
@@ -59,21 +53,25 @@ export default function NotePage() {
   const handleSaveEdit = async () => {
     if (!note || !id) return;
     
+    // GEMINI: attachments도 업데이트에 포함
     await updateNote(id, {
       title: editTitle.trim(),
-      content: editContent.trim()
+      content: editContent.trim(),
+      attachments: editAttachments,
     });
     
-    setNote({ ...note, title: editTitle.trim(), content: editContent.trim() });
+    setNote({ ...note, title: editTitle.trim(), content: editContent.trim(), attachments: editAttachments });
     setEditing(false);
   };
 
   const handleCancelEdit = () => {
     setEditContent(note?.content || '');
     setEditTitle(note?.title || '');
+    setEditAttachments(note?.attachments || []); // GEMINI: 첨부파일 상태도 원복
     setEditing(false);
   };
 
+  // ... (handleDelete, handleConfirmShare 등 다른 핸들러는 변경 없음) ...
   const handleDelete = async () => {
     if (!id) return;
     
@@ -142,6 +140,37 @@ export default function NotePage() {
     setNote({ ...note, todo: updatedTodos });
   };
 
+
+  // GEMINI: 첨부파일 핸들러 (CapturePage와 동일)
+  const handleAddLink = () => {
+    const url = prompt("추가할 URL을 입력하세요:", "https://");
+    if (url) {
+      try {
+        new URL(url);
+        setEditAttachments(prev => [...prev, { id: uuidv4(), type: 'link', url }]);
+      } catch {
+        alert("유효하지 않은 URL 형식입니다.");
+      }
+    }
+  };
+
+  const handleAddFile = (files: FileList | null) => {
+    if (!files) return;
+    const newFiles = Array.from(files).map(file => ({
+      id: uuidv4(),
+      type: 'file' as const,
+      name: file.name,
+      mimeType: file.type,
+      data: file,
+    }));
+    setEditAttachments(prev => [...prev, ...newFiles]);
+  };
+
+  const handleRemoveAttachment = (id: string) => {
+    setEditAttachments(prev => prev.filter(att => att.id !== id));
+  };
+
+  // ... (formatDate, getSourceIcon 등 헬퍼 함수는 변경 없음) ...
   const formatDate = (dateStr: string) => {
     if (!dateStr) return '날짜 없음';
     try {
@@ -164,7 +193,9 @@ export default function NotePage() {
     }
   };
 
+
   if (loading) {
+    // ... (로딩 UI는 변경 없음) ...
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -176,6 +207,7 @@ export default function NotePage() {
   }
 
   if (!note) {
+    // ... (노트 없음 UI는 변경 없음) ...
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -189,6 +221,7 @@ export default function NotePage() {
   return (
     <>
       <div className="min-h-screen bg-background">
+        {/* ... (헤더는 변경 없음) ... */}
         <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border">
           <div className="max-w-4xl mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
@@ -221,6 +254,7 @@ export default function NotePage() {
 
         <main className="max-w-4xl mx-auto px-4 py-8">
           <div className="bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20 p-8">
+            {/* ... (날짜, 소스 정보 등은 변경 없음) ... */}
             <div className="flex items-center gap-4 mb-6 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
@@ -258,6 +292,15 @@ export default function NotePage() {
               {editing ? (
                 <div>
                   <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={15} className="w-full px-4 py-3 border bg-card/60 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent resize-y transition-colors" />
+                  
+                  {/* GEMINI: 수정 모드에서 AttachmentPanel 렌더링 */}
+                  <AttachmentPanel
+                    attachments={editAttachments}
+                    onAddLink={handleAddLink}
+                    onAddFile={handleAddFile}
+                    onRemoveAttachment={handleRemoveAttachment}
+                  />
+
                   <div className="flex justify-end gap-3 mt-4">
                     <button onClick={handleCancelEdit} className="inline-flex items-center gap-2 px-4 py-2 border bg-card/50 hover:bg-card/80 rounded-lg transition-colors text-sm">
                       <X className="h-4 w-4" />
@@ -270,12 +313,20 @@ export default function NotePage() {
                   </div>
                 </div>
               ) : (
-                <div className="prose max-w-none">
-                  <div className="text-card-foreground whitespace-pre-wrap leading-relaxed">{note.content}</div>
+                <div>
+                  <div className="prose max-w-none">
+                    <div className="text-card-foreground whitespace-pre-wrap leading-relaxed">{note.content}</div>
+                  </div>
+                  {/* GEMINI: 읽기 모드에서 AttachmentPanel 렌더링 */}
+                  <AttachmentPanel
+                    attachments={note.attachments || []}
+                    readOnly
+                  />
                 </div>
               )}
             </div>
 
+            {/* ... (하이라이트, 할 일, 라벨 섹션은 변경 없음) ... */}
             {note.highlights.length > 0 && (
               <div className="mb-8">
                 <h3 className="text-lg font-semibold text-card-foreground mb-4 flex items-center gap-2"><Star className="h-5 w-5 text-yellow-500" />하이라이트</h3>

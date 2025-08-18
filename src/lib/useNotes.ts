@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { db } from './db';
-import { Note, SourceType } from './types';
+import { Note, SourceType, Attachment } from './types'; // GEMINI: Attachment 타입 임포트
 import { createNote } from './note';
 
 export type Filters = {
@@ -10,12 +10,13 @@ export type Filters = {
   dateRange?: 'today' | '7days' | '30days' | 'all';
 };
 
-// Define the structure for the note creation payload.
+// GEMINI: AddNotePayload에 attachments 필드 추가
 export interface AddNotePayload {
   title?: string;
   content: string;
   sourceUrl?: string | null;
   sourceType?: SourceType;
+  attachments?: Attachment[];
 }
 
 export function useNotes() {

@@ -1,14 +1,16 @@
 // src/lib/note.ts
 import { db } from "./db";
 import { generateTitle, guessTopics } from "./classify";
-import { Note, SourceType } from "./types";
+import { Note, SourceType, Attachment } from "./types"; // GEMINI: Attachment 타입 임포트
 import { encryptJSON } from './crypto';
 
+// GEMINI: CreateNotePayload에 attachments 필드 추가
 export interface CreateNotePayload {
   content: string;
   title?: string;
   sourceUrl?: string | null;
   sourceType?: SourceType;
+  attachments?: Attachment[];
 }
 
 /**
@@ -17,40 +19,33 @@ export interface CreateNotePayload {
  * @returns The newly created Note object.
  */
 export async function createNote(payload: CreateNotePayload): Promise<Note> {
-  const { content, title: titleFromUser, sourceUrl, sourceType: typeFromUser } = payload;
+  // GEMINI: payload에서 attachments 추출
+  const { content, title: titleFromUser, sourceUrl, sourceType: typeFromUser, attachments } = payload;
 
   if (!content || !content.trim()) {
-    throw new Error("Content cannot be empty.");
+    // GEMINI: 내용이 없어도 첨부파일이 있으면 생성 가능하도록 변경
+    if (!attachments || attachments.length === 0) {
+      throw new Error("Content and attachments cannot both be empty.");
+    }
   }
 
-  // YOUTUBE_LINK_EXTRACTION: 유튜브 링크 추출 및 처리 로직 시작
-  // 유튜브 URL을 찾기 위한 정규식입니다. (standard, short, shorts, live, embed)
-  const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/g;
-  
+  // ... (유튜브 링크 추출 로직은 변경 없음) ...
+  const youtubeRegex = /(?:https?://)?(?:www\.)?(?:youtube\.com/(?:watch\?v=|embed/|v/|shorts/|live/)|youtu\.be/)([a-zA-Z0-9_-]{11})/g;
   let cleanedContent = content;
   let extractedUrl: string | null = null;
-  
-  // 본문에서 모든 유튜브 링크를 찾습니다.
   const matches = content.match(youtubeRegex);
-  
   if (matches && matches.length > 0) {
-    // "첫 번째 링크 우선" 정책에 따라 첫 번째 링크를 대표 URL로 사용합니다.
     extractedUrl = matches[0];
-    // 본문에서 모든 유튜브 링크를 제거하여 내용을 정리합니다.
     cleanedContent = content.replace(youtubeRegex, '').trim();
   }
-  // YOUTUBE_LINK_EXTRACTION: 로직 종료
 
-  // 소스 URL과 타입을 결정합니다. 본문에서 추출된 링크가 우선권을 가집니다.
   const finalSourceUrl = extractedUrl || (sourceUrl ? String(sourceUrl).trim() : null);
   let finalSourceType: SourceType = 'other';
 
   if (finalSourceUrl) {
-    // 사용자가 직접 타입을 지정한 경우 해당 타입을 사용합니다.
     if (typeFromUser) {
       finalSourceType = typeFromUser;
     } 
-    // 그렇지 않으면 URL을 분석하여 타입을 자동으로 결정합니다.
     else if (extractedUrl || finalSourceUrl.includes('youtube.com') || finalSourceUrl.includes('youtu.be')) {
       finalSourceType = 'youtube';
     } else {
@@ -59,16 +54,14 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
   }
 
   const id = crypto.randomUUID();
-  // 제목은 링크가 제거된 내용을 기반으로 생성합니다.
-  const title = (titleFromUser || await generateTitle(cleanedContent)).trim();
-  // 토픽 또한 링크가 제거된 내용을 기반으로 추측합니다.
+  // GEMINI: 내용이 비어있을 경우 "첨부파일 노트"와 같은 기본 제목을 사용
+  const title = (titleFromUser || await generateTitle(cleanedContent) || "첨부파일 노트").trim();
   const topics = await guessTopics(cleanedContent);
   const now = new Date().toISOString();
 
   const newNote: Note = {
     id,
     title,
-    // content는 링크가 제거된 버전으로 저장합니다.
     content: cleanedContent,
     sourceUrl: finalSourceUrl,
     sourceType: finalSourceType,
@@ -78,12 +71,15 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
     highlights: [],
     todo: [],
     favorite: false,
+    // GEMINI: attachments 필드 추가
+    attachments: attachments || [],
   };
 
   await db.notes.add(newNote);
   return newNote;
 }
 
+// ... (shareNote, downloadEncryptedNote 함수는 변경 없음) ...
 /**
  * Encrypts a note and shares it as a file.
  * @param note The note to share.
@@ -98,13 +94,11 @@ export async function shareNote(note: Note, passphrase: string): Promise<void> {
     document.body.appendChild(a);
     a.click();
     
-    // Clean up after a short delay to allow the download to initiate
     setTimeout(() => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }, 100);
 
-    // Inform the user after triggering the download
     alert(`자동 공유가 지원되지 않아 수동 다운로드를 시작합니다.\n\n브라우저에서 다운로드 진행 상황을 확인하고, 설정한 비밀번호 "${passphrase}"를 파일과 함께 전달해주세요.`);
   };
 
@@ -114,13 +108,10 @@ export async function shareNote(note: Note, passphrase: string): Promise<void> {
       labels: note.labels, sourceUrl: note.sourceUrl, sourceType: note.sourceType 
     }, passphrase);
     
-    // SHARE_COMPATIBILITY: API 막힘 방지를 위해 공유 시에는 .txt 확장자를 사용합니다.
-    // 내용은 여전히 JSON 형식이므로 가져오기 기능은 정상적으로 작동합니다.
     const file = new File([JSON.stringify(payload, null, 2)], `${note.title.replace(/[/:*?"<>|]/g, '')}.txt`, { type: 'text/plain' });
 
     if (navigator.share && navigator.canShare({ files: [file] })) {
       try {
-        // FILE_ONLY_SHARE: 파일 공유의 안정성을 높이기 위해 title과 text를 제거하고 파일만 단독으로 공유합니다.
         await navigator.share({
           files: [file],
         });

@@ -5,11 +5,29 @@ export type SourceType = typeof SOURCE_TYPES[number]; // 'youtube' | 'book' | 'w
 export const THEMES = ['light', 'dark'] as const;
 export type Theme = typeof THEMES[number]; // 'light' | 'dark'
 
+// GEMINI: 첨부파일 타입을 정의합니다.
+export type FileAttachment = {
+  id: string;
+  type: 'file';
+  name: string;
+  mimeType: string;
+  data: Blob;
+};
+
+export type LinkAttachment = {
+  id: string;
+  type: 'link';
+  url: string;
+};
+
+export type Attachment = FileAttachment | LinkAttachment;
+
+
 /**
  * Represents a single note entry in the database.
  */
 export interface Note {
-  id: string;
+  id:string;
   title: string;
   content: string;
   sourceType: SourceType;
@@ -20,6 +38,8 @@ export interface Note {
   highlights: { text: string; index: number }[];
   todo: { text: string; done: boolean }[];
   favorite: boolean;
+  // GEMINI: 노트에 첨부파일 필드를 추가합니다.
+  attachments?: Attachment[];
 }
 
 /**

@@ -16,11 +16,12 @@ class AppDB extends Dexie {
     this.version(1).stores({
       notes: 'id, createdAt, *topics, favorite, sourceType',
       settings: 'id',
-      // GEMINI: topicRules 테이블을 독립적으로 정의하고 인덱스를 설정합니다.
-      // '++id': Auto-incrementing primary key
-      // '&topic': Unique index for the topic name
-      // '*keywords': Multi-entry index for searching keywords
       topicRules: '++id, &topic, *keywords',
+    });
+
+    // GEMINI: DB 스키마 버전 2로 업그레이드하고 notes 테이블에 attachments 필드를 추가합니다.
+    this.version(2).stores({
+      notes: 'id, createdAt, *topics, favorite, sourceType, attachments',
     });
   }
 
