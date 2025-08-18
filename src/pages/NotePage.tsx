@@ -317,7 +317,7 @@ export default function NotePage() {
                 </div>
               ) : (
                 <div>
-                  <div className="prose dark:prose-invert max-w-none"
+                  <div className="prose dark:prose-invert max-w-none break-words"
                        dangerouslySetInnerHTML={{ __html: note.content }} />
                   
                   <AttachmentPanel
