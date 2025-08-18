@@ -57,6 +57,10 @@ const Toolbar = ({ editor }: { editor: Editor | null }) => {
   );
 };
 
+import { cleanPaste } from '../lib/cleanPaste';
+
+// ... (Toolbar component remains the same)
+
 const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange }) => {
   const editor = useEditor({
     extensions: [StarterKit],
@@ -67,6 +71,20 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange }) =>
     editorProps: {
       attributes: {
         class: 'prose dark:prose-invert max-w-none p-4 focus:outline-none',
+      },
+      handlePaste: (view, event) => {
+        event.preventDefault();
+        
+        async function processPaste() {
+          if (event.clipboardData) {
+            const cleanedText = await cleanPaste(event.clipboardData);
+            // Tiptap's insertContent will handle the conversion of text to HTML paragraphs
+            editor?.chain().focus().insertContent(cleanedText).run();
+          }
+        }
+        
+        processPaste();
+        return true; // We've handled the paste event
       },
     },
   });

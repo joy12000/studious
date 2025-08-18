@@ -14,9 +14,9 @@ interface AppLayoutProps {
  */
 const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex flex-col md:flex-row h-screen bg-background">
       {/* 사이드바 */}
-      <aside className="w-64 border-r bg-muted/40 p-4">
+      <aside className="w-full md:w-64 border-b md:border-r md:border-b-0 bg-muted/40 p-4">
         <div className="flex h-full flex-col">
           {/* 로고 및 앱 이름 */}
           <div className="mb-8">

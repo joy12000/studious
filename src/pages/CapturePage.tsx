@@ -5,8 +5,6 @@ import RichTextEditor from '../components/RichTextEditor';
 import TemplatePicker from "../components/TemplatePicker";
 import TopicBadge from "../components/TopicBadge";
 import AttachmentPanel from "../components/AttachmentPanel";
-import { cleanPaste } from "../lib/cleanPaste";
-import { readClipboardText } from "../lib/clipboard";
 import { useNotes } from "../lib/useNotes";
 import { guessTopics } from "../lib/classify";
 import { Attachment } from "../lib/types";
@@ -62,7 +60,6 @@ export default function CapturePage() {
   const [userContent, setUserContent] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [aiTopics, setAiTopics] = useState<string[]>([]);
-  const [useSmartClean, setUseSmartClean] = useState<boolean>(() => localStorage.getItem("smartPaste.enabled") !== "0");
   const [activeTemplates, setActiveTemplates] = useState<Record<string, string>>({});
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   
@@ -97,23 +94,27 @@ export default function CapturePage() {
 
   const handleFabPaste = useCallback(async () => {
     try {
-      const res = await readClipboardText();
-      if (!res.ok) {
-        setStatus('클립보드에서 읽을 수 없어요.');
-        return;
+      // Use the modern Clipboard API to get DataTransfer
+      const clipboardItems = await navigator.clipboard.read();
+      const data = new DataTransfer();
+      
+      for (const item of clipboardItems) {
+        for (const type of item.types) {
+          const blob = await item.getType(type);
+          data.setData(type, await blob.text());
+        }
       }
-      const input = res.text || "";
-      const cleaned = useSmartClean ? cleanPaste(input) : input;
+
+      const cleaned = await cleanPaste(data);
       
-      // Append cleaned text as new paragraphs
-      const newHtml = cleaned.split('\n').map(p => `<p>${p}</p>`).join('');
-      
-      setUserContent(prev => prev + newHtml);
+      // Append cleaned text. Tiptap will handle HTML conversion.
+      setUserContent(prev => prev + cleaned);
       setStatus("붙여넣기 완료");
-    } catch {
-      setStatus("붙여넣기에 실패했어요.");
+    } catch (err) {
+      console.error("Paste failed:", err);
+      setStatus("붙여넣기에 실패했어요. 브라우저 권한을 확인해주세요.");
     }
-  }, [useSmartClean]);
+  }, []);
 
   useBindPasteFab(handleFabPaste);
 
@@ -153,12 +154,14 @@ export default function CapturePage() {
     contentToAdd?: { blockId: string; renderedContent: string }
   ) => {
     if (isAdding && contentToAdd) {
+      // Append the new template content to the editor
       setUserContent(prev => prev + contentToAdd.renderedContent);
       setActiveTemplates(prev => ({ ...prev, [templateId]: contentToAdd.blockId }));
     } else {
       const blockId = activeTemplates[templateId];
       if (blockId) {
-        const blockRegex = new RegExp(String.raw`\s*<!-- ${blockId} -->.*?<!-- /${blockId} -->\s*`, "s");
+        // Use a more robust regex to remove the block, including surrounding whitespace
+        const blockRegex = new RegExp(String.raw`  \s*<!-- ${blockId} -->.*?<!-- /${blockId} -->\s*`, "s");
         setUserContent(prev => prev.replace(blockRegex, ""));
         
         setActiveTemplates(prev => {
@@ -219,18 +222,6 @@ export default function CapturePage() {
             activeTemplates={activeTemplates}
             onTemplateToggle={handleTemplateToggle}
           />
-          <label className="text-xs flex items-center gap-2 px-3 py-2 rounded-lg border bg-card/50 hover:bg-card/80 transition-colors">
-            <input
-              type="checkbox"
-              checked={useSmartClean}
-              onChange={(e) => {
-                const v = e.target.checked;
-                setUseSmartClean(v);
-                localStorage.setItem("smartPaste.enabled", v ? "1" : "0");
-              }}
-            />
-            고급 클리닝
-          </label>
         </div>
       </header>
 
