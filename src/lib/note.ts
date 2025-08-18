@@ -13,6 +13,15 @@ export interface CreateNotePayload {
   attachments?: Attachment[];
 }
 
+// GEMINI: HTML에서 순수 텍스트를 추출하는 헬퍼 함수
+function extractTextFromHTML(html: string): string {
+  if (typeof DOMParser === 'undefined') {
+    return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent || "";
+}
+
 /**
  * Creates a new note, generates metadata, and saves it to the database.
  * @param payload The data for the new note.
