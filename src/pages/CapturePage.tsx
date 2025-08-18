@@ -158,10 +158,12 @@ export default function CapturePage() {
       setActiveTemplates(prev => ({ ...prev, [templateId]: contentToAdd.blockId }));
     } else {
       const blockId = activeTemplates[templateId];
-      if (blockId) {
+      if (blockId && editorRef.current) {
+        // GEMINI: userContent 상태 대신 에디터의 현재 내용에서 직접 제거
+        const currentContent = editorRef.current.getContent();
         const blockRegex = new RegExp(String.raw`\s*<!-- ${blockId} -->(.|\n)*?<!-- /${blockId} -->\s*`, "g");
-        const newContent = userContent.replace(blockRegex, "");
-        editorRef.current?.setContent(newContent);
+        const newContent = currentContent.replace(blockRegex, "");
+        editorRef.current.setContent(newContent);
         
         setActiveTemplates(prev => {
           const newState = { ...prev };
@@ -170,7 +172,7 @@ export default function CapturePage() {
         });
       }
     }
-  }, [userContent, activeTemplates]);
+  }, [activeTemplates]);
 
   // GEMINI: 첨부파일 핸들러 함수들 추가
   const handleAddLink = () => {

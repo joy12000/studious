@@ -63,14 +63,18 @@ export function renderTemplateForInsertion(template: UserTemplate): { blockId: s
   const blockId = `template-block-${template.id}-${Date.now()}`;
   const filledContent = renderTemplateContent(template.content);
   
+  // GEMINI: 에디터에서 구조가 깨지지 않도록 contenteditable 속성을 사용한 보호용 래퍼 추가
   const renderedContent = `
-
+<p></p>
 <!-- ${blockId} -->
----
-### 템플릿: ${template.name}
-${filledContent}
----
-<!-- /${blockId} -->`;
+<div contenteditable="false" style="border: 1px dashed #ccc; padding: 12px; border-radius: 8px; margin: 1em 0;">
+  <h3 style="margin-top: 0; font-size: 0.9em; color: #888;">템플릿: ${template.name}</h3>
+  <div contenteditable="true">
+    ${filledContent.replace(/\n/g, '<br>')}
+  </div>
+</div>
+<!-- /${blockId} -->
+<p></p>`;
   
   return { blockId, renderedContent };
 }
