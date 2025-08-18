@@ -1,15 +1,16 @@
-import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import TemplatePicker, { UserTemplate } from "../components/TemplatePicker";
+import TemplatePicker from "../components/TemplatePicker";
 import TopicBadge from "../components/TopicBadge";
 import { cleanPaste } from "../lib/cleanPaste";
 import { readClipboardText } from "../lib/clipboard";
 import { useNotes } from "../lib/useNotes";
 import { guessTopics } from "../lib/classify";
+import { useTemplates, renderTemplate } from "../lib/useTemplates";
 
 // ---------- Robust Paste binding to existing FAB labeled '붙여넣기' ----------
-// (이 부분은 변경되지 않았으므로 생략)
+// (This section remains unchanged, so it's omitted for brevity)
 const MARK_ATTR = "data-robust-paste-bound";
 function isPasteButton(el: Element): boolean {
   const node = el as HTMLElement;
@@ -51,45 +52,16 @@ function useBindPasteFab(handler: () => void) {
 
 // ------------------------------- Page --------------------------------
 
-// GEMINI: 템플릿 관련 로직 추가
-const TEMPLATE_LS_KEY = "userTemplates";
-const defaults: UserTemplate[] = [
-  { id: "default-meeting", name: "회의 메모", content: "## 안건\n- \n\n## 핵심 결론\n- \n\n## 할 일(To-Do)\n- [ ] 담당자:  / 마감: \n\n## 참고\n- \n" },
-  { id: "default-reading", name: "독서 노트", content: "## 책/출처\n- \n\n## 인상 깊은 문장\n> \n\n## 요약\n- \n\n## 적용 아이디어\n- \n" },
-  { id: "default-idea", name: "아이디어 스케치", content: "## 한 줄\n- \n\n## 문제/고객\n- \n\n## 해결 아이디어\n- \n\n## 다음 실험\n- 가설: \n- 지표: \n- 마감: \n" }
-];
-
-function loadUserTemplates(): UserTemplate[] {
-  try {
-    const raw = localStorage.getItem(TEMPLATE_LS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function getTemplateContent(id: string, allTemplates: UserTemplate[]): UserTemplate | undefined {
-  return allTemplates.find(t => t.id === id);
-}
-
-function renderTemplate(src: string, name: string): string {
-  const now = new Date();
-  const date = now.toISOString().slice(0, 10);
-  const time = now.toTimeString().slice(0, 5);
-  const filled = src.replace(/\{\{date\}\}/g, date).replace(/\{\{time\}\}/g, time);
-  return `\n\n---\n### 템플릿: ${name}\n${filled}\n---`;
-}
-
 export default function CapturePage() {
   const { addNote } = useNotes();
+  const { getTemplateById } = useTemplates();
+  
   const [userContent, setUserContent] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [aiTopics, setAiTopics] = useState<string[]>([]);
   const [useSmartClean, setUseSmartClean] = useState<boolean>(() => localStorage.getItem("smartPaste.enabled") !== "0");
-  
-  // GEMINI: 템플릿 상태 및 로직 수정
   const [activeTemplates, setActiveTemplates] = useState<string[]>([]);
-  const allTemplates = useMemo(() => [...defaults, ...loadUserTemplates()], []);
+  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const busyRef = useRef(false);
 
@@ -154,23 +126,20 @@ export default function CapturePage() {
     }
   }
 
-  // GEMINI: 템플릿 토글 시 본문에 직접 추가하도록 핸들러 수정
   const handleTemplateToggle = (id: string) => {
-    // 이미 활성화된 템플릿을 체크 해제하는 경우, 텍스트 내용은 변경하지 않고 상태만 업데이트합니다.
     if (activeTemplates.includes(id)) {
       setActiveTemplates(prev => prev.filter(tId => tId !== id));
+      // Note: Deselecting a template does not remove its content from the textarea.
+      // This is intentional to prevent accidental data loss.
       return;
     }
 
-    // 새 템플릿을 체크하는 경우, 내용을 본문에 추가합니다.
-    const template = getTemplateContent(id, allTemplates);
+    const template = getTemplateById(id);
     if (template) {
-      const renderedContent = renderTemplate(template.content, template.name);
-      // 본문이 비어있으면 앞의 개행 없이, 내용이 있으면 개행과 함께 추가합니다.
+      const renderedContent = renderTemplate(template);
       setUserContent(prev => (prev.trim() ? prev + renderedContent : renderedContent.trim()));
       setActiveTemplates(prev => [...prev, id]);
       
-      // 텍스트 추가 후 포커스 및 스크롤 맨 아래로 이동
       textareaRef.current?.focus();
       setTimeout(() => {
         if (textareaRef.current) {
