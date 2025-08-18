@@ -224,22 +224,26 @@ export default function CapturePage() {
       <section className="p-6 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20 mb-6">
         <textarea
           ref={textareaRef}
-          className="w-full min-h-[40vh] px-4 py-3 border bg-card/60 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent resize-y transition-colors"
+          className="w-full min-h-[30vh] px-4 py-3 border bg-card/60 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent resize-y transition-colors"
           placeholder="여기에 붙여넣기 또는 직접 입력…"
-          value={combinedContent}
-          onChange={(e) => {
-            // GEMINI: 사용자 입력과 템플릿 콘텐츠 분리 로직
-            const fullText = e.target.value;
-            const templateSectionIndex = fullText.indexOf('\n\n---\n### 템플릿:');
-            
-            if (templateSectionIndex !== -1) {
-              const userText = fullText.substring(0, templateSectionIndex);
-              setUserContent(userText);
-            } else {
-              setUserContent(fullText);
-            }
-          }}
+          value={userContent}
+          onChange={(e) => setUserContent(e.target.value)}
         />
+        
+        {/* GEMINI: 템플릿 미리보기 영역 추가 */}
+        {activeTemplates.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-card/20">
+            <div className="text-xs mb-2 opacity-70">템플릿 미리보기 (저장 시 합쳐져요)</div>
+            <div className="p-4 rounded-lg bg-card/50 whitespace-pre-wrap text-sm opacity-80">
+              {activeTemplates
+                .map(id => getTemplateContent(id, allTemplates))
+                .filter(Boolean)
+                .map(t => renderTemplate(t!.content, t!.name))
+                .join('')}
+            </div>
+          </div>
+        )}
+
         <div className="mt-4 text-right">
           <button className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm font-semibold" onClick={onSave}>이 내용으로 저장</button>
         </div>
