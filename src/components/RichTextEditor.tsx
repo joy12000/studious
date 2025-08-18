@@ -12,6 +12,7 @@ interface RichTextEditorProps {
 export interface EditorHandle {
   insertContent: (content: string) => void;
   setContent: (content: string) => void;
+  getContent: () => string; // GEMINI: getContent 메서드 추가
 }
 
 const Toolbar = ({ editor }: { editor: Editor | null }) => {
@@ -100,6 +101,10 @@ const RichTextEditor = forwardRef<EditorHandle, RichTextEditorProps>(({ content,
     },
     setContent: (newContent: string) => {
       editor?.commands.setContent(newContent, true);
+    },
+    // GEMINI: getContent 구현 추가
+    getContent: () => {
+      return editor?.getHTML() || '';
     },
   }));
 
