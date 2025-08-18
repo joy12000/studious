@@ -1,9 +1,24 @@
+// src/components/NoteCard.tsx
 import React from 'react';
-import { Star } from 'lucide-react';
+import { Star, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Note } from '../lib/types';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
-export default function NoteCard({ note, onToggleFavorite }: {note: Note; onToggleFavorite?:(id: string)=>void;}) {
+interface NoteCardProps {
+  note: Note;
+  onToggleFavorite?: (id: string) => void;
+}
+
+/**
+ * AIBOOK-UI: shadcn/ui의 Card 컴포넌트를 기반으로 새롭게 디자인된 노트 카드입니다.
+ * 구조적인 레이아웃과 일관된 디자인 시스템을 적용하여 사용자 경험을 개선합니다.
+ */
+export default function NoteCard({ note, onToggleFavorite }: NoteCardProps) {
+  
+  // 원본 URL을 여는 함수 (기존 로직 유지)
   const openSource = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!note.sourceUrl) return;
@@ -25,38 +40,57 @@ export default function NoteCard({ note, onToggleFavorite }: {note: Note; onTogg
   };
 
   return (
-    <Link to={`/note/${note.id}`} className="block bg-card rounded-2xl p-6 border hover:border-primary/50 transition-colors duration-300">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="font-bold text-lg text-card-foreground line-clamp-2">{note.title || '제목 없음'}</div>
-          <div className="text-sm text-muted-foreground whitespace-pre-wrap mt-2 line-clamp-3">{note.content}</div>
-          {note.sourceUrl && (
-            <button
-              onClick={openSource}
-              className="text-primary hover:text-primary/80 text-sm font-medium mt-4"
-              title="원본 열기"
-            >
-              원본 열기
-            </button>
-          )}
-        </div>
+    <Card className="flex h-full flex-col transition-all hover:shadow-md">
+      {/* 카드 헤더: 제목 및 즐겨찾기 버튼 */}
+      <CardHeader className="flex-row items-start justify-between gap-4 pb-4">
+        <Link to={`/note/${note.id}`} className="flex-1">
+          <CardTitle className="line-clamp-2 text-lg">
+            {note.title || '제목 없음'}
+          </CardTitle>
+        </Link>
         {onToggleFavorite && (
-          <button
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }}
-            className="text-muted-foreground hover:text-yellow-400 transition-colors"
+            className="h-8 w-8 flex-shrink-0"
             title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
           >
-            <Star className={`w-6 h-6 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : ''}`} />
-          </button>
+            <Star className={`h-5 w-5 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+          </Button>
         )}
-      </div>
-      {Array.isArray(note.topics) && note.topics.length > 0 && (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {note.topics.map((t: string) => (
-            <div key={t} className="bg-muted text-muted-foreground rounded-full px-3 py-1 text-xs font-medium">{t}</div>
-          ))}
-        </div>
-      )}
-    </Link>
+      </CardHeader>
+
+      {/* 카드 본문: 노트 내용 */}
+      <CardContent className="flex-1 pb-4">
+        <Link to={`/note/${note.id}`} className="block">
+          <p className="line-clamp-3 text-sm text-muted-foreground">
+            {note.content}
+          </p>
+        </Link>
+      </CardContent>
+
+      {/* 카드 푸터: 토픽 배지 및 원본 링크 */}
+      <CardFooter className="flex flex-col items-start gap-4">
+        {Array.isArray(note.topics) && note.topics.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {note.topics.map((t: string) => (
+              <Badge key={t} variant="secondary">{t}</Badge>
+            ))}
+          </div>
+        )}
+        {note.sourceUrl && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={openSource}
+            className="mt-auto"
+          >
+            <ExternalLink className="mr-2 h-4 w-4" />
+            원본 열기
+          </Button>
+        )}
+      </CardFooter>
+    </Card>
   );
 }

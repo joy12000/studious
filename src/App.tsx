@@ -7,6 +7,7 @@ import SettingsPage from './pages/SettingsPage';
 import SharedNotePage from './pages/SharedNotePage';
 import ShareHandler from './components/ShareHandler';
 import { db } from './lib/db'; // DB import 추가
+import AppLayout from './components/AppLayout'; // AIBOOK-UI: AppLayout 컴포넌트를 가져옵니다.
 
 // A component to handle navigation from outside the Router context
 function ServiceWorkerMessageHandler() {
@@ -82,7 +83,8 @@ function App() {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    // AIBOOK-UI: 기존 div 대신 AppLayout으로 전체 페이지를 감싸도록 구조를 변경합니다.
+    <AppLayout>
       <ShareHandler />
       <ServiceWorkerMessageHandler />
       <Routes>
@@ -93,7 +95,7 @@ function App() {
         <Route path="/share" element={<ShareHandler />} />
         <Route path="/shared-note" element={<SharedNotePage />} />
       </Routes>
-    </div>
+    </AppLayout>
   );
 }
 
