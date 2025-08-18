@@ -74,8 +74,7 @@ export async function guessTopics(text: string): Promise<string[]> {
 
     // 헬퍼 함수: 텍스트에서 키워드를 찾아 점수 추가
     const addScore = (topic: string, keyword: string, weight: number) => {
-      const pattern = `\b${escapeRegExp(keyword.toLowerCase())}\b`;
-      const regex = new RegExp(pattern, 'g');
+      const regex = new RegExp(escapeRegExp(keyword.toLowerCase()), 'g');
       const matches = cleanedText.match(regex);
       if (matches) {
         scores[topic] = (scores[topic] || 0) + (matches.length * weight);
