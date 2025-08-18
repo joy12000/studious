@@ -5,6 +5,7 @@ import RichTextEditor from '../components/RichTextEditor';
 import TemplatePicker from "../components/TemplatePicker";
 import TopicBadge from "../components/TopicBadge";
 import AttachmentPanel from "../components/AttachmentPanel";
+import { processContentForSaving } from "../lib/contentProcessor";
 import { useNotes } from "../lib/useNotes";
 import { guessTopics } from "../lib/classify";
 import { Attachment } from "../lib/types";
@@ -120,9 +121,12 @@ export default function CapturePage() {
 
   async function onSave() {
     if (busyRef.current) return;
-    
+
+    const processedContent = processContentForSaving(userContent);
+
+    // Use a temporary div to get the text content for validation
     const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = userContent;
+    tempDiv.innerHTML = processedContent;
     const textContent = tempDiv.textContent || "";
 
     if (textContent.trim().length === 0 && attachments.length === 0) {
@@ -132,7 +136,8 @@ export default function CapturePage() {
     busyRef.current = true;
     try {
       setStatus("저장 준비 중…");
-      const newNote = await addNote({ content: userContent, attachments });
+      // Save the processed content
+      const newNote = await addNote({ content: processedContent, attachments });
       if (!newNote?.id) {
         setStatus("저장 실패: 반환된 ID가 비어있어요.");
         busyRef.current = false;
