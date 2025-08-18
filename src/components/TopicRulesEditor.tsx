@@ -67,13 +67,27 @@ export default function TopicRulesEditor(){
   }
 
   function resetToDefault(){
-    if (!confirm('기본 추천 규칙으로 되돌릴까요? 현재 규칙은 덮어써집니다.')) return;
-    const defaultRules: TopicRule[] = Object.entries(DEFAULT_TOPIC_RULES).map(([topic, keywordsWithWeights]) => ({
+    if (!confirm('기본 토픽 목록을 불러올까요? 기존 규칙은 유지되며, 목록에 없는 기본 토픽만 키워드가 비워진 상태로 추가됩니다.')) return;
+
+    const userTopics = new Set(rules.map(r => r.topic));
+    const defaultTopics = Object.keys(DEFAULT_TOPIC_RULES);
+
+    // 사용자 규칙에 없는 기본 토픽만 찾아서 추가합니다.
+    const topicsToAdd = defaultTopics.filter(topic => !userTopics.has(topic));
+
+    if (topicsToAdd.length === 0) {
+      alert('모든 기본 토픽이 이미 목록에 있습니다.');
+      return;
+    }
+
+    const newRules = topicsToAdd.map(topic => ({
       topic,
-      keywords: Object.keys(keywordsWithWeights),
-      weight: 1, // 기본 규칙의 가중치는 1로 설정
+      keywords: [], // 키워드는 비워둡니다.
+      weight: 1,     // 기본 가중치는 1로 설정합니다.
     }));
-    setRules(defaultRules);
+
+    setRules(prev => [...prev, ...newRules]);
+    alert(`${topicsToAdd.length}개의 기본 토픽을 추가했습니다. 각 토픽에 키워드를 직접 추가해주세요.`);
   }
 
   // Test preview
