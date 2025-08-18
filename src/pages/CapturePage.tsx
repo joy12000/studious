@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import TemplatePicker from "../components/TemplatePicker";
+import TemplatePicker, { UserTemplate } from "../components/TemplatePicker";
 import TopicBadge from "../components/TopicBadge";
 import { cleanPaste } from "../lib/cleanPaste";
 import { readClipboardText } from "../lib/clipboard";
@@ -9,6 +9,7 @@ import { useNotes } from "../lib/useNotes";
 import { guessTopics } from "../lib/classify";
 
 // ---------- Robust Paste binding to existing FAB labeled '붙여넣기' ----------
+// (이 부분은 변경되지 않았으므로 생략)
 const MARK_ATTR = "data-robust-paste-bound";
 function isPasteButton(el: Element): boolean {
   const node = el as HTMLElement;
@@ -25,7 +26,6 @@ function useBindPasteFab(handler: () => void) {
     const candidates = Array.from(document.querySelectorAll("button, [role='button']"))
       .filter(isPasteButton) as HTMLElement[];
     if (candidates.length > 0) {
-      // keep the first, hide duplicates
       const [main, ...dupes] = candidates;
       dupes.forEach(d => (d.style.display = "none"));
       if (!isMarked(main)) {
@@ -50,32 +50,73 @@ function useBindPasteFab(handler: () => void) {
 }
 
 // ------------------------------- Page --------------------------------
+
+// GEMINI: 템플릿 관련 로직 추가
+const TEMPLATE_LS_KEY = "userTemplates";
+const defaults: UserTemplate[] = [
+  { id: "default-meeting", name: "회의 메모", content: "## 안건\n- \n\n## 핵심 결론\n- \n\n## 할 일(To-Do)\n- [ ] 담당자:  / 마감: \n\n## 참고\n- \n" },
+  { id: "default-reading", name: "독서 노트", content: "## 책/출처\n- \n\n## 인상 깊은 문장\n> \n\n## 요약\n- \n\n## 적용 아이디어\n- \n" },
+  { id: "default-idea", name: "아이디어 스케치", content: "## 한 줄\n- \n\n## 문제/고객\n- \n\n## 해결 아이디어\n- \n\n## 다음 실험\n- 가설: \n- 지표: \n- 마감: \n" }
+];
+
+function loadUserTemplates(): UserTemplate[] {
+  try {
+    const raw = localStorage.getItem(TEMPLATE_LS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function getTemplateContent(id: string, allTemplates: UserTemplate[]): UserTemplate | undefined {
+  return allTemplates.find(t => t.id === id);
+}
+
+function renderTemplate(src: string, name: string): string {
+  const now = new Date();
+  const date = now.toISOString().slice(0, 10);
+  const time = now.toTimeString().slice(0, 5);
+  const filled = src.replace(/\{\{date\}\}/g, date).replace(/\{\{time\}\}/g, time);
+  return `\n\n---\n### 템플릿: ${name}\n${filled}\n---`;
+}
+
 export default function CapturePage() {
-  // MOD: useNotes 훅을 직접 호출하여 addNote 함수를 가져옵니다.
   const { addNote } = useNotes();
-  const [text, setText] = useState<string>("");
+  const [userContent, setUserContent] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [aiTopics, setAiTopics] = useState<string[]>([]);
-  const [useSmartClean, setUseSmartClean] = useState<boolean>(() => {
-    const v = localStorage.getItem("smartPaste.enabled");
-    return v ? v === "1" : true;
-  });
+  const [useSmartClean, setUseSmartClean] = useState<boolean>(() => localStorage.getItem("smartPaste.enabled") !== "0");
+  
+  // GEMINI: 템플릿 상태 및 로직 추가
+  const [activeTemplates, setActiveTemplates] = useState<string[]>([]);
+  const allTemplates = useMemo(() => [...defaults, ...loadUserTemplates()], []);
+  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const busyRef = useRef(false);
 
+  const combinedContent = useMemo(() => {
+    const templateContents = activeTemplates
+      .map(id => getTemplateContent(id, allTemplates))
+      .filter(Boolean)
+      .map(t => renderTemplate(t!.content, t!.name))
+      .join('');
+    return userContent + templateContents;
+  }, [userContent, activeTemplates, allTemplates]);
+
   const refreshAiTopics = useCallback(async (src: string) => {
-    try {
-      const s = (text ? text + "\n" : "") + src;
-      if (s.trim().length < 20) { // Don't run for very short text
-        setAiTopics([]);
-        return;
-      }
-      const top = await guessTopics(s);
-      setAiTopics(top.slice(0, 6));
-    } catch {
-      /* noop */
+    if (src.trim().length < 20) {
+      setAiTopics([]);
+      return;
     }
-  }, [text]);
+    try {
+      const top = await guessTopics(src);
+      setAiTopics(top.slice(0, 6));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    refreshAiTopics(combinedContent);
+  }, [combinedContent, refreshAiTopics]);
 
   const handleFabPaste = useCallback(async () => {
     try {
@@ -86,21 +127,19 @@ export default function CapturePage() {
       }
       const input = res.text || "";
       const cleaned = useSmartClean ? cleanPaste(input) : input;
-      const newText = text ? text + "\n\n" + cleaned : cleaned;
-      setText(newText);
+      setUserContent(prev => prev ? prev + "\n\n" + cleaned : cleaned);
       setStatus("붙여넣기 완료");
       textareaRef.current?.focus();
-      refreshAiTopics(newText); // No await needed, let it run in background
     } catch {
       setStatus("붙여넣기에 실패했어요.");
     }
-  }, [useSmartClean, text, refreshAiTopics]);
+  }, [useSmartClean]);
 
   useBindPasteFab(handleFabPaste);
 
   async function onSave() {
     if (busyRef.current) return;
-    const input = text.trim();
+    const input = combinedContent.trim();
     if (!input) {
       setStatus("내용이 비어 있어요.");
       return;
@@ -109,7 +148,6 @@ export default function CapturePage() {
     try {
       const processed = useSmartClean ? cleanPaste(input) : input;
       setStatus("저장 준비 중…");
-      // MOD: createNoteUniversal 대신 useNotes의 addNote를 사용합니다.
       const newNote = await addNote({ content: processed });
       if (!newNote?.id) {
         setStatus("저장 실패: 반환된 ID가 비어있어요.");
@@ -126,6 +164,12 @@ export default function CapturePage() {
     }
   }
 
+  // GEMINI: 템플릿 토글 핸들러 추가
+  const handleTemplateToggle = (id: string) => {
+    setActiveTemplates(prev =>
+      prev.includes(id) ? prev.filter(tId => tId !== id) : [...prev, id]
+    );
+  };
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 pb-24">
@@ -142,15 +186,8 @@ export default function CapturePage() {
         </div>
         <div className="flex items-center gap-2">
           <TemplatePicker
-            onInsert={(tpl) => {
-              const content = tpl || "";
-              const filled = content
-                .replaceAll("{{date}}", new Date().toISOString().slice(0,10))
-                .replaceAll("{{time}}", new Date().toTimeString().slice(0,5));
-              const newText = text ? text + "\n\n" + filled : filled;
-              setText(newText);
-              refreshAiTopics(newText); // No await needed
-            }}
+            activeTemplates={activeTemplates}
+            onTemplateToggle={handleTemplateToggle}
           />
           <label className="text-xs flex items-center gap-2 px-3 py-2 rounded-lg border bg-card/50 hover:bg-card/80 transition-colors">
             <input
@@ -189,11 +226,18 @@ export default function CapturePage() {
           ref={textareaRef}
           className="w-full min-h-[40vh] px-4 py-3 border bg-card/60 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent resize-y transition-colors"
           placeholder="여기에 붙여넣기 또는 직접 입력…"
-          value={text}
+          value={combinedContent}
           onChange={(e) => {
-            const newText = e.target.value;
-            setText(newText);
-            refreshAiTopics(newText); // No await needed
+            // GEMINI: 사용자 입력과 템플릿 콘텐츠 분리 로직
+            const fullText = e.target.value;
+            const templateSectionIndex = fullText.indexOf('\n\n---\n### 템플릿:');
+            
+            if (templateSectionIndex !== -1) {
+              const userText = fullText.substring(0, templateSectionIndex);
+              setUserContent(userText);
+            } else {
+              setUserContent(fullText);
+            }
           }}
         />
         <div className="mt-4 text-right">
