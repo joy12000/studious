@@ -1,16 +1,17 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
 import TemplatePicker from "../components/TemplatePicker";
 import TopicBadge from "../components/TopicBadge";
-import AttachmentPanel from "../components/AttachmentPanel"; // GEMINI: AttachmentPanel 임포트
+import AttachmentPanel from "../components/AttachmentPanel";
 import { cleanPaste } from "../lib/cleanPaste";
 import { readClipboardText } from "../lib/clipboard";
 import { useNotes } from "../lib/useNotes";
 import { guessTopics } from "../lib/classify";
-import { useTemplates } from "../lib/useTemplates";
-import { Attachment } from "../lib/types"; // GEMINI: Attachment 타입 임포트
-import { v4 as uuidv4 } from 'uuid'; // GEMINI: uuid 임포트
+import { Attachment } from "../lib/types";
+import { v4 as uuidv4 } from 'uuid';
 
 
 // ---------- Robust Paste binding to existing FAB labeled '붙여넣기' ----------
@@ -64,28 +65,46 @@ export default function CapturePage() {
   const [aiTopics, setAiTopics] = useState<string[]>([]);
   const [useSmartClean, setUseSmartClean] = useState<boolean>(() => localStorage.getItem("smartPaste.enabled") !== "0");
   const [activeTemplates, setActiveTemplates] = useState<Record<string, string>>({});
-  const [attachments, setAttachments] = useState<Attachment[]>([]); // GEMINI: 첨부파일 상태 추가
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const busyRef = useRef(false);
 
-  // ... (refreshAiTopics, useEffect, handleFabPaste, useBindPasteFab 등은 변경 없음) ...
+  const editor = useEditor({
+    extensions: [StarterKit],
+    content: userContent,
+    onUpdate: ({ editor }) => {
+      setUserContent(editor.getHTML());
+    },
+    editorProps: {
+      attributes: {
+        class: 'prose dark:prose-invert prose-sm sm:prose-base lg:prose-lg xl:prose-2xl m-5 focus:outline-none',
+      },
+    },
+  });
+
   const refreshAiTopics = useCallback(async (src: string) => {
-    if (src.trim().length < 20) {
+    if (!editor) return;
+    const textContent = editor.state.doc.textContent;
+    if (textContent.trim().length < 20) {
       setAiTopics([]);
       return;
     }
     try {
-      const top = await guessTopics(src);
+      const top = await guessTopics(textContent);
       setAiTopics(top.slice(0, 6));
-    } catch {} 
-  }, []);
+    } catch (e) {
+      console.error("Failed to guess topics:", e);
+    }
+  }, [editor]);
 
   useEffect(() => {
-    refreshAiTopics(userContent);
-  }, [userContent, refreshAiTopics]);
+    if (editor) {
+      refreshAiTopics(userContent);
+    }
+  }, [userContent, editor, refreshAiTopics]);
 
   const handleFabPaste = useCallback(async () => {
+    if (!editor) return;
     try {
       const res = await readClipboardText();
       if (!res.ok) {
@@ -94,30 +113,35 @@ export default function CapturePage() {
       }
       const input = res.text || "";
       const cleaned = useSmartClean ? cleanPaste(input) : input;
-      setUserContent(prev => prev ? prev + "\n\n" + cleaned : cleaned);
+      
+      // Convert plain text to HTML paragraphs
+      const htmlContent = cleaned.split('\n').map(p => `<p>${p}</p>`).join('');
+
+      editor.commands.insertContent(htmlContent);
       setStatus("붙여넣기 완료");
-      textareaRef.current?.focus();
+      editor.commands.focus();
     } catch {
       setStatus("붙여넣기에 실패했어요.");
     }
-  }, [useSmartClean]);
+  }, [useSmartClean, editor]);
 
   useBindPasteFab(handleFabPaste);
 
-
   async function onSave() {
-    if (busyRef.current) return;
-    const input = userContent.trim();
-    if (!input && attachments.length === 0) { // GEMINI: 첨부파일도 없는지 확인
+    if (busyRef.current || !editor) return;
+    const htmlContent = editor.getHTML();
+    // Check if content is empty (Tiptap may leave empty <p></p>)
+    const textContent = editor.state.doc.textContent.trim();
+
+    if (textContent.length === 0 && attachments.length === 0) {
       setStatus("내용이나 첨부파일이 비어 있어요.");
       return;
     }
     busyRef.current = true;
     try {
-      const processed = useSmartClean ? cleanPaste(input) : input;
+      // The content is already cleaned on paste, but we can process the whole html if needed
       setStatus("저장 준비 중…");
-      // GEMINI: 저장 시 attachments 정보도 함께 전달
-      const newNote = await addNote({ content: processed, attachments });
+      const newNote = await addNote({ content: htmlContent, attachments });
       if (!newNote?.id) {
         setStatus("저장 실패: 반환된 ID가 비어있어요.");
         busyRef.current = false;
@@ -133,28 +157,27 @@ export default function CapturePage() {
     }
   }
 
-  const handleTemplateToggle = useCallback(( 
-    templateId: string, 
-    isAdding: boolean, 
+  const handleTemplateToggle = useCallback((
+    templateId: string,
+    isAdding: boolean,
     contentToAdd?: { blockId: string; renderedContent: string }
   ) => {
-    // ... (템플릿 토글 로직은 변경 없음) ...
-    if (isAdding && contentToAdd) {
-      setUserContent(prev => (prev.trim() ? prev + contentToAdd.renderedContent : contentToAdd.renderedContent.trim()));
-      setActiveTemplates(prev => ({ ...prev, [templateId]: contentToAdd.blockId }));
-      
-      textareaRef.current?.focus();
-      setTimeout(() => {
-        if (textareaRef.current) {
-          textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
-        }
-      }, 0);
+    if (!editor) return;
 
+    if (isAdding && contentToAdd) {
+      editor.commands.insertContent(contentToAdd.renderedContent);
+      setActiveTemplates(prev => ({ ...prev, [templateId]: contentToAdd.blockId }));
+      editor.commands.focus();
     } else {
       const blockId = activeTemplates[templateId];
       if (blockId) {
-        const blockRegex = new RegExp(String.raw`\s*<!-- ${blockId} -->.*?<!-- /${blockId} -->\s*`, "s");
-        setUserContent(prev => prev.replace(blockRegex, ""));
+        const { state, view } = editor;
+        const { from, to } = view.state.selection;
+        const blockRegex = new RegExp(String.raw`<!-- ${blockId} -->.*?<!-- /${blockId} -->`, "s");
+        
+        // This is a simplified way. A more robust solution would parse the HTML.
+        const newContent = editor.getHTML().replace(blockRegex, "");
+        editor.commands.setContent(newContent);
         
         setActiveTemplates(prev => {
           const newState = { ...prev };
@@ -163,7 +186,7 @@ export default function CapturePage() {
         });
       }
     }
-  }, [activeTemplates]);
+  }, [editor, activeTemplates]);
 
   // GEMINI: 첨부파일 핸들러 함수들 추가
   const handleAddLink = () => {
@@ -248,15 +271,10 @@ export default function CapturePage() {
       </section>
 
       <section className="p-6 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20 mb-6">
-        <textarea
-          ref={textareaRef}
-          className="w-full min-h-[30vh] px-4 py-3 border bg-card/60 rounded-lg focus:ring-2 focus:ring-ring focus:border-transparent resize-y transition-colors"
-          placeholder="여기에 붙여넣기 또는 직접 입력…"
-          value={userContent}
-          onChange={(e) => setUserContent(e.target.value)}
-        />
+        <div className="w-full min-h-[30vh] px-4 py-3 border bg-card/60 rounded-lg focus-within:ring-2 focus-within:ring-ring focus-within:border-transparent resize-y transition-colors">
+          <EditorContent editor={editor} />
+        </div>
         
-        {/* GEMINI: AttachmentPanel 추가 */}
         <AttachmentPanel
           attachments={attachments}
           onAddLink={handleAddLink}

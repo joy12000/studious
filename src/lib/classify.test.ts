@@ -1,10 +1,11 @@
-import { describe, it, expect } from 'vitest';
+    import { describe, it, expect } from 'vitest';
 import { escapeRegExp } from './classify';
 
 describe('escapeRegExp', () => {
   it('should escape special regular expression characters', () => {
-    const specialChars = '.*+?^${}()|[]\';
-    const expected = '\.\*\+\\\?\^\$\{\}\(\)\|\[\]\\';
+    // The backslash needs to be escaped in the string literal.
+    const specialChars = '.*+?^${}()|[]\\';
+    const expected = '\\.\\*\\+\\?\\^\\$\\{\\}\\(\\)\\|\\[\\]\\\\';
     expect(escapeRegExp(specialChars)).toBe(expected);
   });
 
@@ -15,7 +16,7 @@ describe('escapeRegExp', () => {
 
   it('should correctly handle a mixed string of special and normal characters', () => {
     const mixedString = 'a.b*c+d?e^f${g}(h)|i[j]\k';
-    const expected = 'a\.b\*c\+d\?e\^f\$\{g\}\(h\)\|i\[j\]\\k';
+    const expected = 'a\\.b\\*c\\+d\\?e\\^f\\$\\{g\\}\\(h\\)\\|i\\[j\\]\\\\k';
     expect(escapeRegExp(mixedString)).toBe(expected);
   });
 

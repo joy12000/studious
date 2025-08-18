@@ -31,7 +31,9 @@ export default function HomePage() {
   }, [notes]);
 
   useEffect(()=>{
-    try { localStorage.setItem('pinFavorites', String(pinFav)); } catch {}
+    try { localStorage.setItem('pinFavorites', String(pinFav)); } catch (e) {
+      console.error("Failed to save pinFavorites to localStorage:", e);
+    }
   }, [pinFav]);
 
   const sortedNotes = useMemo(() => {
