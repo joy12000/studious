@@ -87,21 +87,11 @@ export default function CapturePage() {
   const [aiTopics, setAiTopics] = useState<string[]>([]);
   const [useSmartClean, setUseSmartClean] = useState<boolean>(() => localStorage.getItem("smartPaste.enabled") !== "0");
   
-  // GEMINI: 템플릿 상태 및 로직 추가
+  // GEMINI: 템플릿 상태 및 로직 수정
   const [activeTemplates, setActiveTemplates] = useState<string[]>([]);
   const allTemplates = useMemo(() => [...defaults, ...loadUserTemplates()], []);
-  
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const busyRef = useRef(false);
-
-  const combinedContent = useMemo(() => {
-    const templateContents = activeTemplates
-      .map(id => getTemplateContent(id, allTemplates))
-      .filter(Boolean)
-      .map(t => renderTemplate(t!.content, t!.name))
-      .join('');
-    return userContent + templateContents;
-  }, [userContent, activeTemplates, allTemplates]);
 
   const refreshAiTopics = useCallback(async (src: string) => {
     if (src.trim().length < 20) {
@@ -111,12 +101,12 @@ export default function CapturePage() {
     try {
       const top = await guessTopics(src);
       setAiTopics(top.slice(0, 6));
-    } catch {}
+    } catch {} 
   }, []);
 
   useEffect(() => {
-    refreshAiTopics(combinedContent);
-  }, [combinedContent, refreshAiTopics]);
+    refreshAiTopics(userContent);
+  }, [userContent, refreshAiTopics]);
 
   const handleFabPaste = useCallback(async () => {
     try {
@@ -139,7 +129,7 @@ export default function CapturePage() {
 
   async function onSave() {
     if (busyRef.current) return;
-    const input = combinedContent.trim();
+    const input = userContent.trim();
     if (!input) {
       setStatus("내용이 비어 있어요.");
       return;
@@ -164,11 +154,30 @@ export default function CapturePage() {
     }
   }
 
-  // GEMINI: 템플릿 토글 핸들러 추가
+  // GEMINI: 템플릿 토글 시 본문에 직접 추가하도록 핸들러 수정
   const handleTemplateToggle = (id: string) => {
-    setActiveTemplates(prev =>
-      prev.includes(id) ? prev.filter(tId => tId !== id) : [...prev, id]
-    );
+    // 이미 활성화된 템플릿을 체크 해제하는 경우, 텍스트 내용은 변경하지 않고 상태만 업데이트합니다.
+    if (activeTemplates.includes(id)) {
+      setActiveTemplates(prev => prev.filter(tId => tId !== id));
+      return;
+    }
+
+    // 새 템플릿을 체크하는 경우, 내용을 본문에 추가합니다.
+    const template = getTemplateContent(id, allTemplates);
+    if (template) {
+      const renderedContent = renderTemplate(template.content, template.name);
+      // 본문이 비어있으면 앞의 개행 없이, 내용이 있으면 개행과 함께 추가합니다.
+      setUserContent(prev => (prev.trim() ? prev + renderedContent : renderedContent.trim()));
+      setActiveTemplates(prev => [...prev, id]);
+      
+      // 텍스트 추가 후 포커스 및 스크롤 맨 아래로 이동
+      textareaRef.current?.focus();
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
+        }
+      }, 0);
+    }
   };
 
   return (
@@ -230,20 +239,6 @@ export default function CapturePage() {
           onChange={(e) => setUserContent(e.target.value)}
         />
         
-        {/* GEMINI: 템플릿 미리보기 영역 추가 */}
-        {activeTemplates.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-card/20">
-            <div className="text-xs mb-2 opacity-70">템플릿 미리보기 (저장 시 합쳐져요)</div>
-            <div className="p-4 rounded-lg bg-card/50 whitespace-pre-wrap text-sm opacity-80">
-              {activeTemplates
-                .map(id => getTemplateContent(id, allTemplates))
-                .filter(Boolean)
-                .map(t => renderTemplate(t!.content, t!.name))
-                .join('')}
-            </div>
-          </div>
-        )}
-
         <div className="mt-4 text-right">
           <button className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg hover:bg-primary/90 transition-colors text-sm font-semibold" onClick={onSave}>이 내용으로 저장</button>
         </div>
