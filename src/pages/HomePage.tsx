@@ -6,13 +6,14 @@ import NoteCard from '../components/NoteCard';
 import FilterBar from '../components/FilterBar';
 import PasteFAB from '../components/PasteFAB';
 import ImportButton from '../components/ImportButton';
-import { Pin, Plus, LayoutGrid, List } from 'lucide-react'; // AIBOOK-UI: 아이콘 추가
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'; // AIBOOK-UI: ToggleGroup 추가
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'; // AIBOOK-UI: Tooltip 추가
+import { Pin, Plus, LayoutGrid, List } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 /**
  * AIBOOK-UI: 홈페이지 컴포넌트입니다.
  * 노트 목록을 그리드 또는 리스트 뷰로 보여주는 기능과 필터링, 노트 추가 등의 액션을 포함합니다.
+ * GEMINI: 모바일 뷰에서 헤더 레이아웃과 노트 목록 표시를 개선했습니다.
  */
 export default function HomePage() {
   const { notes, loading, filters, setFilters, toggleFavorite, addNote } = useNotes();
@@ -21,7 +22,6 @@ export default function HomePage() {
   const [pinFav, setPinFav] = useState<boolean>(() => {
     try { return localStorage.getItem('pinFavorites') !== 'false'; } catch { return true; }
   });
-  // AIBOOK-UI: 'grid' 또는 'list' 뷰 모드를 저장하는 상태를 추가합니다.
   const [view, setView] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
@@ -65,9 +65,10 @@ export default function HomePage() {
       {/* AIBOOK-UI: 새롭게 디자인된 고정 헤더 */}
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b mb-6">
         <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center gap-4">
+          {/* GEMINI: 반응형 레이아웃으로 수정 (모바일: 수직, 데스크탑: 수평) */}
+          <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
             {/* 필터 바 */}
-            <div className="flex-grow">
+            <div className="flex-grow w-full">
               <FilterBar filters={filters} onFiltersChange={setFilters} availableTopics={availableTopics} />
             </div>
             
@@ -139,7 +140,8 @@ export default function HomePage() {
           : "flex flex-col gap-4"
         }>
           {sortedNotes.map(n => (
-            <NoteCard key={n.id} note={n} onToggleFavorite={toggleFavorite} />
+            // GEMINI: view prop을 NoteCard에 전달
+            <NoteCard key={n.id} note={n} onToggleFavorite={toggleFavorite} view={view} />
           ))}
         </div>
       </main>
