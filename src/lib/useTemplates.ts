@@ -23,15 +23,18 @@ function loadUserTemplatesFromStorage(): UserTemplate[] {
     const raw = localStorage.getItem(TEMPLATES_LS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      // 기본 타입 체크
+      // GEMINI: 타입 체크 강화
       if (Array.isArray(parsed)) {
-        return parsed.filter(t => t.id && t.name && typeof t.content !== 'undefined');
+        return parsed.filter(t => t && typeof t.id === 'string' && typeof t.name === 'string' && typeof t.content === 'string');
       }
     }
   } catch (error) {
     console.error("Failed to load user templates from localStorage", error);
   }
-  return [];
+  // GEMINI: 최초 로드 시 기본 템플릿 복사본을 사용자 템플릿으로 저장
+  const initialUserTemplates = defaultTemplates.map(t => ({...t, id: `user-${t.id}`}));
+  saveUserTemplatesToStorage(initialUserTemplates);
+  return initialUserTemplates;
 }
 
 function saveUserTemplatesToStorage(templates: UserTemplate[]) {
@@ -42,17 +45,34 @@ function saveUserTemplatesToStorage(templates: UserTemplate[]) {
   }
 }
 
-// ## 템플릿 렌더링 함수
-export function renderTemplate(template: UserTemplate): string {
+// ## 템플릿 렌더링 헬퍼 함수
+
+// GEMINI: 실시간 미리보기 및 변수 치환 전용 함수
+export function renderTemplateContent(content: string): string {
   const now = new Date();
   const date = now.toISOString().slice(0, 10);
   const time = now.toTimeString().slice(0, 5);
   
-  const filled = template.content
+  return content
     .replace(/\{\{date\}\}/g, date)
     .replace(/\{\{time\}\}/g, time);
-    
-  return `\n\n---\n### 템플릿: ${template.name}\n${filled}\n---`;
+}
+
+// GEMINI: 본문 삽입용 최종 템플릿 렌더링 함수 (고유 ID 포함)
+export function renderTemplateForInsertion(template: UserTemplate): { blockId: string, renderedContent: string } {
+  const blockId = `template-block-${template.id}-${Date.now()}`;
+  const filledContent = renderTemplateContent(template.content);
+  
+  const renderedContent = `
+
+<!-- ${blockId} -->
+---
+### 템플릿: ${template.name}
+${filledContent}
+---
+<!-- /${blockId} -->`;
+  
+  return { blockId, renderedContent };
 }
 
 
@@ -60,8 +80,9 @@ export function renderTemplate(template: UserTemplate): string {
 export function useTemplates() {
   const [userTemplates, setUserTemplates] = useState<UserTemplate[]>(loadUserTemplatesFromStorage);
 
+  // GEMINI: allTemplates를 userTemplates로 단일화. 기본 템플릿은 초기값으로만 활용.
   const allTemplates = useMemo<UserTemplate[]>(() => {
-    return [...defaultTemplates, ...userTemplates];
+    return userTemplates;
   }, [userTemplates]);
 
   const addTemplate = useCallback((templateData: { name: string; content: string }) => {
@@ -97,7 +118,7 @@ export function useTemplates() {
   }, [allTemplates]);
 
   return {
-    defaultTemplates,
+    // GEMINI: defaultTemplates는 더 이상 외부로 노출할 필요 없음
     userTemplates,
     allTemplates,
     addTemplate,

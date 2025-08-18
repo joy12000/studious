@@ -7,7 +7,8 @@ import { cleanPaste } from "../lib/cleanPaste";
 import { readClipboardText } from "../lib/clipboard";
 import { useNotes } from "../lib/useNotes";
 import { guessTopics } from "../lib/classify";
-import { useTemplates, renderTemplate } from "../lib/useTemplates";
+// GEMINI: renderTemplate 제거
+import { useTemplates } from "../lib/useTemplates";
 
 // ---------- Robust Paste binding to existing FAB labeled '붙여넣기' ----------
 // (This section remains unchanged, so it's omitted for brevity)
@@ -54,13 +55,14 @@ function useBindPasteFab(handler: () => void) {
 
 export default function CapturePage() {
   const { addNote } = useNotes();
-  const { getTemplateById } = useTemplates();
+  // GEMINI: getTemplateById는 TemplatePicker 내부에서만 사용되므로 제거
   
   const [userContent, setUserContent] = useState<string>("");
   const [status, setStatus] = useState<string>("");
   const [aiTopics, setAiTopics] = useState<string[]>([]);
   const [useSmartClean, setUseSmartClean] = useState<boolean>(() => localStorage.getItem("smartPaste.enabled") !== "0");
-  const [activeTemplates, setActiveTemplates] = useState<string[]>([]);
+  // GEMINI: activeTemplates 상태를 객체로 변경: { [templateId]: blockId }
+  const [activeTemplates, setActiveTemplates] = useState<Record<string, string>>({});
   
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const busyRef = useRef(false);
@@ -126,28 +128,41 @@ export default function CapturePage() {
     }
   }
 
-  const handleTemplateToggle = (id: string) => {
-    if (activeTemplates.includes(id)) {
-      setActiveTemplates(prev => prev.filter(tId => tId !== id));
-      // Note: Deselecting a template does not remove its content from the textarea.
-      // This is intentional to prevent accidental data loss.
-      return;
-    }
-
-    const template = getTemplateById(id);
-    if (template) {
-      const renderedContent = renderTemplate(template);
-      setUserContent(prev => (prev.trim() ? prev + renderedContent : renderedContent.trim()));
-      setActiveTemplates(prev => [...prev, id]);
+  // GEMINI: 템플릿 토글 핸들러 로직 수정
+  const handleTemplateToggle = useCallback(( 
+    templateId: string, 
+    isAdding: boolean, 
+    contentToAdd?: { blockId: string; renderedContent: string }
+  ) => {
+    if (isAdding && contentToAdd) {
+      // 템플릿 추가
+      setUserContent(prev => (prev.trim() ? prev + contentToAdd.renderedContent : contentToAdd.renderedContent.trim()));
+      setActiveTemplates(prev => ({ ...prev, [templateId]: contentToAdd.blockId }));
       
+      // 추가 후 포커스 및 스크롤
       textareaRef.current?.focus();
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.scrollTop = textareaRef.current.scrollHeight;
         }
       }, 0);
+
+    } else {
+      // 템플릿 제거
+      const blockId = activeTemplates[templateId];
+      if (blockId) {
+        // <!-- blockId -->...<!-- /blockId --> 사이의 모든 내용을 포함하여 제거
+        const blockRegex = new RegExp(String.raw`\s*<!-- ${blockId} -->.*?<!-- /${blockId} -->\s*`, "s");
+        setUserContent(prev => prev.replace(blockRegex, ""));
+        
+        setActiveTemplates(prev => {
+          const newState = { ...prev };
+          delete newState[templateId];
+          return newState;
+        });
+      }
     }
-  };
+  }, [activeTemplates]);
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8 pb-24">
