@@ -1,5 +1,5 @@
 // src/components/NoteCard.tsx
-import React from 'react';
+import React, { useMemo } from 'react'; // GEMINI: useMemo 임포트
 import { Star, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { Note } from '../lib/types';
@@ -10,16 +10,27 @@ import { Badge } from '@/components/ui/badge';
 interface NoteCardProps {
   note: Note;
   onToggleFavorite?: (id: string) => void;
-  view?: 'grid' | 'list'; // GEMINI: 뷰 모드 prop 추가
+  view?: 'grid' | 'list';
+}
+
+// GEMINI: HTML에서 순수 텍스트를 추출하는 헬퍼 함수
+function extractTextFromHTML(html: string): string {
+  if (typeof DOMParser === 'undefined') {
+    return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  return doc.body.textContent || "";
 }
 
 /**
  * AIBOOK-UI: shadcn/ui의 Card 컴포넌트를 기반으로 새롭게 디자인된 노트 카드입니다.
- * 구조적인 레이아웃과 일관된 디자인 시스템을 적용하여 사용자 경험을 개선합니다.
- * GEMINI: 'list' 뷰 모드를 지원하도록 수정되었습니다.
+ * GEMINI: 'list' 뷰 모드를 지원하고, 미리보기 시 HTML 태그를 제거하도록 수정되었습니다.
  */
 export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: NoteCardProps) {
   
+  // GEMINI: note.content에서 HTML 태그를 제거한 미리보기용 텍스트를 생성합니다.
+  const previewText = useMemo(() => extractTextFromHTML(note.content), [note.content]);
+
   // 원본 URL을 여는 함수 (기존 로직 유지)
   const openSource = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -32,7 +43,6 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
     let used = false;
     const t = setTimeout(() => { if (!used) fallback(); }, 350);
     try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).location.href = deep;
       used = true;
     } catch (err) {
@@ -41,7 +51,7 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
     setTimeout(()=>clearTimeout(t), 2000);
   };
 
-  // GEMINI: 'list' 뷰일 때의 카드 레이아웃
+  // 'list' 뷰일 때의 카드 레이아웃
   if (view === 'list') {
     return (
       <Card className="flex w-full flex-row items-start gap-4 p-4 transition-all hover:shadow-md">
@@ -51,7 +61,7 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
           </Link>
           <Link to={`/note/${note.id}`} className="block">
             <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
-              {note.content}
+              {previewText}
             </p>
           </Link>
           {Array.isArray(note.topics) && note.topics.length > 0 && (
@@ -89,10 +99,9 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
     );
   }
 
-  // GEMINI: 기본 'grid' 뷰 레이아웃
+  // 기본 'grid' 뷰 레이아웃
   return (
     <Card className="flex h-full flex-col transition-all hover:shadow-md">
-      {/* 카드 헤더: 제목 및 즐겨찾기 버튼 */}
       <CardHeader className="flex-row items-start justify-between gap-4 pb-4">
         <Link to={`/note/${note.id}`} className="flex-1">
           <CardTitle className="line-clamp-2 text-lg">
@@ -112,16 +121,14 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
         )}
       </CardHeader>
 
-      {/* 카드 본문: 노트 내용 */}
       <CardContent className="flex-1 pb-4">
         <Link to={`/note/${note.id}`} className="block">
           <p className="line-clamp-3 text-sm text-muted-foreground">
-            {note.content}
+            {previewText}
           </p>
         </Link>
       </CardContent>
 
-      {/* 카드 푸터: 토픽 배지 및 원본 링크 */}
       <CardFooter className="flex flex-col items-start gap-4">
         {Array.isArray(note.topics) && note.topics.length > 0 && (
           <div className="flex flex-wrap gap-2">

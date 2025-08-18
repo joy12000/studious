@@ -30,14 +30,14 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
   }
 
   // ... (유튜브 링크 추출 로직은 변경 없음) ...
-  // ... (유튜브 링크 추출 로직은 변경 없음) ...
   const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/g;
-  let cleanedContent = content;
+  let tempContent = content; // 원본 content는 보존
   let extractedUrl: string | null = null;
-  const matches = content.match(youtubeRegex);
+  const matches = tempContent.match(youtubeRegex);
   if (matches && matches.length > 0) {
     extractedUrl = matches[0];
-    cleanedContent = content.replace(youtubeRegex, '').trim();
+    // 링크 제거는 텍스트 분석용으로만 사용
+    tempContent = tempContent.replace(youtubeRegex, '').trim();
   }
 
   const finalSourceUrl = extractedUrl || (sourceUrl ? String(sourceUrl).trim() : null);
@@ -54,16 +54,19 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
     }
   }
 
+  // GEMINI: 텍스트 분석은 HTML을 제거한 순수 텍스트로 수행
+  const textForAnalysis = extractTextFromHTML(tempContent);
+
   const id = crypto.randomUUID();
   // GEMINI: 내용이 비어있을 경우 "첨부파일 노트"와 같은 기본 제목을 사용
-  const title = (titleFromUser || await generateTitle(cleanedContent) || "첨부파일 노트").trim();
-  const topics = await guessTopics(cleanedContent);
+  const title = (titleFromUser || await generateTitle(textForAnalysis) || "첨부파일 노트").trim();
+  const topics = await guessTopics(textForAnalysis);
   const now = new Date().toISOString();
 
   const newNote: Note = {
     id,
     title,
-    content: cleanedContent,
+    content: content, // GEMINI: 원본 HTML 콘텐츠를 그대로 저장
     sourceUrl: finalSourceUrl,
     sourceType: finalSourceType,
     createdAt: now,
