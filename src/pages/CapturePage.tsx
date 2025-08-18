@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import RichTextEditor from '../components/RichTextEditor';
+import RichTextEditor, { EditorHandle } from '../components/RichTextEditor';
 import TemplatePicker from "../components/TemplatePicker";
 import TopicBadge from "../components/TopicBadge";
 import AttachmentPanel from "../components/AttachmentPanel";
@@ -10,7 +10,7 @@ import { useNotes } from "../lib/useNotes";
 import { guessTopics } from "../lib/classify";
 import { Attachment } from "../lib/types";
 import { v4 as uuidv4 } from 'uuid';
-
+import { cleanPaste } from "../lib/cleanPaste";
 
 // ---------- Robust Paste binding to existing FAB labeled '붙여넣기' ----------
 // (This section remains unchanged, so it's omitted for brevity)
@@ -57,6 +57,7 @@ function useBindPasteFab(handler: () => void) {
 
 export default function CapturePage() {
   const { addNote } = useNotes();
+  const editorRef = useRef<EditorHandle>(null);
   
   const [userContent, setUserContent] = useState<string>("");
   const [status, setStatus] = useState<string>("");
@@ -65,11 +66,6 @@ export default function CapturePage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   
   const busyRef = useRef(false);
-  const contentRef = useRef(userContent); // Ref to hold the latest content for callbacks
-
-  useEffect(() => {
-    contentRef.current = userContent;
-  }, [userContent]);
 
   const refreshAiTopics = useCallback(async (htmlContent: string) => {
     // Create a temporary div to extract text content
@@ -102,14 +98,13 @@ export default function CapturePage() {
       for (const item of clipboardItems) {
         for (const type of item.types) {
           const blob = await item.getType(type);
-          data.setData(type, await blob.text());
+          // NOTE: This might not work for all blob types, but is fine for text/html
+          data.setData(type, await blob.text()); 
         }
       }
 
-      const cleaned = await cleanPaste(data);
-      
-      // Append cleaned text. Tiptap will handle HTML conversion.
-      setUserContent(prev => prev + cleaned);
+      const cleanedHtml = await cleanPaste(data);
+      editorRef.current?.insertContent(cleanedHtml);
       setStatus("붙여넣기 완료");
     } catch (err) {
       console.error("Paste failed:", err);
@@ -153,21 +148,20 @@ export default function CapturePage() {
     }
   }
 
-  const handleTemplateToggle = useCallback((
+  const handleTemplateToggle = useCallback(( 
     templateId: string,
     isAdding: boolean,
     contentToAdd?: { blockId: string; renderedContent: string }
   ) => {
     if (isAdding && contentToAdd) {
-      // Append the new template content to the editor
-      setUserContent(prev => prev + contentToAdd.renderedContent);
+      editorRef.current?.insertContent(contentToAdd.renderedContent);
       setActiveTemplates(prev => ({ ...prev, [templateId]: contentToAdd.blockId }));
     } else {
       const blockId = activeTemplates[templateId];
       if (blockId) {
-        // Use a more robust regex to remove the block, including surrounding whitespace
-        const blockRegex = new RegExp(String.raw`  \s*<!-- ${blockId} -->.*?<!-- /${blockId} -->\s*`, "s");
-        setUserContent(prev => prev.replace(blockRegex, ""));
+        const blockRegex = new RegExp(String.raw`\s*<!-- ${blockId} -->(.|\n)*?<!-- /${blockId} -->\s*`, "g");
+        const newContent = userContent.replace(blockRegex, "");
+        editorRef.current?.setContent(newContent);
         
         setActiveTemplates(prev => {
           const newState = { ...prev };
@@ -176,7 +170,7 @@ export default function CapturePage() {
         });
       }
     }
-  }, [activeTemplates]);
+  }, [userContent, activeTemplates]);
 
   // GEMINI: 첨부파일 핸들러 함수들 추가
   const handleAddLink = () => {
@@ -250,6 +244,7 @@ export default function CapturePage() {
 
       <section className="p-6 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20 mb-6">
         <RichTextEditor
+          ref={editorRef}
           content={userContent}
           onChange={setUserContent}
         />

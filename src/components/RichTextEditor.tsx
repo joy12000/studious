@@ -1,11 +1,17 @@
-import React from 'react';
+import React, { useImperativeHandle, forwardRef } from 'react';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import { Bold, Italic, Strikethrough, List, ListOrdered } from 'lucide-react';
+import { cleanPaste } from '../lib/cleanPaste';
 
 interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
+}
+
+export interface EditorHandle {
+  insertContent: (content: string) => void;
+  setContent: (content: string) => void;
 }
 
 const Toolbar = ({ editor }: { editor: Editor | null }) => {
@@ -57,11 +63,7 @@ const Toolbar = ({ editor }: { editor: Editor | null }) => {
   );
 };
 
-import { cleanPaste } from '../lib/cleanPaste';
-
-// ... (Toolbar component remains the same)
-
-const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange }) => {
+const RichTextEditor = forwardRef<EditorHandle, RichTextEditorProps>(({ content, onChange }, ref) => {
   const editor = useEditor({
     extensions: [StarterKit],
     content: content,
@@ -78,16 +80,28 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange }) =>
         async function processPaste() {
           if (event.clipboardData) {
             const cleanedText = await cleanPaste(event.clipboardData);
-            // Tiptap's insertContent will handle the conversion of text to HTML paragraphs
-            editor?.chain().focus().insertContent(cleanedText).run();
+            editor?.chain().focus().insertContent(cleanedText, {
+              parseOptions: {
+                preserveWhitespace: 'full',
+              }
+            }).run();
           }
         }
         
         processPaste();
-        return true; // We've handled the paste event
+        return true;
       },
     },
   });
+
+  useImperativeHandle(ref, () => ({
+    insertContent: (newContent: string) => {
+      editor?.chain().focus().insertContent(newContent).run();
+    },
+    setContent: (newContent: string) => {
+      editor?.commands.setContent(newContent, true);
+    },
+  }));
 
   return (
     <div className="border rounded-lg">
@@ -95,6 +109,6 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({ content, onChange }) =>
       <EditorContent editor={editor} className="min-h-[200px]" />
     </div>
   );
-};
+});
 
 export default RichTextEditor;
