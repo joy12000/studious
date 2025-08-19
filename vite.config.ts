@@ -23,8 +23,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon-192.png','icon-512.png'],
       manifest: {
-        name: 'SelfDev Notes',
-        short_name: 'SelfDev',
+        name: 'Aibrary',
+        short_name: 'Aibrary',
         start_url: '/',
         display: 'standalone',
         theme_color: '#3B82F6',
