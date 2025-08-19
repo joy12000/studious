@@ -38,16 +38,19 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
     }
   }
 
-  // GEMINI: 유튜브 링크 추출 및 본문에서 제거 기능 복원
+  // GEMINI: 유튜브 링크 추출 및 본문에서 모든 링크 제거
   const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/g;
+  const allLinksRegex = /https?:\/\/\S+/gi; // GEMINI: 모든 http/https 링크를 찾는 정규식
   let contentForSaving = content;
   let extractedUrl: string | null = null;
   
   const matches = content.match(youtubeRegex);
   if (matches && matches.length > 0) {
-    extractedUrl = matches[0]; // 첫 번째 링크를 소스 URL로 저장
-    contentForSaving = content.replace(youtubeRegex, '').trim(); // 본문에서는 모든 유튜브 링크 제거
+    extractedUrl = matches[0]; // 첫 번째 유튜브 링크를 소스 URL로 저장
   }
+  
+  // 본문에서는 모든 링크를 제거
+  contentForSaving = content.replace(allLinksRegex, '').trim();
 
   const finalSourceUrl = extractedUrl || (sourceUrl ? String(sourceUrl).trim() : null);
   let finalSourceType: SourceType = 'other';
