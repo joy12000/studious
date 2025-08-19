@@ -38,15 +38,15 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
     }
   }
 
-  // GEMINI: 유튜브 링크 추출 및 본문에서 모든 링크 제거
-  const youtubeRegex = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|v\/|shorts\/|live\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/g;
-  const allLinksRegex = /https?:\/\/\S+/gi; // GEMINI: 모든 http/https 링크를 찾는 정규식
+  // GEMINI: 유튜브 링크 추출 로직 수정
+  const youtubeRegex = new RegExp('(https?://(?:www\\.)?(?:youtube\\.com/(?:watch\\?v=|embed/|v/|shorts/|live/)|youtu\\.be/)[a-zA-Z0-9_-]{11})');
+  const allLinksRegex = /https?://\S+/gi; // GEMINI: 모든 http/https 링크를 찾는 정규식
   let contentForSaving = content;
   let extractedUrl: string | null = null;
   
-  const matches = content.match(youtubeRegex);
-  if (matches && matches.length > 0) {
-    extractedUrl = matches[0]; // 첫 번째 유튜브 링크를 소스 URL로 저장
+  const match = content.match(youtubeRegex);
+  if (match) {
+    extractedUrl = match[0]; // 첫 번째 매칭된 전체 URL을 소스 URL로 저장
   }
   
   // 본문에서는 모든 링크를 제거
@@ -55,11 +55,11 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
   const finalSourceUrl = extractedUrl || (sourceUrl ? String(sourceUrl).trim() : null);
   let finalSourceType: SourceType = 'other';
 
-  if (finalSourceUrl) {
-    if (typeFromUser) {
-      finalSourceType = typeFromUser;
-    } 
-    else if (extractedUrl || finalSourceUrl.includes('youtube.com') || finalSourceUrl.includes('youtu.be')) {
+  if (typeFromUser) {
+    finalSourceType = typeFromUser;
+  } else if (finalSourceUrl) {
+    const isYoutube = finalSourceUrl.includes('youtube.com') || finalSourceUrl.includes('youtu.be');
+    if (isYoutube) {
       finalSourceType = 'youtube';
     } else {
       finalSourceType = 'web';
@@ -164,7 +164,7 @@ export async function downloadEncryptedNote(note: Note, passphrase: string): Pro
 
     const file = new File(
       [JSON.stringify(payload, null, 2)],
-      `${note.title.replace(/[\\/:*?"<>|]/g, '')}.aibook`,
+      `${note.title.replace(/[\\/:*?"<>|]/g, '')}.aibrary`,
       { type: 'text/plain' }
     );
 

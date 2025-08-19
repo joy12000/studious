@@ -37,8 +37,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       {/* 로고 및 앱 이름 */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-primary">AIBook Beta</h1>
-          <p className="text-sm text-muted-foreground">Your AI-Powered Notebook</p>
+          {/* GEMINI: 앱 이름을 Aibrary로 변경하고 부제를 제거하여 디자인을 단순화했습니다. */}
+          <h1 className="text-2xl font-bold text-primary">Aibrary</h1>
         </div>
         {/* 모바일에서 닫기 버튼 */}
         <Button
@@ -69,7 +69,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
       {/* 사이드바 하단 (버전 정보 등) */}
       <div className="mt-auto">
-        <p className="text-xs text-muted-foreground">v1.0.0 - UI Revamp</p>
+        {/* GEMINI: 버전 정보에서 불필요한 설명을 제거했습니다. */}
+        <p className="text-xs text-muted-foreground">v1.0.0</p>
       </div>
     </div>
   );
@@ -86,8 +87,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         )}
 
         {/* 사이드바 */}
+        {/* GEMINI: 사이드바 배경을 bg-background/95로 변경하여 블러 효과를 강조하고 디자인을 세련되게 개선했습니다. */}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 w-64 border-r bg-muted/95 backdrop-blur-lg p-4 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0
+          className={`fixed inset-y-0 left-0 z-40 w-64 border-r bg-background/95 backdrop-blur-lg p-4 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0
             ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
         >
           <SidebarContent />

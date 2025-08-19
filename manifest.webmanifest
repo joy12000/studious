@@ -1,6 +1,6 @@
 {
-  "name": "SelfDev Notes",
-  "short_name": "SelfDev",
+  "name": "Aibrary",
+  "short_name": "Aibrary",
   "start_url": "/?source=pwa",
   "display": "standalone",
   "background_color": "#ffffff",
@@ -38,7 +38,7 @@
     {
       "action": "/",
       "accept": {
-        "text/plain": [".aibook"]
+        "text/plain": [".aibrary"]
       },
       "launch_type": "single-client"
     }
