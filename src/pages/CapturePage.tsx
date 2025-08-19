@@ -153,26 +153,26 @@ export default function CapturePage() {
     isAdding: boolean,
     contentToAdd?: { blockId: string; renderedContent: string }
   ) => {
-    if (isAdding && contentToAdd) {
-      editorRef.current?.insertContent(contentToAdd.renderedContent);
-      setActiveTemplates(prev => ({ ...prev, [templateId]: contentToAdd.blockId }));
-    } else {
-      const blockId = activeTemplates[templateId];
-      if (blockId && editorRef.current) {
-        // GEMINI: userContent 상태 대신 에디터의 현재 내용에서 직접 제거
-        const currentContent = editorRef.current.getContent();
-        const blockRegex = new RegExp(String.raw`\s*<!-- ${blockId} -->(.|\n)*?<!-- /${blockId} -->\s*`, "g");
-        const newContent = currentContent.replace(blockRegex, "");
-        editorRef.current.setContent(newContent);
-        
-        setActiveTemplates(prev => {
-          const newState = { ...prev };
+    setActiveTemplates(prevActive => {
+      if (isAdding && contentToAdd) {
+        editorRef.current?.insertContent(contentToAdd.renderedContent);
+        return { ...prevActive, [templateId]: contentToAdd.blockId };
+      } else {
+        const blockId = prevActive[templateId];
+        if (blockId && editorRef.current) {
+          const currentContent = editorRef.current.getContent();
+          const blockRegex = new RegExp(String.raw`\s*<!-- ${blockId} -->(.|\n)*?<!-- /${blockId} -->\s*`, "g");
+          const newContent = currentContent.replace(blockRegex, "");
+          editorRef.current.setContent(newContent);
+          
+          const newState = { ...prevActive };
           delete newState[templateId];
           return newState;
-        });
+        }
       }
-    }
-  }, [activeTemplates]);
+      return prevActive;
+    });
+  }, []);
 
   // GEMINI: 첨부파일 핸들러 함수들 추가
   const handleAddLink = () => {

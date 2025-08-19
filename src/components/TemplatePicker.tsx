@@ -29,17 +29,15 @@ const TemplateItem = ({ t, isChecked, onToggle, onEdit, onRemove }: {
       />
       <span className="flex-1 text-left">{t.name}</span>
     </label>
-    {/* GEMINI: 사용자 템플릿 식별 로직 변경 */}
-    {t.id.startsWith('user-') || !t.id.startsWith('default-') ? (
-      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center">
-        <button className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => onEdit?.(t)} aria-label="수정">
-          <Edit className="h-4 w-4" />
-        </button>
-        <button className="p-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/40 text-red-600" onClick={() => onRemove?.(t.id)} aria-label="삭제">
-          <Trash2 className="h-4 w-4" />
-        </button>
-      </div>
-    ) : null}
+    {/* GEMINI: 모든 템플릿을 편집/삭제 가능하도록 조건문 제거 */}
+    <div className="flex items-center transition-opacity">
+      <button className="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => onEdit?.(t)} aria-label="수정">
+        <Edit className="h-4 w-4" />
+      </button>
+      <button className="p-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/40 text-red-600" onClick={() => onRemove?.(t.id)} aria-label="삭제">
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
   </div>
 );
 
