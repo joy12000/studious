@@ -40,7 +40,7 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
 
   // GEMINI: 유튜브 링크 추출 로직 수정
   const youtubeRegex = new RegExp('(https?://(?:www\\.)?(?:youtube\\.com/(?:watch\\?v=|embed/|v/|shorts/|live/)|youtu\\.be/)[a-zA-Z0-9_-]{11})');
-  const allLinksRegex = /https?://\S+/gi; // GEMINI: 모든 http/https 링크를 찾는 정규식
+  const allLinksRegex = new RegExp('https?://\S+', 'gi'); // GEMINI: 모든 http/https 링크를 찾는 정규식
   let contentForSaving = content;
   let extractedUrl: string | null = null;
   
