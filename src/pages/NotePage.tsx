@@ -6,7 +6,6 @@ import { useNotes } from '../lib/useNotes';
 import TopicBadge from '../components/TopicBadge';
 import ShareModal from '../components/ShareModal';
 import AttachmentPanel from '../components/AttachmentPanel';
-import RichTextEditor from '../components/RichTextEditor'; // 추가
 import { shareNote, downloadEncryptedNote } from '../lib/note';
 import { v4 as uuidv4 } from 'uuid';
 import { 
@@ -292,9 +291,10 @@ export default function NotePage() {
             <div className="mb-8">
               {editing ? (
                 <div>
-                  <RichTextEditor
-                    content={editContent}
-                    onChange={setEditContent}
+                  <textarea
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    className="w-full h-64 bg-transparent border rounded-lg p-2 focus:ring-0 resize-none"
                   />
                   
                   <AttachmentPanel
@@ -317,8 +317,9 @@ export default function NotePage() {
                 </div>
               ) : (
                 <div>
-                  <div className="prose dark:prose-invert max-w-none break-words"
-                       dangerouslySetInnerHTML={{ __html: note.content }} />
+                  <div className="prose dark:prose-invert max-w-none break-words whitespace-pre-wrap">
+                    {note.content}
+                  </div>
                   
                   <AttachmentPanel
                     attachments={note.attachments || []}
