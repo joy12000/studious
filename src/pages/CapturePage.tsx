@@ -1,11 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
-import RichTextEditor, { EditorHandle } from '../components/RichTextEditor';
 import TemplatePicker from "../components/TemplatePicker";
 import TopicBadge from "../components/TopicBadge";
 import AttachmentPanel from "../components/AttachmentPanel";
-import { processContentForSaving } from "../lib/contentProcessor";
 import { useNotes } from "../lib/useNotes";
 import { guessTopics } from "../lib/classify";
 import { Attachment } from "../lib/types";
@@ -57,7 +55,7 @@ function useBindPasteFab(handler: () => void) {
 
 export default function CapturePage() {
   const { addNote } = useNotes();
-  const editorRef = useRef<EditorHandle>(null);
+  const editorRef = useRef<HTMLTextAreaElement>(null);
   
   const [userContent, setUserContent] = useState<string>("");
   const [status, setStatus] = useState<string>("");
@@ -67,12 +65,7 @@ export default function CapturePage() {
   
   const busyRef = useRef(false);
 
-  const refreshAiTopics = useCallback(async (htmlContent: string) => {
-    // Create a temporary div to extract text content
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
-    const textContent = tempDiv.textContent || "";
-
+  const refreshAiTopics = useCallback(async (textContent: string) => {
     if (textContent.trim().length < 20) {
       setAiTopics([]);
       return;
@@ -91,20 +84,29 @@ export default function CapturePage() {
 
   const handleFabPaste = useCallback(async () => {
     try {
-      // Use the modern Clipboard API to get DataTransfer
       const clipboardItems = await navigator.clipboard.read();
       const data = new DataTransfer();
       
       for (const item of clipboardItems) {
         for (const type of item.types) {
           const blob = await item.getType(type);
-          // NOTE: This might not work for all blob types, but is fine for text/html
           data.setData(type, await blob.text()); 
         }
       }
 
       const cleanedHtml = await cleanPaste(data);
-      editorRef.current?.insertContent(cleanedHtml);
+      
+      // GEMINI: Convert HTML to text for textarea
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = cleanedHtml;
+      const textContent = tempDiv.textContent || "";
+
+      if (editorRef.current) {
+        const { selectionStart, selectionEnd } = editorRef.current;
+        const currentContent = editorRef.current.value;
+        const newContent = currentContent.substring(0, selectionStart) + textContent + currentContent.substring(selectionEnd);
+        setUserContent(newContent);
+      }
       setStatus("붙여넣기 완료");
     } catch (err) {
       console.error("Paste failed:", err);
@@ -117,12 +119,7 @@ export default function CapturePage() {
   async function onSave() {
     if (busyRef.current) return;
 
-    const processedContent = processContentForSaving(userContent);
-
-    // Use a temporary div to get the text content for validation
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = processedContent;
-    const textContent = tempDiv.textContent || "";
+    const textContent = userContent;
 
     if (textContent.trim().length === 0 && attachments.length === 0) {
       setStatus("내용이나 첨부파일이 비어 있어요.");
@@ -131,8 +128,7 @@ export default function CapturePage() {
     busyRef.current = true;
     try {
       setStatus("저장 준비 중…");
-      // Save the processed content
-      const newNote = await addNote({ content: processedContent, attachments });
+      const newNote = await addNote({ content: textContent, attachments });
       if (!newNote?.id) {
         setStatus("저장 실패: 반환된 ID가 비어있어요.");
         busyRef.current = false;
@@ -155,15 +151,25 @@ export default function CapturePage() {
   ) => {
     setActiveTemplates(prevActive => {
       if (isAdding && contentToAdd) {
-        editorRef.current?.insertContent(contentToAdd.renderedContent);
+        // GEMINI: Convert HTML to text for textarea
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = contentToAdd.renderedContent;
+        const textContent = tempDiv.textContent || "";
+        
+        if (editorRef.current) {
+          const { selectionStart, selectionEnd } = editorRef.current;
+          const currentContent = editorRef.current.value;
+          const newContent = currentContent.substring(0, selectionStart) + textContent + currentContent.substring(selectionEnd);
+          setUserContent(newContent);
+        }
         return { ...prevActive, [templateId]: contentToAdd.blockId };
       } else {
         const blockId = prevActive[templateId];
-        if (blockId && editorRef.current) {
-          const currentContent = editorRef.current.getContent();
+        if (blockId) {
+          const currentContent = userContent;
           const blockRegex = new RegExp(String.raw`\s*<!-- ${blockId} -->(.|\n)*?<!-- /${blockId} -->\s*`, "g");
           const newContent = currentContent.replace(blockRegex, "");
-          editorRef.current.setContent(newContent);
+          setUserContent(newContent);
           
           const newState = { ...prevActive };
           delete newState[templateId];
@@ -172,7 +178,7 @@ export default function CapturePage() {
       }
       return prevActive;
     });
-  }, []);
+  }, [userContent]);
 
   // GEMINI: 첨부파일 핸들러 함수들 추가
   const handleAddLink = () => {
@@ -245,10 +251,12 @@ export default function CapturePage() {
       </section>
 
       <section className="p-6 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20 mb-6">
-        <RichTextEditor
+        <textarea
           ref={editorRef}
-          content={userContent}
-          onChange={setUserContent}
+          value={userContent}
+          onChange={(e) => setUserContent(e.target.value)}
+          className="w-full h-64 bg-transparent border-none focus:ring-0 resize-none p-2"
+          placeholder="여기에 내용을 입력하거나 붙여넣으세요..."
         />
         
         <AttachmentPanel
