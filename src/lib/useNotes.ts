@@ -1,22 +1,17 @@
 import { useEffect, useState, useCallback } from 'react';
 import { db } from './db';
-import { Note, SourceType, Attachment } from './types'; // GEMINI: Attachment 타입 임포트
-import { createNote } from './note';
+import { Note, SourceType, Attachment } from './types';
 
 export type Filters = {
   search?: string;
-  topics?: string[];
+  tag?: string; // topics -> tag로 변경
   favorite?: boolean;
   dateRange?: 'today' | '7days' | '30days' | 'all';
 };
 
-// GEMINI: AddNotePayload에 attachments 필드 추가
+// 🚀 기존 AddNotePayload 인터페이스를 youtubeUrl만 받도록 수정
 export interface AddNotePayload {
-  title?: string;
-  content: string;
-  sourceUrl?: string | null;
-  sourceType?: SourceType;
-  attachments?: Attachment[];
+  youtubeUrl: string;
 }
 
 export function useNotes() {
@@ -27,7 +22,6 @@ export function useNotes() {
   const loadNotes = useCallback(async () => {
     setLoading(true);
     try {
-      // MOD: Dexie.js 쿼리 최적화를 위해 `where`를 `orderBy`보다 먼저 사용합니다.
       let query;
       if (filters.dateRange && filters.dateRange !== 'all') {
         const now = new Date();
@@ -39,14 +33,11 @@ export function useNotes() {
         } else { // 30days
           cutoffDate = new Date(now.setDate(now.getDate() - 30));
         }
-        // `where`를 사용하여 인덱싱된 필터링을 수행합니다.
         query = db.notes.where('createdAt').above(cutoffDate.toISOString());
       } else {
-        // 날짜 필터가 없으면 전체 테이블을 대상으로 합니다.
         query = db.notes.toCollection();
       }
 
-      // 정렬은 항상 마지막에 적용합니다.
       let notesFromDb = await query.reverse().sortBy('createdAt');
 
       if (filters.search) {
@@ -57,9 +48,9 @@ export function useNotes() {
         );
       }
 
-      if (filters.topics && filters.topics.length > 0) {
-        const topicSet = new Set(filters.topics);
-        notesFromDb = notesFromDb.filter(n => n.topics.some(t => topicSet.has(t)));
+      // 🚀 tag 필터링 적용
+      if (filters.tag) {
+        notesFromDb = notesFromDb.filter(n => n.tag === filters.tag);
       }
 
       if (filters.favorite) {
@@ -92,16 +83,50 @@ export function useNotes() {
   };
 
   const addNote = async (payload: AddNotePayload) => {
-    const newNote = await createNote(payload);
-    // Add to local state to avoid a full reload
+    // 🚀 서버리스 함수 호출 로직
+    const response = await fetch('/api/summarize-youtube', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ youtubeUrl: payload.youtubeUrl })
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to summarize video.');
+    }
+
+    const result = await response.json();
+
+    // 🚀 서버로부터 받은 데이터로 최종 Note 객체 생성
+    const newNote: Note = {
+      id: crypto.randomUUID(),
+      title: result.title,
+      content: result.summary,
+      key_insights: result.key_insights,
+      tag: result.tag,
+      sourceUrl: result.sourceUrl,
+      sourceType: 'youtube',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().getTime(),
+      topics: [result.tag], // 레거시 호환성을 위해 tag를 topics 배열에 넣어줌
+      labels: [],
+      highlights: [],
+      todo: [],
+      favorite: false,
+      attachments: [],
+    };
+
+    await db.notes.add(newNote);
+    
+    // 로컬 상태 업데이트
     setNotes(prevNotes => [newNote, ...prevNotes]);
     return newNote;
   };
-
+  
   const updateNote = async (id: string, patch: Partial<Note>) => {
-    await db.notes.update(id, patch);
+    await db.notes.update(id, { ...patch, updatedAt: new Date().getTime() });
     setNotes(prevNotes =>
-      prevNotes.map(n => n.id === id ? { ...n, ...patch } : n)
+      prevNotes.map(n => n.id === id ? { ...n, ...patch, updatedAt: new Date().getTime() } : n)
     );
   };
 

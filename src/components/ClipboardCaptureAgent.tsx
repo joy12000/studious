@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Clipboard, Check, AlertCircle, X } from 'lucide-react';
 import { db } from '../lib/db';
-import { guessTopics, generateTitle } from '../lib/classify';
+
 
 function getPath(): string {
   const { pathname = '/', hash = '' } = window.location;
@@ -37,13 +37,12 @@ function genId(): string {
 
 async function saveRawNote(text: string) {
   const id = genId();
-  const topics = await guessTopics(text);
-  const title = generateTitle(text);
   const now = Date.now();
   await db.notes.put({
-    id, content: text, topics,
+    id, content: text, topics: [],
     favorite: false, createdAt: now,
-    title, sourceType: 'share', todo: []
+    title: text.split('\n')[0].slice(0, 50) || '새 노트', 
+    sourceType: 'share', todo: []
   });
   return id;
 }

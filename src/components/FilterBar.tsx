@@ -1,35 +1,43 @@
+
 import React, { useEffect, useRef, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import type { Filters } from '../lib/useNotes';
 
+// 🚀 Props 변경: availableTopics -> availableTags
+// 🚀 Filters 타입에 tag 추가 (useNotes.ts에도 추가 필요)
+interface ExtendedFilters extends Filters {
+  tag?: string;
+}
+
 type Props = {
-  filters?: Filters;
-  onFiltersChange: (next: Filters) => void;
-  availableTopics?: string[];
+  filters?: ExtendedFilters;
+  onFiltersChange: (next: ExtendedFilters) => void;
+  availableTags?: string[];
 };
 
-export default function FilterBar({ filters, onFiltersChange, availableTopics = [] }: Props) {
+export default function FilterBar({ filters, onFiltersChange, availableTags = [] }: Props) {
   const [localSearch, setLocalSearch] = useState(filters?.search ?? '');
-  const [selectedTopics, setSelectedTopics] = useState<string[]>(filters?.topics ?? []);
+  // 🚀 단일 태그 선택으로 변경
+  const [selectedTag, setSelectedTag] = useState<string | undefined>(filters?.tag);
   const timerRef = useRef<number | null>(null);
 
-  // propagate local search/topics (debounced)
+  // propagate local search/tag (debounced)
   useEffect(() => {
     if (timerRef.current) window.clearTimeout(timerRef.current);
     timerRef.current = window.setTimeout(() => {
       onFiltersChange({
         ...(filters || {}),
         search: localSearch || undefined,
-        topics: selectedTopics.length ? selectedTopics : undefined,
-        // favorite 필터는 UI에서 노출하지 않되 값은 유지
+        tag: selectedTag,
       });
     }, 200);
     return () => { if (timerRef.current) window.clearTimeout(timerRef.current); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [localSearch, selectedTopics]);
+  }, [localSearch, selectedTag]);
 
-  const toggleTopic = (t: string) => {
-    setSelectedTopics(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
+  const selectTag = (t: string) => {
+    // 🚀 이미 선택된 태그를 다시 클릭하면 선택 해제
+    setSelectedTag(prev => prev === t ? undefined : t);
   };
 
   return (
@@ -42,18 +50,23 @@ export default function FilterBar({ filters, onFiltersChange, availableTopics = 
           placeholder="노트 검색..."
           className="flex-1 outline-none bg-transparent text-base placeholder-gray-500"
         />
+        {localSearch && (
+            <button onClick={() => setLocalSearch('')} className="p-1 rounded-full hover:bg-gray-200">
+                <X className="h-4 w-4 text-gray-500" />
+            </button>
+        )}
       </div>
 
-      {availableTopics.length > 0 && (
+      {availableTags.length > 0 && (
         <div className="flex flex-wrap gap-2 pt-2">
-          {availableTopics.map(t => (
+          {availableTags.map(t => (
             <button
               key={t}
-              onClick={() => toggleTopic(t)}
+              onClick={() => selectTag(t)}
               className={`text-xs px-3 py-1 rounded-full border transition-colors ${
-                selectedTopics.includes(t)
-                  ? 'bg-teal-600 text-white border-teal-600'
-                  : 'bg-white/60 text-gray-800 border-gray-200/80 hover:bg-white/90'
+                selectedTag === t
+                  ? 'bg-primary text-primary-foreground border-primary'
+                  : 'bg-card text-card-foreground border hover:bg-muted'
               }`}
             >
               {t}

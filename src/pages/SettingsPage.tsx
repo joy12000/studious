@@ -5,7 +5,7 @@ import { canInstall, onCanInstallChange, promptInstall } from '../lib/install';
 import { useNotes } from '../lib/useNotes';
 import BackupPanel from '../components/BackupPanel';
 import DataUsagePanel from '../components/DataUsagePanel';
-import TopicRulesEditor from '../components/TopicRulesEditor';
+
 import { db } from '../lib/db';
 import type { AppSettings } from '../lib/types';
 import { autoBackupIfNeeded } from '../lib/backup';
@@ -137,11 +137,7 @@ export default function SettingsPage(){
         </div>
       )}
 
-      {tab==='topics' && (
-        <div className="space-y-4">
-          <TopicRulesEditor />
-        </div>
-      )}
+      
 
       {tab==='app' && (
         <div className="space-y-4">

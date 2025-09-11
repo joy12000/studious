@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
 import HomePage from './pages/HomePage';
-import CapturePage from './pages/CapturePage';
+import NoteListPage from './pages/NoteListPage';
 import NotePage from './pages/NotePage';
 import SettingsPage from './pages/SettingsPage';
 import SharedNotePage from './pages/SharedNotePage';
@@ -89,7 +89,7 @@ function App() {
       <ServiceWorkerMessageHandler />
       <Routes>
         <Route path="/" element={<HomePage />} />
-        <Route path="/capture" element={<CapturePage />} />
+        <Route path="/notes" element={<NoteListPage />} />
         <Route path="/note/:id" element={<NotePage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/share" element={<ShareHandler />} />

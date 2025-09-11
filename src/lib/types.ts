@@ -27,18 +27,20 @@ export type Attachment = FileAttachment | LinkAttachment;
  * Represents a single note entry in the database.
  */
 export interface Note {
-  id:string;
-  title: string;
-  content: string;
+  id: string;
+  title: string;       // (수정) Gemini가 생성
+  content: string;     // (수정) Gemini가 생성한 요약문 (summary)
   sourceType: SourceType;
   sourceUrl?: string | null;
   createdAt: string;
-  topics: string[];
+  updatedAt: number; // updatedAt은 number 타입 유지
+  tag: string;         // (대체) Gemini가 생성한 단일 태그
+  key_insights: string[]; // (신규) Gemini가 생성한 핵심 인사이트
+  topics: string[];    // (삭제 예정 또는 레거시 데이터용으로 유지)
   labels: string[];
   highlights: { text: string; index: number }[];
   todo: { text: string; done: boolean }[];
   favorite: boolean;
-  // GEMINI: 노트에 첨부파일 필드를 추가합니다.
   attachments?: Attachment[];
 }
 
@@ -60,3 +62,16 @@ export interface AppSettings {
   theme: Theme;
   defaultTopics: string[];
 }
+
+// --- API 데이터 타입 ---
+
+export interface SummaryData {
+  summary: string;
+  key_insights: string[];
+}
+
+export interface TaggingData {
+  title: string;
+  tag: string; // API는 tag 하나만 반환하지만, 우리 시스템은 topics 배열을 사용합니다.
+}
+

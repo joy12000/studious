@@ -64,11 +64,9 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
               {previewText}
             </p>
           </Link>
-          {Array.isArray(note.topics) && note.topics.length > 0 && (
+          {note.tag && (
             <div className="flex flex-wrap gap-2">
-              {note.topics.map((t: string) => (
-                <Badge key={t} variant="secondary">{t}</Badge>
-              ))}
+              <Badge variant="secondary">{note.tag}</Badge>
             </div>
           )}
         </div>
@@ -130,11 +128,9 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
       </CardContent>
 
       <CardFooter className="flex flex-col items-start gap-4">
-        {Array.isArray(note.topics) && note.topics.length > 0 && (
+        {note.tag && (
           <div className="flex flex-wrap gap-2">
-            {note.topics.map((t: string) => (
-              <Badge key={t} variant="secondary">{t}</Badge>
-            ))}
+            <Badge variant="secondary">{note.tag}</Badge>
           </div>
         )}
         {note.sourceUrl && (

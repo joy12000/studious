@@ -1,6 +1,6 @@
 import Dexie, { Table } from 'dexie';
 import { Note, AppSettings, TopicRule } from './types';
-import { DEFAULT_TOPIC_RULES } from './classify'; // Import from classify.ts
+
 
 class AppDB extends Dexie {
   notes!: Table<Note, string>;
@@ -23,6 +23,12 @@ class AppDB extends Dexie {
     this.version(2).stores({
       notes: 'id, createdAt, *topics, favorite, sourceType, attachments',
     });
+
+    // 🚀 신규 버전 추가
+    this.version(3).stores({
+      notes: 'id, createdAt, tag, favorite, sourceType', // topics -> tag 로 인덱스 변경
+      // key_insights는 배열이라 직접 인덱싱하지 않음
+    });
   }
 
   /**
@@ -42,9 +48,7 @@ class AppDB extends Dexie {
           defaultTopics: ['생산성', '학습', '자기계발', '건강/운동', '경제/금융', '기술/IT', '창작/아이디어', '관계/소통', '문화/취미', '여행', '음식/요리', '일상/쇼핑']
         });
         
-        // GEMINI: topicRules 테이블에 기본 규칙을 추가합니다.
-        console.log('Initializing default topic rules...');
-        await this.topicRules.bulkAdd(DEFAULT_TOPIC_RULES);
+        
       }
     });
   }

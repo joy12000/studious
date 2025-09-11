@@ -1,6 +1,6 @@
 // src/lib/note.ts
 import { db } from "./db";
-import { generateTitle, guessTopics } from "./classify";
+
 import { Note, SourceType, Attachment } from "./types"; // GEMINI: Attachment 타입 임포트
 import { encryptJSON } from './crypto';
 
@@ -67,8 +67,6 @@ export async function createNote(payload: CreateNotePayload): Promise<Note> {
   }
 
   // GEMINI: 텍스트 분석은 링크가 제거된 HTML에서 수행
-  const textForAnalysis = extractTextFromHTML(contentForSaving);
-
   const id = crypto.randomUUID();
   // GEMINI: 내용이 비어있을 경우 "첨부파일 노트"와 같은 기본 제목을 사용
   const title = (titleFromUser || await generateTitle(textForAnalysis) || "첨부파일 노트").trim();
