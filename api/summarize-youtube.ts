@@ -1,17 +1,47 @@
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { YoutubeTranscript } from 'youtube-transcript';
+import ytdl from 'ytdl-core';
 import type { SummaryData, TaggingData } from '../src/lib/types';
 
-function getYoutubeVideoId(url: string): string | null {
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-  const match = url.match(regExp);
-  if (match && match[7].length === 11) {
-    return match[7];
+// 🚀 ytdl-core를 사용하여 자막을 가져오는 새로운 헬퍼 함수
+async function getTranscriptFromYtdl(url: string): Promise<string> {
+  try {
+    const info = await ytdl.getInfo(url);
+    const tracks = info.player_response?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+
+    if (!tracks || tracks.length === 0) {
+      throw new Error('No caption tracks found for this video.');
+    }
+
+    // 한국어 또는 영어 자막을 우선적으로 찾습니다.
+    const track = tracks.find(t => t.languageCode === 'ko') || tracks.find(t => t.languageCode === 'en');
+
+    if (!track) {
+      throw new Error('No Korean or English caption track found.');
+    }
+
+    const transcriptResponse = await fetch(track.baseUrl);
+    const transcriptXML = await transcriptResponse.text();
+
+    // XML에서 텍스트만 추출하고 HTML 엔티티를 디코딩합니다.
+    const lines = [...transcriptXML.matchAll(/<text.*?>(.*?)<\/text>/gs)].map(match => match[1]);
+    const decodedLines = lines.map(line => 
+      line.replace(/&amp;#39;/g, "'")
+          .replace(/&quot;/g, '"')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&amp;/g, '&')
+    );
+
+    return decodedLines.join(' ');
+  } catch (error) {
+    console.error(`[ytdl-core] Failed to get transcript: ${error}`);
+    throw new Error('Failed to get video transcript via ytdl-core.');
   }
-  return null;
 }
 
+// --- 프롬프트 템플릿 정의 (기존과 동일) ---
 const SUMMARY_PROMPT_TEMPLATE = `
 당신은 영상 콘텐츠 요약을 전문으로 하는 요약 전문가입니다. 
 사용자가 제공한 유튜브 영상의 전사 내용을 꼼꼼히 분석한 뒤, 영상의 핵심 메시지와 중요한 인사이트를 빠짐없이 담아 체계적으로 요약해주세요.
@@ -56,6 +86,7 @@ ${'```json'}
 ${'```'}
 `;
 
+// --- 서버리스 함수 핸들러 ---
 export default async function handler(
   req: VercelRequest,
   res: VercelResponse
@@ -71,19 +102,8 @@ export default async function handler(
       return res.status(400).json({ error: 'youtubeUrl is required' });
     }
 
-    // --- 1. 유튜브 스크립트 추출 ---
-    let videoTranscript = "";
-    try {
-      const videoId = getYoutubeVideoId(youtubeUrl);
-      if (!videoId) {
-        throw new Error('Invalid YouTube URL');
-      }
-      const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-      videoTranscript = transcript.map(item => item.text).join(' ');
-    } catch (e) {
-      console.error('Failed to fetch transcript:', e);
-      return res.status(400).json({ error: 'Failed to get video transcript. Check if the URL is correct and has transcripts enabled.' });
-    }
+    // --- 1. 유튜브 스크립트 추출 (ytdl-core 방식) ---
+    const videoTranscript = await getTranscriptFromYtdl(youtubeUrl);
     
     if (!videoTranscript) {
         return res.status(400).json({ error: 'Transcript is empty or unavailable.' });
@@ -116,7 +136,7 @@ export default async function handler(
 
   } catch (error) {
     console.error("API 함수 처리 중 오류:", error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return res.status(500).json({ error: 'Failed to process request.', details: errorMessage });
+    const errorMessage = error instanceof Error ? error.message : 'Failed to process request.';
+    return res.status(500).json({ error: errorMessage });
   }
 }
