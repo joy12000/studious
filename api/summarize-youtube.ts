@@ -3,6 +3,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { SummaryData, TaggingData, Note } from '../src/lib/types';
+import { execFile } from 'child_process';
+import path from 'path';
 
 // --- 프롬프트 템플릿 ---
 const SUMMARY_PROMPT_TEMPLATE = `
@@ -46,46 +48,42 @@ ${summaryText}
 '''
 `;
 
-// --- 외부 API 호출을 위한 헬퍼 함수 ---
-async function getTranscriptFromScrapingBee(youtubeUrl: string): Promise<string> {
-  const apiKey = process.env.SCRAPINGBEE_API_KEY;
-  if (!apiKey) {
-    throw new Error('ScrapingBee API key is not configured.');
-  }
+// --- 헬퍼 함수: yt-dlp 실행하여 자막 추출 ---
+async function getTranscriptWithYtDlp(youtubeUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // 1. Vercel 환경에서는 /var/task/bin/yt-dlp 경로에 실행 파일이 위치합니다.
+    //    로컬 개발 환경과의 호환성을 위해 경로를 동적으로 설정합니다.
+    const ytDlpPath = process.env.VERCEL
+      ? path.join(process.cwd(), 'bin', 'yt-dlp')
+      : 'yt-dlp'; // 로컬에서는 시스템에 설치된 yt-dlp를 사용 (또는 로컬 bin 경로 지정)
 
-  // ScrapingBee의 유튜브 자막 추출 전용 파라미터 설정
-  const params = new URLSearchParams({
-    api_key: apiKey,
-    url: youtubeUrl,
-    extract_rules: JSON.stringify({
-      "transcript": {
-        "selector": "ytd-transcript-segment-renderer span", // 유튜브 자막 텍스트 선택자
-        "type": "list",
-        "output": "text"
+    // 2. yt-dlp 명령어 인자 설정
+    const args = [
+      '--write-auto-sub', // 자동 생성 자막 다운로드
+      '--sub-lang', 'ko',    // 한국어 자막 우선
+      '--skip-download',    // 영상은 다운로드 안 함
+      '--sub-format', 'vtt', // 자막 형식
+      '-o', '-',            // 결과를 파일이 아닌 표준 출력(stdout)으로 내보냄
+      youtubeUrl
+    ];
+
+    // 3. 명령어 실행
+    execFile(ytDlpPath, args, { maxBuffer: 1024 * 1024 * 5 }, (error, stdout, stderr) => {
+      if (error) {
+        console.error('yt-dlp stderr:', stderr);
+        return reject(new Error(`yt-dlp execution failed: ${error.message}`));
       }
-    }),
-    custom_google: 'false', // 미국 구글 검색 결과 사용 안 함
-    render_js: 'true', // 자바스크립트 렌더링 활성화 (필수)
+
+      // 4. VTT 자막 형식에서 순수 텍스트만 추출
+      const transcript = stdout
+        .split('\n')
+        .filter(line => !line.startsWith('WEBVTT') && !line.startsWith('Kind:') && !line.startsWith('Language:') && !/-->/.test(line) && line.trim() !== '')
+        .join(' ');
+      
+      resolve(transcript);
+    });
   });
-
-  const response = await fetch(`https://app.scrapingbee.com/api/v1/?${params.toString()}`);
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error('ScrapingBee Error:', errorText);
-    throw new Error(`ScrapingBee API failed with status: ${response.status}`);
-  }
-
-  const result = await response.json();
-  
-  // API가 반환한 자막 리스트를 하나의 문자열로 합칩니다.
-  if (result.transcript && Array.isArray(result.transcript)) {
-    return result.transcript.join(' ');
-  }
-
-  return ''; // 자막이 없는 경우 빈 문자열 반환
 }
-
 
 // --- 메인 서버리스 함수 핸들러 ---
 export default async function handler(
@@ -103,13 +101,13 @@ export default async function handler(
       return res.status(400).json({ error: 'youtubeUrl is required.' });
     }
 
-    // --- 🚀 ScrapingBee를 이용해 자막 데이터 가져오기 ---
-    const videoTranscript = await getTranscriptFromScrapingBee(youtubeUrl);
+    // --- 🚀 yt-dlp로 자막 데이터 가져오기 ---
+    const videoTranscript = await getTranscriptWithYtDlp(youtubeUrl);
 
     if (!videoTranscript || videoTranscript.trim().length === 0) {
-      return res.status(404).json({ error: 'Transcript not found for this video.' });
+      return res.status(404).json({ error: 'Transcript not found using yt-dlp.' });
     }
-    
+
     // --- Gemini API 호출 및 데이터 처리 (기존 로직과 동일) ---
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
