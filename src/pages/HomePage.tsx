@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { useNotes } from "../lib/useNotes";
 import { useNavigate } from "react-router-dom";
@@ -52,12 +51,11 @@ export default function HomePage() {
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4">
         <div className="w-full max-w-3xl text-center">
           
-          {/* 🚀 하나의 핵심 문장으로 변경 */}
-          <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground mb-12">
+          {/* 🚀 글씨 크기 수정 */}
+          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-12">
             AI가 영상의 핵심만 요약해 드립니다.
           </h1>
 
-          {/* 🚀 디자인 및 여백이 개선된 입력창 */}
           <div className="relative">
             <div className="relative flex items-center w-full">
               <Youtube className="absolute left-6 h-6 w-6 text-muted-foreground" />
@@ -66,14 +64,15 @@ export default function HomePage() {
                 value={youtubeUrl}
                 onChange={(e) => setYoutubeUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-                className="w-full pl-16 pr-36 py-5 text-lg border bg-card rounded-full shadow-md focus:ring-2 focus:ring-primary focus:border-transparent focus:shadow-lg transition-all disabled:opacity-70"
+                className="w-full pl-16 pr-32 py-4 text-lg border bg-card rounded-full shadow-md focus:ring-2 focus:ring-primary focus:border-transparent focus:shadow-lg transition-all disabled:opacity-70"
                 placeholder="유튜브 링크 붙여넣기"
                 disabled={isLoading}
               />
+              {/* 🚀 버튼 크기 수정 */}
               <button 
                 onClick={handleSave} 
                 disabled={isLoading}
-                className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center justify-center bg-primary text-primary-foreground h-14 px-8 rounded-full font-semibold hover:bg-primary/90 disabled:opacity-50 transition-all"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center bg-primary text-primary-foreground h-12 px-6 rounded-full font-semibold hover:bg-primary/90 disabled:opacity-50 transition-all"
               >
                 {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "요약"}
               </button>

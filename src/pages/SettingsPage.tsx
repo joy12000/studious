@@ -1,4 +1,4 @@
-// src/pages/SettingsPage.tsx
+
 import React, { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Home, Smartphone, RefreshCcw, Sun, Moon, Trash2 } from 'lucide-react';
 import { canInstall, onCanInstallChange, promptInstall } from '../lib/install';
@@ -34,9 +34,11 @@ export default function SettingsPage(){
   useEffect(()=>{ autoBackupIfNeeded(); }, []);
 
   const noteCount = notes.length;
-  const topicCount = useMemo(()=>{
+  const tagCount = useMemo(()=>{
     const all = new Set<string>();
-    notes.forEach(n => (n.topics||[]).forEach(t => all.add(t)));
+    notes.forEach(n => {
+      if (n.tag) all.add(n.tag);
+    });
     return all.size;
   }, [notes]);
 
@@ -50,33 +52,29 @@ export default function SettingsPage(){
       const root = document.documentElement;
       if (next === 'dark') root.classList.add('dark'); else root.classList.remove('dark');
       localStorage.setItem('pref-theme', next);
-    } catch {
-      // localStorage can be unavailable in some browser environments (e.g., private mode).
-      // This is not a critical failure, so we can safely ignore the error.
-    }
+    } catch {}
   }
 
   async function wipeAll(){
-    if (!confirm('정말 모든 노트와 설정을 삭제할까요? 이 작업은 되돌릴 수 없습니다.')) return;
+    if (!confirm('앱의 모든 노트와 설정을 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없으니, 반드시 백업을 먼저 진행해주세요.')) return;
     indexedDB.deleteDatabase('selfdev-db');
     location.reload();
   }
 
-  // Back buttons (no Router dependency)
   function goBack(){ history.back(); }
   function goHome(){ location.assign('/'); }
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-            <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border px-4 py-3">
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border px-4 py-3">
         <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-y-3">
           <div className="flex items-center gap-4">
             <button onClick={goBack} className="p-2 rounded-lg border bg-card/80 hover:bg-card transition-colors" title="뒤로가기">
               <ArrowLeft className="h-5 w-5" />
             </button>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">설정</h1>
-              <p className="text-sm text-muted-foreground">백업/복원, 데이터, 분류 규칙, PWA 설치</p>
+              <h1 className="text-2xl font-bold tracking-tight">앱 설정</h1>
+              <p className="text-sm text-muted-foreground">테마, 데이터 관리, 백업 등을 설정합니다.</p>
             </div>
           </div>
           <button onClick={goHome} className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg border bg-card hover:bg-muted text-card-foreground transition-colors" title="홈으로">
@@ -85,13 +83,11 @@ export default function SettingsPage(){
         </div>
       </header>
 
-      {/* Tabs */}
       <div className="flex items-center gap-2 flex-wrap">
         <TabButton active={tab==='general'} onClick={()=>setTab('general')}>일반</TabButton>
-        <TabButton active={tab==='backup'} onClick={()=>setTab('backup')}>백업</TabButton>
-        <TabButton active={tab==='data'} onClick={()=>setTab('data')}>데이터</TabButton>
-        
-        <TabButton active={tab==='app'} onClick={()=>setTab('app')}>앱</TabButton>
+        <TabButton active={tab==='backup'} onClick={()=>setTab('backup')}>백업/복원</TabButton>
+        <TabButton active={tab==='data'} onClick={()=>setTab('data')}>데이터 관리</TabButton>
+        <TabButton active={tab==='app'} onClick={()=>setTab('app')}>앱 정보</TabButton>
       </div>
 
       {tab==='general' && (
@@ -99,24 +95,24 @@ export default function SettingsPage(){
           <section className="p-6 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20">
             <div className="flex items-center justify-between">
               <div>
-                <div className="font-medium">테마</div>
-                <div className="text-xs text-muted-foreground">현재: {settings?.theme || 'light'}</div>
+                <div className="font-medium">화면 테마</div>
+                <div className="text-xs text-muted-foreground">현재 테마: {settings?.theme === 'dark' ? '다크' : '라이트'}</div>
               </div>
               <button onClick={toggleTheme} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-card/80 hover:bg-card transition-colors">
                 {settings?.theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-                {settings?.theme === 'dark' ? '라이트로 전환' : '다크로 전환'}
+                {settings?.theme === 'dark' ? '라이트 모드로' : '다크 모드로'}
               </button>
             </div>
           </section>
 
           <section className="p-4 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20 grid grid-cols-2 gap-4">
             <div className="p-3 rounded-lg bg-card/60">
-              <div className="text-xs text-muted-foreground">전체 노트</div>
+              <div className="text-xs text-muted-foreground">전체 노트 수</div>
               <div className="text-xl font-semibold">{noteCount.toLocaleString()}</div>
             </div>
             <div className="p-3 rounded-lg bg-card/60">
-              <div className="text-xs text-muted-foreground">주제 수</div>
-              <div className="text-xl font-semibold">{topicCount.toLocaleString()}</div>
+              <div className="text-xs text-muted-foreground">전체 태그 수</div>
+              <div className="text-xl font-semibold">{tagCount.toLocaleString()}</div>
             </div>
           </section>
         </div>
@@ -125,9 +121,6 @@ export default function SettingsPage(){
       {tab==='backup' && (
         <div className="space-y-4">
           <BackupPanel />
-          <div className="text-xs text-muted-foreground">
-            자동 백업은 앱을 열었을 때 최근 백업이 7일 이상 지났다면 JSON을 다운로드합니다.
-          </div>
         </div>
       )}
 
@@ -137,8 +130,6 @@ export default function SettingsPage(){
         </div>
       )}
 
-      
-
       {tab==='app' && (
         <div className="space-y-4">
           <section className="p-6 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20 space-y-3">
@@ -146,8 +137,8 @@ export default function SettingsPage(){
               <div className="flex items-center gap-3">
                 <Smartphone className="h-5 w-5 text-muted-foreground" />
                 <div>
-                  <div className="font-medium">PWA 설치</div>
-                  <div className="text-xs text-muted-foreground">홈화면에 앱처럼 설치합니다.</div>
+                  <div className="font-medium">앱 설치</div>
+                  <div className="text-xs text-muted-foreground">현재 기기에 앱을 설치하여 바로 사용하세요.</div>
                 </div>
               </div>
               <button
@@ -164,13 +155,13 @@ export default function SettingsPage(){
             <div className="flex items-center gap-3">
               <RefreshCcw className="h-5 w-5 text-muted-foreground" />
               <div>
-                <div className="font-medium">캐시 초기화</div>
-                <div className="text-xs text-muted-foreground">서비스워커/캐시 꼬임 시 강제 새로고침</div>
+                <div className="font-medium">앱 데이터 초기화</div>
+                <div className="text-xs text-muted-foreground">앱이 오작동하거나 느려졌을 때 사용하세요.</div>
               </div>
             </div>
             <div>
               <button
-                onClick={() => { navigator.serviceWorker?.getRegistrations().then(rs => rs.forEach(r => r.unregister())); location.reload(); }}
+                onClick={() => { if(confirm('앱의 캐시 데이터를 비우고 새로고침합니다. 계속할까요?')) { navigator.serviceWorker?.getRegistrations().then(rs => rs.forEach(r => r.unregister())); location.reload(); }}}
                 className="px-4 py-2 rounded-lg border bg-card/80 hover:bg-card text-sm transition-colors"
               >
                 캐시 비우고 새로고침
@@ -181,11 +172,11 @@ export default function SettingsPage(){
           <section className="p-6 bg-destructive/10 backdrop-blur-lg rounded-2xl shadow-lg border border-destructive/20">
             <div className="flex items-center gap-3 text-destructive">
               <Trash2 className="h-5 w-5" />
-              <div className="font-medium">위험 구역</div>
+              <div className="font-medium">모든 데이터 삭제</div>
             </div>
-            <p className="text-xs text-destructive/80 mt-2">모든 데이터를 완전히 삭제합니다. 백업 후 진행하세요.</p>
+            <p className="text-xs text-destructive/80 mt-2">앱의 모든 노트와 설정을 영구적으로 삭제합니다. 이 작업은 되돌릴 수 없으니, 반드시 백업을 먼저 진행해주세요.</p>
             <button onClick={wipeAll} className="mt-3 px-4 py-2 rounded-lg border bg-card/80 hover:bg-card text-destructive border-destructive/50 text-sm font-semibold transition-colors">
-              전체 삭제
+              모든 데이터 영구 삭제
             </button>
           </section>
 
