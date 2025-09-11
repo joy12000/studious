@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { decryptJSON, EncryptedPayload } from '../lib/crypto';
 import { Note } from '../lib/types';
-import { createNote } from '../lib/note';
+import { db } from '../lib/db';
 
 // DECRYPT_VIEW: 복호화된 내용을 보여주는 뷰 컴포넌트
 function DecryptView({ note, onSave }: { note: Partial<Note>, onSave: () => void }) {
@@ -142,12 +142,25 @@ export default function SharedNotePage() {
   const handleSaveNote = async () => {
     if (!decryptedNote || !decryptedNote.content) return;
     try {
-      await createNote({
+      const now = new Date();
+      const newNote: Note = {
+        id: crypto.randomUUID(),
+        title: decryptedNote.title || '공유된 노트',
         content: decryptedNote.content,
-        title: decryptedNote.title,
         sourceUrl: decryptedNote.sourceUrl,
         sourceType: decryptedNote.sourceType,
-      });
+        createdAt: now.toISOString(),
+        updatedAt: now.getTime(),
+        tag: decryptedNote.topics?.[0] || '공유', // 기존 topics의 첫번째를 태그로 사용
+        topics: decryptedNote.topics || ['공유'],
+        key_insights: [],
+        labels: [],
+        highlights: [],
+        todo: [],
+        favorite: false,
+        attachments: [],
+      };
+      await db.notes.add(newNote);
       alert('노트가 성공적으로 저장되었습니다.');
     } catch (err) {
       console.error('Failed to save note:', err);

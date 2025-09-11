@@ -1,17 +1,16 @@
-// src/components/AppLayout.tsx
-import React, { useState, createContext, useContext } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, createContext, useContext, useMemo } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Home, Settings, X } from 'lucide-react';
+import { Home, Settings, X, List, ChevronsLeft, ChevronsRight, Notebook } from 'lucide-react';
+import { useNotes } from '../lib/useNotes'; // 🚀 노트 목록을 가져오기 위해 추가
 
-// GEMINI: 사이드바 상태를 공유하기 위한 Context 생성
+// 사이드바 상태 공유를 위한 Context (기존과 동일)
 interface SidebarContextType {
   isSidebarOpen: boolean;
   setIsSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
 }
 export const SidebarContext = createContext<SidebarContextType | undefined>(undefined);
 
-// GEMINI: Context를 쉽게 사용하기 위한 커스텀 훅
 export const useSidebar = () => {
   const context = useContext(SidebarContext);
   if (!context) {
@@ -20,65 +19,85 @@ export const useSidebar = () => {
   return context;
 };
 
-interface AppLayoutProps {
-  children: React.ReactNode;
-}
+// 🚀 사이드바 컨텐츠를 별도 컴포넌트로 분리하여 로직을 더 명확하게 관리
+const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean, onToggleCollapse: () => void }) => {
+  const { notes } = useNotes();
+  const { setIsSidebarOpen } = useSidebar();
+  const location = useLocation();
 
-/**
- * AIBOOK-UI: 앱의 전체적인 레이아웃을 정의하는 컴포넌트입니다.
- * 데스크탑에서는 사이드바가 고정되며, 모바일에서는 오프캔버스 메뉴로 동작합니다.
- * GEMINI: 모바일 헤더를 제거하고 Context API를 통해 사이드바 상태를 관리하도록 수정되었습니다.
- */
-const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const handleLinkClick = () => {
+    if (window.innerWidth < 768) { // 모바일 화면에서만 링크 클릭 시 사이드바 닫기
+      setIsSidebarOpen(false);
+    }
+  };
 
-  const SidebarContent = () => (
+  // 🚀 최신 노트 7개만 선택
+  const recentNotes = useMemo(() => notes.slice(0, 7), [notes]);
+
+  const NavLink = ({ to, icon, children }: { to: string, icon: React.ReactNode, children: React.ReactNode }) => {
+    const isActive = location.pathname === to;
+    return (
+      <Button asChild variant={isActive ? "secondary" : "ghost"} className="justify-start" onClick={handleLinkClick}>
+        <Link to={to} className="flex items-center w-full">
+          {icon}
+          {!isCollapsed && <span className="ml-2 truncate">{children}</span>}
+        </Link>
+      </Button>
+    );
+  };
+
+  return (
     <div className="flex h-full flex-col">
-      {/* 로고 및 앱 이름 */}
       <div className="mb-8 flex items-center justify-between">
-        <div>
-          {/* GEMINI: 앱 이름을 Aibrary로 변경하고 부제를 제거하여 디자인을 단순화했습니다. */}
-          <h1 className="text-2xl font-bold text-primary">Aibrary</h1>
+        <div className={`font-bold text-primary transition-all duration-300 ${isCollapsed ? 'text-lg' : 'text-2xl'}`}>
+          <Link to="/" onClick={handleLinkClick}>{isCollapsed ? 'A' : 'Aibrary'}</Link>
         </div>
-        {/* 모바일에서 닫기 버튼 */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="md:hidden"
-          onClick={() => setIsSidebarOpen(false)}
-        >
+        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(false)}>
           <X className="h-6 w-6" />
         </Button>
       </div>
 
-      {/* 네비게이션 메뉴 */}
+      {/* 메인 네비게이션 */}
       <nav className="flex flex-col space-y-2">
-        <Button asChild variant="ghost" className="justify-start" onClick={() => setIsSidebarOpen(false)}>
-          <Link to="/">
-            <Home className="mr-2 h-4 w-4" />
-            Home
-          </Link>
-        </Button>
-        <Button asChild variant="ghost" className="justify-start" onClick={() => setIsSidebarOpen(false)}>
-          <Link to="/settings">
-            <Settings className="mr-2 h-4 w-4" />
-            Settings
-          </Link>
-        </Button>
+        <NavLink to="/" icon={<Home className="h-4 w-4" />}>Home</NavLink>
+        <NavLink to="/notes" icon={<List className="h-4 w-4" />}>노트 목록</NavLink>
+        <NavLink to="/settings" icon={<Settings className="h-4 w-4" />}>Settings</NavLink>
       </nav>
 
-      {/* 사이드바 하단 (버전 정보 등) */}
-      <div className="mt-auto">
-        {/* GEMINI: 버전 정보에서 불필요한 설명을 제거했습니다. */}
-        <p className="text-xs text-muted-foreground">v1.0.0</p>
+      <hr className="my-6" />
+
+      {/* 🚀 최근 노트 목록 */}
+      <div className="flex-1 overflow-y-auto">
+        <h2 className={`text-sm font-semibold text-muted-foreground mb-3 px-4 transition-opacity ${isCollapsed ? 'opacity-0' : 'opacity-100'}`}>최근 노트</h2>
+        <nav className="flex flex-col space-y-2">
+          {recentNotes.map(note => (
+            <NavLink key={note.id} to={`/note/${note.id}`} icon={<Notebook className="h-4 w-4 flex-shrink-0" />}>
+              {note.title}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
+
+      {/* 사이드바 하단 */}
+      <div className="mt-auto pt-4">
+        <Button variant="ghost" onClick={onToggleCollapse} className="w-full justify-start hidden md:flex">
+          {isCollapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
+          {!isCollapsed && <span className="ml-2">Collapse</span>}
+        </Button>
+        <p className={`text-xs text-muted-foreground mt-2 transition-opacity ${isCollapsed ? 'opacity-0' : 'opacity-100'}`}>v1.0.0</p>
       </div>
     </div>
   );
+};
+
+
+const AppLayout = ({ children }: { children: React.ReactNode }) => {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false); // 🚀 데스크탑 접기 상태
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, setIsSidebarOpen }}>
       <div className="relative h-screen md:flex bg-background">
-        {/* 오버레이: 모바일에서 사이드바 열렸을 때 */}
         {isSidebarOpen && (
           <div
             className="fixed inset-0 z-30 bg-black/60 md:hidden"
@@ -86,18 +105,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           />
         )}
 
-        {/* 사이드바 */}
-        {/* GEMINI: 사이드바 배경을 bg-background/95로 변경하여 블러 효과를 강조하고 디자인을 세련되게 개선했습니다. */}
+        {/* 🚀 사이드바 스타일 및 기능 개선 */}
         <aside
-          className={`fixed inset-y-0 left-0 z-40 w-64 border-r bg-background/95 backdrop-blur-lg p-4 transform transition-transform duration-300 ease-in-out md:relative md:translate-x-0
-            ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+          className={`fixed inset-y-0 left-0 z-40 border-r bg-background/95 backdrop-blur-lg p-4 transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 shadow-xl
+            ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+            ${isCollapsed ? 'md:w-20' : 'md:w-64'}` // 데스크탑 접기/펼치기 너비
+          }
         >
-          <SidebarContent />
+          <SidebarContent isCollapsed={isCollapsed} onToggleCollapse={() => setIsCollapsed(!isCollapsed)} />
         </aside>
 
-        {/* 메인 콘텐츠 */}
         <main className="flex-1 overflow-y-auto">
-          {/* GEMINI: AppLayout의 모바일 헤더를 제거하고 children이 전체 공간을 사용하도록 함 */}
           {children}
         </main>
       </div>

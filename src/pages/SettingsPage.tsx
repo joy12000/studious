@@ -10,7 +10,7 @@ import { db } from '../lib/db';
 import type { AppSettings } from '../lib/types';
 import { autoBackupIfNeeded } from '../lib/backup';
 
-type TabKey = 'general'|'backup'|'data'|'topics'|'app';
+type TabKey = 'general'|'backup'|'data'|'app';
 
 function TabButton({active, onClick, children}:{active:boolean; onClick:()=>void; children:React.ReactNode}){
   return (
@@ -90,7 +90,7 @@ export default function SettingsPage(){
         <TabButton active={tab==='general'} onClick={()=>setTab('general')}>일반</TabButton>
         <TabButton active={tab==='backup'} onClick={()=>setTab('backup')}>백업</TabButton>
         <TabButton active={tab==='data'} onClick={()=>setTab('data')}>데이터</TabButton>
-        <TabButton active={tab==='topics'} onClick={()=>setTab('topics')}>분류 규칙</TabButton>
+        
         <TabButton active={tab==='app'} onClick={()=>setTab('app')}>앱</TabButton>
       </div>
 

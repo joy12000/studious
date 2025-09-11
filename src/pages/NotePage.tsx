@@ -6,7 +6,7 @@ import { useNotes } from '../lib/useNotes';
 import TopicBadge from '../components/TopicBadge';
 import ShareModal from '../components/ShareModal';
 import AttachmentPanel from '../components/AttachmentPanel';
-import { shareNote, downloadEncryptedNote } from '../lib/note';
+import { encryptJSON } from '../lib/crypto';
 import { v4 as uuidv4 } from 'uuid';
 import { 
   ArrowLeft, Heart, ExternalLink, Calendar, Edit2, Check, X, Star, Trash2, Share2, Youtube
@@ -84,13 +84,32 @@ export default function NotePage() {
   const handleConfirmShare = async (passphrase: string) => {
     if (!note) return;
     setIsShareModalOpen(false);
-    await shareNote(note, passphrase);
+    const encryptedPayload = await encryptJSON(note, passphrase);
+    const shareData = {
+      title: note.title,
+      text: JSON.stringify(encryptedPayload),
+    };
+    try {
+      await navigator.share(shareData);
+    } catch (err) {
+      console.error('Share failed:', err);
+      alert('노트 공유에 실패했습니다.');
+    }
   };
 
   const handleConfirmDownload = async (passphrase: string) => {
     if (!note) return;
     setIsShareModalOpen(false);
-    await downloadEncryptedNote(note, passphrase);
+    const encryptedPayload = await encryptJSON(note, passphrase);
+    const blob = new Blob([JSON.stringify(encryptedPayload)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${note.title.replace(/[^a-z0-9]/gi, '_')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const openSource = (e?: React.MouseEvent) => {
@@ -285,7 +304,7 @@ export default function NotePage() {
             </div>
 
             <div className="flex flex-wrap gap-2 mb-8">
-              {note.topics.map((topic) => (<TopicBadge key={topic} topic={topic} />))}
+              {note.tag && <TopicBadge topic={note.tag} />}
             </div>
 
             <div className="mb-8">
@@ -320,6 +339,24 @@ export default function NotePage() {
                   <div className="prose dark:prose-invert max-w-none break-words whitespace-pre-wrap">
                     {note.content}
                   </div>
+
+                  {/* 🚀 핵심 인사이트 섹션 추가 */}
+                  {note.key_insights && note.key_insights.length > 0 && (
+                    <div className="mt-8">
+                      <h3 className="text-lg font-semibold text-card-foreground mb-4 flex items-center gap-2">
+                        <Star className="h-5 w-5 text-yellow-500" />
+                        핵심 인사이트
+                      </h3>
+                      <div className="space-y-3">
+                        {note.key_insights.map((insight, index) => (
+                          <div key={index} className="flex items-start gap-3 p-4 bg-primary/5 border-l-4 border-primary/50 rounded-r-lg">
+                            <div className="text-primary font-bold mt-1">{index + 1}.</div>
+                            <p className="text-card-foreground m-0">{insight}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   
                   <AttachmentPanel
                     attachments={note.attachments || []}
