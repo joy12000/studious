@@ -70,7 +70,8 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             try:
-                transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+                ytt_api = YouTubeTranscriptApi() # Instantiate the class
+                transcript_list = ytt_api.list(video_id) # Call the instance method 'list'
                 # Try to find a manual transcript in Korean or English
                 try:
                     transcript = transcript_list.find_transcript(['ko', 'en'])
