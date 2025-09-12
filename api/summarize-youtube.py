@@ -70,8 +70,16 @@ class handler(BaseHTTPRequestHandler):
                 return
 
             try:
-                transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=['ko', 'en'])
-                video_transcript = " ".join([item['text'] for item in transcript_list])
+                transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+                # Try to find a manual transcript in Korean or English
+                try:
+                    transcript = transcript_list.find_transcript(['ko', 'en'])
+                # If no manual transcript is found, try to find a generated one
+                except NoTranscriptFound:
+                    transcript = transcript_list.find_generated_transcript(['ko', 'en'])
+                
+                fetched_transcript = transcript.fetch()
+                video_transcript = " ".join([item['text'] for item in fetched_transcript])
             except (NoTranscriptFound, TranscriptsDisabled):
                 self._send_response(404, {'error': 'Transcript not found for this video.'})
                 return
