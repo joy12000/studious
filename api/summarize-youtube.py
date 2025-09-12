@@ -114,14 +114,24 @@ class handler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(data).encode('utf-8'))
 
     def _get_video_id(self, url):
-        # Standard YouTube URLs
-        match = re.search(r"(?:v=|")([0-9A-Za-z_-]{11}).*", url)
-        if match:
-            return match.group(1)
-        # Shortened youtu.be URLs
-        match = re.search(r"youtu\.be\/([0-9A-Za-z_-]{11})", url)
-        if match:
-            return match.group(1)
+        """Extracts the video ID from a YouTube URL."""
+        parsed_url = urlparse(url)
+        hostname = parsed_url.hostname
+        
+        if hostname is None:
+            return None
+
+        if 'youtube.com' in hostname:
+            if parsed_url.path == '/watch':
+                qs = parse_qs(parsed_url.query)
+                return qs.get('v', [None])[0]
+            elif parsed_url.path.startswith('/embed/'):
+                return parsed_url.path.split('/embed/')[1]
+            elif parsed_url.path.startswith('/v/'):
+                return parsed_url.path.split('/v/')[1]
+        elif 'youtu.be' in hostname:
+            return parsed_url.path[1:]
+            
         return None
 
     def _clean_and_parse_json(self, text):
