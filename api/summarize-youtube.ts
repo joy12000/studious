@@ -3,8 +3,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { SummaryData, TaggingData } from '../../src/lib/types';
-import TranscriptClient from 'youtube-transcript-api';
-import type { AxiosRequestConfig } from 'axios';
+import { YoutubeTranscript } from 'youtube-transcript';
 
 // --- 프롬프트 템플릿 (기존과 동일) ---
 const SUMMARY_PROMPT_TEMPLATE = `
@@ -96,39 +95,53 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return sendError('YouTube URL에서 비디오 ID를 추출할 수 없습니다.');
     }
     
-    // 프록시 설정
-    let transcriptClient;
-    const proxyUrl = process.env.PROXY_URL;
+    sendProgress("자막 추출 중...");
 
-    if (proxyUrl) {
-      try {
-        const proxy = new URL(proxyUrl);
-        const proxyConfig: AxiosRequestConfig['proxy'] = {
-          protocol: proxy.protocol.replace(':', ''),
-          host: proxy.hostname,
-          port: parseInt(proxy.port, 10),
-          auth: (proxy.username || proxy.password) ? {
-            username: proxy.username,
-            password: proxy.password,
-          } : undefined,
-        };
-        transcriptClient = new TranscriptClient({ axiosOptions: { proxy: proxyConfig } });
-        await transcriptClient.ready; // 클라이언트 초기화 대기
-        sendProgress("프록시를 사용하여 자막 추출 중...");
-      } catch (e) {
-        console.error("프록시 URL 파싱 오류:", e);
-        return sendError('프록시 URL이 유효하지 않습니다.');
-      }
-    } else {
-      transcriptClient = new TranscriptClient();
-      await transcriptClient.ready; // 클라이언트 초기화 대기
-      sendProgress("자막 추출 중...");
+    // Scraper API를 사용하여 자막 추출
+    const scraperApiKey = process.env.SCRAPER_API_KEY;
+    if (!scraperApiKey) {
+      return sendError('SCRAPER_API_KEY가 설정되지 않았습니다.');
     }
 
-    const transcriptParts = await transcriptClient.getTranscript(videoId, {
-      lang: 'ko',
-    });
-    const videoTranscript = transcriptParts.map(part => part.text).join(' ');
+    let videoTranscript = '';
+    try {
+      const scrapeUrl = `http://api.scraperapi.com?api_key=${scraperApiKey}&url=${encodeURIComponent(youtubeUrl)}`;
+      const pageResponse = await fetch(scrapeUrl);
+      if (!pageResponse.ok) throw new Error(`Scraper API page fetch failed with status: ${pageResponse.status}`);
+      
+      const pageHtml = await pageResponse.text();
+      
+      const playerResponseRegex = /var ytInitialPlayerResponse = ({.*?});/;
+      const match = pageHtml.match(playerResponseRegex);
+      if (!match || !match[1]) throw new Error('Could not find player response data in page HTML.');
+
+      const playerResponse = JSON.parse(match[1]);
+      const captionTracks = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+      if (!captionTracks || captionTracks.length === 0) throw new Error('Video does not have captions.');
+
+      const koreanTrack = captionTracks.find(track => track.languageCode === 'ko' && track.kind !== 'asr') || captionTracks.find(track => track.languageCode === 'ko');
+      if (!koreanTrack || !koreanTrack.baseUrl) throw new Error('Could not find Korean captions.');
+
+      const transcriptUrl = koreanTrack.baseUrl;
+      const transcriptResponse = await fetch(transcriptUrl);
+      if (!transcriptResponse.ok) throw new Error('Failed to fetch the transcript file.');
+      
+      const transcriptXml = await transcriptResponse.text();
+      
+      videoTranscript = transcriptXml
+        .match(/<text.*?>(.*?)<\/text>/g)
+        ?.map(tag => tag.replace(/<[^>]+>/g, ''))
+        .join(' ')
+        ?.replace(/&amp;#39;/g, "'")
+        ?.replace(/&amp;quot;/g, '"')
+        ?.replace(/&#39;/g, "'")
+        ?.replace(/&quot;/g, '"')
+        || '';
+
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e);
+        return sendError(`자막 추출 실패: ${message}`);
+    }
 
     if (!videoTranscript || videoTranscript.trim().length === 0) {
       return sendError('자막을 찾을 수 없습니다. 다른 영상을 시도해주세요.');
@@ -173,8 +186,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error("API 함수 처리 중 오류:", error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     // 🚀 에러 메시지를 좀 더 사용자 친화적으로 변경
-    if (errorMessage.includes('Transcript not available') || (error as any)?.cause?.toString()?.includes('404')) {
-        sendError('이 영상의 한국어 자막을 자동으로 생성할 수 없습니다. 다른 영상을 시도해주세요.');
+    if (errorMessage.includes('Transcript not available') || (error as any)?.cause?.toString()?.includes('404') || errorMessage.includes('Could not get transcript')) {
+        sendError('이 영상의 한국어 자막을 자동으로 생성할 수 없거나, 자막 기능이 비활성화된 영상입니다.');
     } else {
         sendError(`요청 처리 중 오류가 발생했습니다: ${errorMessage}`);
     }
