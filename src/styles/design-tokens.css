@@ -20,18 +20,18 @@
 }
 
 :root.dark {
-  --bg: 2 6 23;                    /* slate-950 */
-  --bg-muted: 15 23 42;            /* slate-900 */
-  --bg-elev: 17 24 39;             /* slate-800 */
-  --text: 226 232 240;             /* slate-200 */
+  --bg: 15 23 42;                 /* slate-900 */
+  --bg-muted: 30 41 59;            /* slate-800 */
+  --bg-elev: 17 24 39;             /* slate-800 (original) - keeping for deep elevation */
+  --text: 241 245 249;             /* slate-100 */
   --text-muted: 148 163 184;       /* slate-400 */
-  --primary: 59 130 246;           /* blue-500 */
-  --primary-foreground: 255 255 255;
-  --border: 30 41 59;              /* slate-700 */
-  --card: 15 23 42;
-  --card-contrast: 241 245 249;
+  --primary: 96 165 250;           /* blue-400 */
+  --primary-foreground: 15 23 42;  /* slate-900 */
+  --border: 51 65 85;              /* slate-700 */
+  --card: 30 41 59;                /* slate-800 */
+  --card-contrast: 241 245 249;    /* slate-100 */
   --accent: 56 189 248;            /* sky-400 */
-  --ring: 96 165 250;
-  --warning-bg: 69 26 3;           /* amber-900/30 approx */
-  --warning-border: 120 53 15;     /* amber-800 */
+  --ring: 96 165 250;              /* blue-400 */
+  --warning-bg: 69 26 3;           
+  --warning-border: 120 53 15;     
 }
