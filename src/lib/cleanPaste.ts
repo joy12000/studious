@@ -35,53 +35,7 @@ function stripTrackingParamsInText(text: string): string {
   });
 }
 
-/**
- * Extracts meaningful text content from an HTML string, preserving line breaks and basic structure.
- * @param html The HTML string to parse.
- * @returns A plain text representation with preserved structure.
- */
-function getTextFromHTML(html: string): string {
-  // Use the browser's built-in parser.
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  
-  // Function to recursively traverse the DOM tree.
-  function traverse(node: Node): string {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return node.textContent || '';
-    }
 
-    if (node.nodeType !== Node.ELEMENT_NODE) {
-      return '';
-    }
-
-    let text = '';
-    const element = node as HTMLElement;
-
-    // Add line breaks before and after block-level elements for spacing.
-    const isBlock = window.getComputedStyle(element).display === 'block';
-    if (isBlock) {
-      text += '\n';
-    }
-
-    for (const child of Array.from(node.childNodes)) {
-      text += traverse(child);
-    }
-
-    // Add another line break after block elements.
-    if (isBlock) {
-      text += '\n';
-    }
-    
-    // Handle specific tags like <br> for explicit line breaks.
-    if (element.tagName === 'BR') {
-      text += '\n';
-    }
-
-    return text;
-  }
-
-  return traverse(doc.body);
-}
 
 
 /**
@@ -125,7 +79,7 @@ export async function cleanPaste(data: DataTransfer): Promise<string> {
   }
 
   // HTML이 없으면 일반 텍스트를 처리합니다.
-  let pastedText = data.getData('text/plain');
+  const pastedText = data.getData('text/plain');
 
   if (typeof pastedText !== 'string' || !pastedText) {
     return '';

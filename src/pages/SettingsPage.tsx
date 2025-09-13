@@ -52,7 +52,9 @@ export default function SettingsPage(){
       const root = document.documentElement;
       if (next === 'dark') root.classList.add('dark'); else root.classList.remove('dark');
       localStorage.setItem('pref-theme', next);
-    } catch {}
+    } catch {
+      // localStorage or document might not be available in all environments
+    }
   }
 
   async function wipeAll(){

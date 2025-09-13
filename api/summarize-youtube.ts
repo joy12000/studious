@@ -4,6 +4,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { SummaryData, TaggingData } from '../../src/lib/types';
 import TranscriptClient from 'youtube-transcript-api';
+import type { AxiosRequestConfig } from 'axios';
 
 // --- 프롬프트 템플릿 (기존과 동일) ---
 const SUMMARY_PROMPT_TEMPLATE = `
@@ -48,16 +49,16 @@ ${summaryText}
 `;
 
 // Gemini 응답을 파싱하기 위한 헬퍼 함수
-function cleanAndParseJson(rawText: string): any {
+function cleanAndParseJson<T>(rawText: string): T {
   const cleanedText = rawText.replace(/^```json\n/, '').replace(/\n```$/, '');
-  return JSON.parse(cleanedText);
+  return JSON.parse(cleanedText) as T;
 }
 
 // --- 메인 핸들러 (SSE + 자동 모델 선택) ---
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
-    return res.status(405).end(`Method ${req.method} Not Allowed`);
+    return res.status(405).end(\`Method ${req.method} Not Allowed‘);
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -65,21 +66,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  const sendProgress = (status: string, data?: any) => {
-    res.write(`data: ${JSON.stringify({ status, ...data })}\n\n`);
+  const sendProgress = (status: string, data?: Record<string, unknown>) => {
+    res.write(\`data: ${JSON.stringify({ status, ...data })}\n\n‘);
   };
 
   const sendError = (message: string) => {
-    res.write(`data: ${JSON.stringify({ error: message })}\n\n`);
+    res.write(\`data: ${JSON.stringify({ error: message })}\n\n‘);
     res.end();
   };
 
   try {
     const youtubeUrl = req.query.youtubeUrl as string;
     if (!youtubeUrl) return sendError('youtubeUrl is required.');
-
-    // 🚀 [수정] youtube-transcript-api를 사용하여 자막 추출
-    sendProgress("자막 추출 중...");
 
     // URL에서 비디오 ID 추출
     let videoId = null;
@@ -90,7 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } else if (url.hostname.includes('youtube.com')) {
         videoId = url.searchParams.get('v');
       }
-    } catch (e) {
+    } catch {
         return sendError('유효하지 않은 YouTube URL입니다.');
     }
 
@@ -98,59 +96,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return sendError('YouTube URL에서 비디오 ID를 추출할 수 없습니다.');
     }
     
-    const transcriptClient = new TranscriptClient();
-    const transcriptParts = await transcriptClient.getTranscript(videoId, {
-      lang: 'ko',
-    });
-    const videoTranscript = transcriptParts.map(part => part.text).join(' ');
+    // 프록시 설정
+    let transcriptClient;
+    const proxyUrl = process.env.PROXY_URL;
 
-    if (!videoTranscript || videoTranscript.trim().length === 0) {
-      return sendError('자막을 찾을 수 없습니다. 다른 영상을 시도해주세요.');
-    }
-
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!); 
-
-    // 토큰 수에 따라 동적으로 모델 선택 및 알림
-    const tokenCount = Math.round(videoTranscript.length / 2.5);
-    let modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.0-flash";
-    let usingProModel = false;
-
-    if (tokenCount <= 250000) {
-      modelName = "gemini-2.5-pro";
-      usingProModel = true;
-    }
-    
-    if (usingProModel) {
-        sendProgress(`토큰(약 ${tokenCount.toLocaleString()}개)이 많아 Gemini 2.5 Pro로 요약합니다.`);
+    if (proxyUrl) {
+      try {
+        const proxy = new URL(proxyUrl);
+        const proxyConfig: AxiosRequestConfig['proxy'] = {
+          protocol: proxy.protocol.replace(':', ''),
+          host: proxy.hostname,
+          port: parseInt(proxy.port, 10),
+          auth: (proxy.username || proxy.password) ? {
+            username: proxy.username,
+            password: proxy.password,
+          } : undefined,
+        };
+        transcriptClient = new TranscriptClient({ axiosOptions: { proxy: proxyConfig } });
+        sendProgress("프록시를 사용하여 자막 추출 중...");
+      } catch (e) {
+        console.error("프록시 URL 파싱 오류:", e);
+        return sendError('프록시 URL이 유효하지 않습니다.');
+      }
     } else {
-        sendProgress(`기본 모델로 요약을 시작합니다.`);
-    }
-
-    const model = genAI.getGenerativeModel({ model: modelName });
-
-    const summaryPrompt = `${SUMMARY_PROMPT_TEMPLATE}\n\n[영상 스크립트]\n${videoTranscript}`;
-    const summaryResult = await model.generateContent(summaryPrompt);
-    const summaryData: SummaryData = cleanAndParseJson(summaryResult.response.text());
-
-    sendProgress("제목 및 태그 생성 중...");
-    const taggingModel = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL_NAME || "gemini-2.0-flash" });
-    const taggingPrompt = TAGGING_PROMPT_TEMPLATE(summaryData.summary);
-    const taggingResult = await taggingModel.generateContent(taggingPrompt);
-    const taggingData: TaggingData = cleanAndParseJson(taggingResult.response.text());
-
-    const finalData = { ...summaryData, ...taggingData, sourceUrl: youtubeUrl };
-
-    sendProgress("완료", { payload: finalData });
-    res.end();
-
-  } catch (error) {
-    console.error("API 함수 처리 중 오류:", error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    // 🚀 에러 메시지를 좀 더 사용자 친화적으로 변경
-    if (errorMessage.includes('Transcript not available')) {
-        sendError('이 영상의 한국어 자막을 자동으로 생성할 수 없습니다. 다른 영상을 시도해주세요.');
-    } else {
-        sendError(`요청 처리 중 오류가 발생했습니다: ${errorMessage}`);
-    }
-  }
-}
+      transcriptClient = new TranscriptClient();
+      sendProgress(
