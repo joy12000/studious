@@ -53,8 +53,6 @@ function cleanAndParseJson(rawText: string): any {
   return JSON.parse(cleanedText);
 }
 
-const transcriptClient = new TranscriptClient();
-
 // --- 메인 핸들러 (SSE + 자동 모델 선택) ---
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -100,6 +98,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return sendError('YouTube URL에서 비디오 ID를 추출할 수 없습니다.');
     }
     
+    const transcriptClient = new TranscriptClient();
     const transcriptParts = await transcriptClient.getTranscript(videoId, {
       lang: 'ko',
     });
