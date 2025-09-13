@@ -3,7 +3,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { SummaryData, TaggingData } from '../../src/lib/types';
-import { parse } from 'node-html-parser'; // HTML 파싱을 위한 라이브러리
+import { execFile } from 'child_process';
+import path from 'path';
 
 // --- 프롬프트 템플릿 (기존과 동일) ---
 const SUMMARY_PROMPT_TEMPLATE = `
@@ -47,85 +48,89 @@ ${summaryText}
 '''
 `;
 
-// --- 헬퍼 함수: ScraperAPI를 이용해 자막 추출 ---
-async function getTranscriptWithScraperAPI(youtubeUrl: string): Promise<string> {
-    const apiKey = process.env.SCRAPER_API_KEY;
-    if (!apiKey) {
-        throw new Error('ScraperAPI key is not configured.');
-    }
+// --- 헬퍼 함수: yt-dlp 실행하여 자막 추출 ---
+async function getTranscriptWithYtDlp(youtubeUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // 1. Vercel 환경에서는 /var/task/bin/yt-dlp 경로에 실행 파일이 위치합니다.
+    //    로컬 개발 환경과의 호환성을 위해 경로를 동적으로 설정합니다.
+    const ytDlpPath = process.env.VERCEL
+      ? path.join(process.cwd(), 'bin', 'yt-dlp')
+      : 'yt-dlp'; // 로컬에서는 시스템에 설치된 yt-dlp를 사용 (또는 로컬 bin 경로 지정)
 
-    // ScraperAPI 엔드포인트 구성
-    const params = new URLSearchParams({
-        api_key: apiKey,
-        url: youtubeUrl,
-        render: 'true', // 자바스크립트 렌더링 활성화
+    // 2. yt-dlp 명령어 인자 설정
+    const args = [
+      '--write-auto-sub', // 자동 생성 자막 다운로드
+      '--sub-lang', 'ko',    // 한국어 자막 우선
+      '--skip-download',    // 영상은 다운로드 안 함
+      '--sub-format', 'vtt', // 자막 형식
+      '-o', '-',            // 결과를 파일이 아닌 표준 출력(stdout)으로 내보냄
+      youtubeUrl
+    ];
+
+    // 3. 명령어 실행
+    execFile(ytDlpPath, args, { maxBuffer: 1024 * 1024 * 5 }, (error, stdout, stderr) => {
+      if (error) {
+        console.error('yt-dlp stderr:', stderr);
+        return reject(new Error(`yt-dlp execution failed: ${error.message}`));
+      }
+
+      // 4. VTT 자막 형식에서 순수 텍스트만 추출
+      const transcript = stdout
+        .split('\n')
+        .filter(line => !line.startsWith('WEBVTT') && !line.startsWith('Kind:') && !line.startsWith('Language:') && !/-->/.test(line) && line.trim() !== '')
+        .join(' ');
+      
+      resolve(transcript);
     });
-    
-    const response = await fetch(`http://api.scraperapi.com/?${params.toString()}`);
-
-    if (!response.ok) {
-        throw new Error(`ScraperAPI failed with status: ${response.status}`);
-    }
-
-    const html = await response.text();
-
-    // 가져온 HTML에서 자막 텍스트만 파싱
-    const root = parse(html);
-    const segments = root.querySelectorAll('ytd-transcript-segment-renderer span');
-    
-    if (segments.length === 0) {
-        return ''; // 자막을 찾지 못한 경우
-    }
-    
-    return segments.map(segment => segment.text).join(' ');
+  });
 }
 
 // --- 메인 서버리스 함수 핸들러 ---
 export default async function handler(
-    req: VercelRequest,
-    res: VercelResponse
+  req: VercelRequest,
+  res: VercelResponse
 ) {
-    if (req.method !== 'POST') {
-        res.setHeader('Allow', ['POST']);
-        return res.status(405).end(`Method ${req.method} Not Allowed`);
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
+  }
+
+  try {
+    const { youtubeUrl } = req.body;
+    if (!youtubeUrl) {
+      return res.status(400).json({ error: 'youtubeUrl is required.' });
     }
 
-    try {
-        const { youtubeUrl } = req.body;
-        if (!youtubeUrl) {
-            return res.status(400).json({ error: 'youtubeUrl is required.' });
-        }
+    // --- 🚀 yt-dlp로 자막 데이터 가져오기 ---
+    const videoTranscript = await getTranscriptWithYtDlp(youtubeUrl);
 
-        // --- 🚀 ScraperAPI로 자막 데이터 가져오기 ---
-        const videoTranscript = await getTranscriptWithScraperAPI(youtubeUrl);
-
-        if (!videoTranscript || videoTranscript.trim().length === 0) {
-            return res.status(404).json({ error: 'Transcript not found using ScraperAPI.' });
-        }
-
-        // --- Gemini API 호출 및 데이터 처리 (기존 로직과 동일) ---
-        const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-        const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-        const summaryPrompt = `${SUMMARY_PROMPT_TEMPLATE}\n\n[영상 스크립트]\n${videoTranscript}`;
-        const summaryResult = await model.generateContent(summaryPrompt);
-        const summaryData: SummaryData = JSON.parse(summaryResult.response.text());
-
-        const taggingPrompt = TAGGING_PROMPT_TEMPLATE(summaryData.summary);
-        const taggingResult = await model.generateContent(taggingPrompt);
-        const taggingData: TaggingData = JSON.parse(taggingResult.response.text());
-
-        const finalData = {
-            ...summaryData,
-            ...taggingData,
-            sourceUrl: youtubeUrl,
-        };
-
-        return res.status(200).json(finalData);
-
-    } catch (error) {
-        console.error("API 함수 처리 중 오류:", error);
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        return res.status(500).json({ error: 'Failed to process request.', details: errorMessage });
+    if (!videoTranscript || videoTranscript.trim().length === 0) {
+      return res.status(404).json({ error: 'Transcript not found using yt-dlp.' });
     }
+
+    // --- Gemini API 호출 및 데이터 처리 (기존 로직과 동일) ---
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+    const summaryPrompt = `${SUMMARY_PROMPT_TEMPLATE}\n\n[영상 스크립트]\n${videoTranscript}`;
+    const summaryResult = await model.generateContent(summaryPrompt);
+    const summaryData: SummaryData = JSON.parse(summaryResult.response.text());
+
+    const taggingPrompt = TAGGING_PROMPT_TEMPLATE(summaryData.summary);
+    const taggingResult = await model.generateContent(taggingPrompt);
+    const taggingData: TaggingData = JSON.parse(taggingResult.response.text());
+
+    const finalData = {
+      ...summaryData,
+      ...taggingData,
+      sourceUrl: youtubeUrl,
+    };
+
+    return res.status(200).json(finalData);
+
+  } catch (error) {
+    console.error("API 함수 처리 중 오류:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({ error: 'Failed to process request.', details: errorMessage });
+  }
 }
