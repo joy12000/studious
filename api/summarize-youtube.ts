@@ -64,8 +64,14 @@ async function getTranscriptWithYtDlp(youtubeUrl: string): Promise<string> {
       '--skip-download',    // 영상은 다운로드 안 함
       '--sub-format', 'vtt', // 자막 형식
       '-o', '-',            // 결과를 파일이 아닌 표준 출력(stdout)으로 내보냄
-      youtubeUrl
     ];
+
+    // Add proxy argument if PROXY_URL environment variable is set
+    if (process.env.PROXY_URL) {
+      args.push('--proxy', process.env.PROXY_URL);
+    }
+
+    args.push(youtubeUrl); // Add YouTube URL at the end
 
     // 3. 명령어 실행
     execFile(ytDlpPath, args, { maxBuffer: 1024 * 1024 * 5 }, (error, stdout, stderr) => {
