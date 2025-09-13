@@ -150,7 +150,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     sendProgress("영상 내용 요약 중...");
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.0-flash";
+
+    // 🚀 자막 길이에 따라 동적으로 모델 선택
+    let modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.0-flash";
+    if (videoTranscript.length <= 250000) {
+      modelName = "gemini-1.5-pro";
+    }
+
     const model = genAI.getGenerativeModel({ model: modelName });
     const summaryPrompt = `${SUMMARY_PROMPT_TEMPLATE}\n\n[영상 스크립트]\n${videoTranscript}`;
     const summaryResult = await model.generateContent(summaryPrompt);
