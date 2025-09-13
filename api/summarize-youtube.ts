@@ -52,6 +52,7 @@ ${summaryText}
 async function getTranscriptWithYtDlp(youtubeUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const ytdlpCookieString = process.env.YTDLP_COOKIE_STRING; // Get cookie string from environment variable
+    const proxyUrl = process.env.PROXY_URL; // Declare proxyUrl here
 
     const args = [
       '--no-check-certificate', // SSL 인증서 확인 비활성화
