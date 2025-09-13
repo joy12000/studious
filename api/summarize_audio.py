@@ -96,6 +96,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 '-f', 'bestaudio',
                 '-o', output_filename,
                 '--no-check-certificate',
+                '--no-cache-dir',
                 youtube_url
             ]
 
