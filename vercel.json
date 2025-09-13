@@ -1,1 +1,7 @@
-{}
+{
+  "functions": {
+    "api/summarize_audio.py": {
+      "maxDuration": 60
+    }
+  }
+}
