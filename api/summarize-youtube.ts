@@ -11,8 +11,8 @@ const SUMMARY_PROMPT_TEMPLATE = `
 당신은 영상 콘텐츠 요약을 전문으로 하는 요약 전문가입니다. 
 사용자가 제공한 유튜브 영상의 전사 내용을 꼼꼼히 분석한 뒤, 영상의 핵심 메시지와 중요한 인사이트를 빠짐없이 담아 체계적으로 요약해주세요.
 
-- **요약 스타일:** 전문 요약가로서 객관적이고 정확한 어조로 작성합니다.
-- **특히 강조할 점:** 영상에서 강조된 통찰이나 시사점이 있다면 이를 요약에 반드시 포함합니다.
+- 요약 스타일: 전문 요약가로서 객관적이고 정확한 어조로 작성합니다.
+- 특히 강조할 점: 영상에서 강조된 통찰이나 시사점이 있다면 이를 요약에 반드시 포함합니다.
 
 [결과 출력 형식]
 아래와 같은 JSON 형식에 맞춰 한국어로 결과를 반환해주세요.
@@ -58,7 +58,7 @@ function cleanAndParseJson<T>(rawText: string): T {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
-    return res.status(405).end(\`Method ${req.method} Not Allowed‘);
+    return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -67,11 +67,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.flushHeaders();
 
   const sendProgress = (status: string, data?: Record<string, unknown>) => {
-    res.write(\`data: ${JSON.stringify({ status, ...data })}\n\n‘);
+    res.write(`data: ${JSON.stringify({ status, ...data })}\n\n`);
   };
 
   const sendError = (message: string) => {
-    res.write(\`data: ${JSON.stringify({ error: message })}\n\n‘);
+    res.write(`data: ${JSON.stringify({ error: message })}\n\n`);
     res.end();
   };
 
