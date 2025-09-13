@@ -150,7 +150,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     sendProgress("영상 내용 요약 중...");
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.0-flash";
+    const model = genAI.getGenerativeModel({ model: modelName });
     const summaryPrompt = `${SUMMARY_PROMPT_TEMPLATE}\n\n[영상 스크립트]\n${videoTranscript}`;
     const summaryResult = await model.generateContent(summaryPrompt);
     // 🚀 파싱 전 데이터 정제
