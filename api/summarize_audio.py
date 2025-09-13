@@ -2,6 +2,7 @@ import http.server
 import json
 import os
 import ssl
+import stat
 import subprocess
 import tempfile
 from urllib.parse import urlparse, parse_qs
@@ -103,6 +104,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if proxy_url:
                 print(f"[PROXY] Using proxy: {proxy_url}")
                 command.extend(['--proxy', proxy_url])
+
+            # Set executable permission for yt-dlp
+            st = os.stat(yt_dlp_path)
+            os.chmod(yt_dlp_path, st.st_mode | stat.S_IEXEC)
 
             process = subprocess.run(command, capture_output=True, text=True, timeout=180) # 3-minute timeout
 
