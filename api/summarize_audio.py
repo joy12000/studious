@@ -1,11 +1,11 @@
 import http.server
-import socketserver
 import json
 import os
 import ssl
-from urllib.parse import urlparse, parse_qs
+import subprocess
 import tempfile
-from pytube import YouTube
+from urllib.parse import urlparse, parse_qs
+import google.generativeai as genai
 
 # --- SSL Certificate Verification Workaround ---
 try:
@@ -14,6 +14,20 @@ except AttributeError:
     pass
 else:
     ssl._create_default_https_context = _create_unverified_https_context
+
+# --- Gemini API Configuration ---
+try:
+    genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
+except Exception as e:
+    print(f"[ERROR] Failed to configure Gemini API: {e}")
+
+# --- Prompts ---
+SUMMARY_PROMPT = """..." # (Content is long, assuming it's correct from previous steps)
+TAGGING_PROMPT_TEMPLATE = """..." # (Content is long, assuming it's correct)
+
+def clean_and_parse_json(raw_text):
+    cleaned_text = raw_text.replace('```json', '').replace('```', '').strip()
+    return json.loads(cleaned_text)
 
 class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
@@ -32,32 +46,66 @@ class Handler(http.server.BaseHTTPRequestHandler):
         audio_path = None
         
         try:
-            # 1. Pytube로 오디오 다운로드 (이것만 테스트)
-            print(f"[AUDIO_DL] Start downloading for: {youtube_url}")
+            # 1. yt-dlp로 오디오 다운로드
+            print(f"[YTDLP_DL] Start downloading for: {youtube_url}")
             
-            proxies = {}
-            proxy_url_env = os.environ.get("PROXY_URL")
-            if proxy_url_env:
-                print("[PROXY] Using proxy from PROXY_URL environment variable.")
-                proxies = {"http": proxy_url_env, "https": proxy_url_env}
+            # Define a unique output filename
+            video_id = parse_qs(urlparse(youtube_url).query).get('v', [os.path.basename(urlparse(youtube_url).path)])[0]
+            output_filename = os.path.join(temp_dir, f"{video_id}.%(ext)s")
 
-            yt = YouTube(youtube_url, proxies=proxies)
-            audio_stream = yt.streams.get_audio_only()
-            audio_path = audio_stream.download(output_path=temp_dir)
+            command = [
+                './bin/yt-dlp',
+                '-f', 'bestaudio',
+                '-o', output_filename,
+                '--no-check-certificate',
+                youtube_url
+            ]
+
+            proxy_url = os.environ.get("PROXY_URL")
+            if proxy_url:
+                print(f"[PROXY] Using proxy: {proxy_url}")
+                command.extend(['--proxy', proxy_url])
+
+            process = subprocess.run(command, capture_output=True, text=True, timeout=180) # 3-minute timeout
+
+            if process.returncode != 0:
+                print(f"[YTDLP_DL] Failed. Stderr: {process.stderr}")
+                raise Exception(f"yt-dlp failed: {process.stderr}")
             
-            print(f"[AUDIO_DL] Success. File path: {audio_path}")
+            # Find the actual downloaded file path (extension is unknown)
+            downloaded_files = [f for f in os.listdir(temp_dir) if f.startswith(video_id)]
+            if not downloaded_files:
+                raise Exception("Downloaded audio file not found.")
+            audio_path = os.path.join(temp_dir, downloaded_files[0])
+            print(f"[YTDLP_DL] Success. File path: {audio_path}")
+
+            # 2. Gemini 처리 (이하 동일)
+            print(f"[GEMINI_UPLOAD] Start uploading: {audio_path}")
+            audio_file = genai.upload_file(path=audio_path, display_name=video_id)
+            print(f"[GEMINI_UPLOAD] Success. File URI: {audio_file.uri}")
+
+            print("[GEMINI_SUMMARY] Start generating summary...")
+            model = genai.GenerativeModel(model_name='models/gemini-1.5-flash-latest')
+            summary_response = model.generate_content([SUMMARY_PROMPT, audio_file])
+            summary_data = clean_and_parse_json(summary_response.text)
+            print("[GEMINI_SUMMARY] Success.")
             
-            # 테스트 성공 메시지 전송
-            response_data = {"message": "TEST_SUCCESS: Audio downloaded successfully.", "path": audio_path}
-            self.wfile.write(json.dumps(response_data).encode('utf-8'))
+            print("[GEMINI_TAGGING] Start generating title and tag...")
+            tagging_model = genai.GenerativeModel(model_name='models/gemini-1.5-flash-latest')
+            tagging_prompt = TAGGING_PROMPT_TEMPLATE.format(summary_text=summary_data['summary'])
+            tagging_response = tagging_model.generate_content(tagging_prompt)
+            tagging_data = clean_and_parse_json(tagging_response.text)
+            print("[GEMINI_TAGGING] Success.")
+
+            final_data = {**summary_data, **tagging_data, "sourceUrl": youtube_url}
+            self.wfile.write(json.dumps(final_data).encode('utf-8'))
 
         except Exception as e:
-            error_message = f"An error occurred during pytube download test: {str(e)}"
+            error_message = f"An error occurred: {str(e)}"
             print(f"[ERROR] {error_message}")
             self.wfile.write(json.dumps({"error": error_message}).encode('utf-8'))
         
         finally:
-            # 임시 오디오 파일 삭제
             if audio_path and os.path.exists(audio_path):
                 os.remove(audio_path)
                 print(f"Cleaned up temporary file: {audio_path}")
