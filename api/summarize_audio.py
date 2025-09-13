@@ -3,7 +3,21 @@ import http.server
 import socketserver
 import json
 import os
+import ssl
 from urllib.parse import urlparse, parse_qs
+
+# --- SSL Certificate Verification Workaround ---
+# In some serverless/containerized environments, Python cannot find root CAs.
+# This creates an unverified context to bypass SSL certificate verification.
+# Note: This is less secure but often necessary for these environments.
+try:
+    _create_unverified_https_context = ssl._create_unverified_context
+except AttributeError:
+    # For Python versions that don't have this, do nothing.
+    pass
+else:
+    ssl._create_default_https_context = _create_unverified_https_context
+
 import tempfile
 import google.generativeai as genai
 from pytube import YouTube
