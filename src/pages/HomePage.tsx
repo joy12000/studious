@@ -1,14 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useNotes } from "../lib/useNotes";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Youtube } from "lucide-react";
 
-function LoadingOverlay() {
+// 진행 메시지를 표시하도록 수정
+function LoadingOverlay({ message }: { message: string }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="flex flex-col items-center gap-4 rounded-lg bg-card p-8 text-card-foreground shadow-xl">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-lg font-medium">AI가 노트를 생성하고 있습니다.</p>
+        <p className="text-lg font-medium">{message}</p>
         <p className="text-sm text-muted-foreground">잠시만 기다려주세요...</p>
       </div>
     </div>
@@ -19,10 +20,11 @@ export default function HomePage() {
   const { addNote } = useNotes();
   const navigate = useNavigate();
   const [youtubeUrl, setYoutubeUrl] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+  const [progressMessage, setProgressMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const eventSourceRef = useRef<EventSource | null>(null);
 
-  const handleSave = async () => {
+  const handleSave = () => { // async 제거
     if (!youtubeUrl.trim()) {
       setError("유튜브 URL을 입력해주세요.");
       return;
@@ -32,22 +34,45 @@ export default function HomePage() {
       return;
     }
     
-    setIsLoading(true);
+    setProgressMessage("요약을 준비하는 중...");
     setError(null);
 
-    try {
-      const newNote = await addNote({ youtubeUrl });
-      navigate(`/note/${newNote.id}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "요약에 실패했습니다.");
-    } finally {
-      setIsLoading(false);
+    // 이전 EventSource가 있다면 닫기
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
     }
+
+    // 콜백을 사용하는 새로운 addNote 호출 방식
+    const newEventSource = addNote({
+      youtubeUrl,
+      onProgress: (status) => {
+        setProgressMessage(status);
+      },
+      onComplete: (newNote) => {
+        setProgressMessage(null);
+        navigate(`/note/${newNote.id}`);
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
+      },
+      onError: (err) => {
+        setError(err);
+        setProgressMessage(null);
+        if (eventSourceRef.current) {
+          eventSourceRef.current.close();
+          eventSourceRef.current = null;
+        }
+      },
+    });
+    eventSourceRef.current = newEventSource;
   };
+
+  const isLoading = progressMessage !== null;
 
   return (
     <>
-      {isLoading && <LoadingOverlay />}
+      {isLoading && <LoadingOverlay message={progressMessage as string} />}
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4">
         <div className="w-full max-w-3xl text-center">
           
