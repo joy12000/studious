@@ -91,7 +91,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             video_id = parse_qs(urlparse(youtube_url).query).get('v', [os.path.basename(urlparse(youtube_url).path)])[0]
             output_filename = os.path.join(temp_dir, f"{video_id}.%(ext)s")
 
-            yt_dlp_path = os.path.join(os.path.dirname(__file__), '..', 'bin', 'yt-dlp')
+            yt_dlp_path = os.path.join(os.path.dirname(__file__), 'yt-dlp')
             command = [
                 yt_dlp_path,
                 '-f', 'bestaudio',
