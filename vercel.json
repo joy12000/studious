@@ -1,7 +1,1 @@
-{
-  "functions": {
-    "api/summarize-youtube.ts": {
-      "includeFiles": "bin/yt-dlp"
-    }
-  }
-}
+{}

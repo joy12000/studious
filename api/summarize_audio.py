@@ -23,11 +23,11 @@ Your summary should capture the main topics, key arguments, and important insigh
 Output the result in Korean, following this JSON format:
 '''json
 {
-  "summary": "A comprehensive summary of the audio, organized into 3-4 paragraphs.",
+  "summary": "오디오 전체 내용을 아우르는 3~4 문단의 핵심 요약문",
   "key_insights": [
-    "The most important insight or point from the audio 1",
-    "The most important insight or point from the audio 2",
-    "Other notable information or arguments"
+    "오디오의 가장 중요한 통찰 또는 시사점 1",
+    "오디오의 가장 중요한 통찰 또는 시사점 2",
+    "그 외 주목할 만한 핵심 정보나 주장"
   ]
 }
 '''
