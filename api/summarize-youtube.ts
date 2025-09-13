@@ -51,6 +51,9 @@ ${summaryText}
 // --- 헬퍼 함수: yt-dlp 실행하여 자막 추출 ---
 async function getTranscriptWithYtDlp(youtubeUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
+    const ytDlpPath = process.env.VERCEL
+      ? path.join(process.cwd(), 'bin', 'yt-dlp')
+      : 'yt-dlp'; // Declare ytDlpPath here
     const ytdlpCookieString = process.env.YTDLP_COOKIE_STRING; // Get cookie string from environment variable
     const proxyUrl = process.env.PROXY_URL; // Declare proxyUrl here
 
