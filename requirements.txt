@@ -1,2 +1,2 @@
-pytube
+pytube>=15.0.0
 google-generativeai

@@ -79,7 +79,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
         try:
             # 1. Pytube로 오디오 다운로드
             print(f"[AUDIO_DL] Start downloading for: {youtube_url}")
-            yt = YouTube(youtube_url)
+
+            proxies = {}
+            proxy_url_env = os.environ.get("PROXY_URL")
+            if proxy_url_env:
+                print("[PROXY] Using proxy from PROXY_URL environment variable.")
+                proxies = {"http": proxy_url_env, "https": proxy_url_env}
+
+            yt = YouTube(youtube_url, proxies=proxies)
             audio_stream = yt.streams.get_audio_only()
             audio_path = audio_stream.download(output_path=temp_dir)
             print(f"[AUDIO_DL] Success. File path: {audio_path}")
