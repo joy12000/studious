@@ -5,6 +5,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { SummaryData, TaggingData } from '../../src/lib/types';
 import { execFile } from 'child_process';
 import path from 'path';
+import fs from 'fs';
+import os from 'os';
 
 // --- 프롬프트 템플릿 (기존과 동일) ---
 const SUMMARY_PROMPT_TEMPLATE = `
@@ -53,24 +55,31 @@ async function getTranscriptWithYtDlp(youtubeUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const ytDlpPath = process.env.VERCEL
       ? path.join(process.cwd(), 'bin', 'yt-dlp')
-      : 'yt-dlp'; // Declare ytDlpPath here
-    const ytdlpCookieString = process.env.YTDLP_COOKIE_STRING; // Get cookie string from environment variable
-    const proxyUrl = process.env.PROXY_URL; // Declare proxyUrl here
+      : 'yt-dlp';
+    const ytdlpCookieString = process.env.YTDLP_COOKIE_STRING;
+    const proxyUrl = process.env.PROXY_URL;
 
     const args = [
-      '--no-check-certificate', // SSL 인증서 확인 비활성화
-      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36', // 최신 크롬 User-Agent
+      '--no-check-certificate',
+      '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
     ];
 
+    let cookieFilePath: string | null = null;
+
     if (ytdlpCookieString) {
-      args.push('--cookie-string', ytdlpCookieString); // Use --cookie-string argument
+      cookieFilePath = path.join(os.tmpdir(), `cookies_${Date.now()}.txt`);
+      try {
+        fs.writeFileSync(cookieFilePath, ytdlpCookieString);
+        args.push('--cookies', cookieFilePath);
+      } catch (err) {
+        return reject(new Error(`Failed to write cookie file: ${(err as Error).message}`));
+      }
     }
 
     if (proxyUrl) {
       args.push('--proxy', proxyUrl);
     }
 
-    // 나머지 옵션은 동일
     args.push(
         '--write-auto-sub',
         '--sub-lang', 'ko',
@@ -81,6 +90,14 @@ async function getTranscriptWithYtDlp(youtubeUrl: string): Promise<string> {
     );
 
     execFile(ytDlpPath, args, { maxBuffer: 1024 * 1024 * 5 }, (error, stdout, stderr) => {
+      if (cookieFilePath) {
+        fs.unlink(cookieFilePath, (unlinkErr) => {
+          if (unlinkErr) {
+            console.error('Failed to delete temporary cookie file:', unlinkErr);
+          }
+        });
+      }
+
       if (error) {
         console.error('yt-dlp stderr:', stderr);
         if (stderr.toLowerCase().includes('proxy')) {
@@ -89,11 +106,9 @@ async function getTranscriptWithYtDlp(youtubeUrl: string): Promise<string> {
         return reject(new Error(`yt-dlp execution failed: ${error.message}`));
       }
       
-      // ... (자막 파싱 로직은 동일) ...
       const transcript = stdout.split('\n').filter(line => !line.startsWith('WEBVTT') && !/-->/.test(line) && line.trim() !== '').map(line => line.trim()).join(' ');
       
       if (!transcript) {
-        // 자막이 없는 경우, stderr에 유용한 정보가 있는지 확인
         if (stderr.includes('subtitles not available')) {
           return reject(new Error('Subtitles not available for this video in the requested language.'));
         }
