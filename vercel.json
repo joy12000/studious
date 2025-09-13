@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/summarize_audio.py": {
-      "includeFiles": "bin/yt-dlp"
+      "includeFiles": "../bin/yt-dlp"
     }
   }
 }
