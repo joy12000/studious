@@ -3,7 +3,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { SummaryData, TaggingData } from '../../src/lib/types';
-import { YouTubeTranscript } from 'youtube-transcript-api';
+import TranscriptClient from 'youtube-transcript-api';
 
 // --- 프롬프트 템플릿 (기존과 동일) ---
 const SUMMARY_PROMPT_TEMPLATE = `
@@ -53,6 +53,8 @@ function cleanAndParseJson(rawText: string): any {
   return JSON.parse(cleanedText);
 }
 
+const transcriptClient = new TranscriptClient();
+
 // --- 메인 핸들러 (SSE + 자동 모델 선택) ---
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -80,7 +82,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 🚀 [수정] youtube-transcript-api를 사용하여 자막 추출
     sendProgress("자막 추출 중...");
-    const transcriptParts = await YouTubeTranscript.fetchTranscript(youtubeUrl, {
+
+    // URL에서 비디오 ID 추출
+    let videoId = null;
+    try {
+      const url = new URL(youtubeUrl);
+      if (url.hostname === 'youtu.be') {
+        videoId = url.pathname.substring(1);
+      } else if (url.hostname.includes('youtube.com')) {
+        videoId = url.searchParams.get('v');
+      }
+    } catch (e) {
+        return sendError('유효하지 않은 YouTube URL입니다.');
+    }
+
+    if (!videoId) {
+      return sendError('YouTube URL에서 비디오 ID를 추출할 수 없습니다.');
+    }
+    
+    const transcriptParts = await transcriptClient.getTranscript(videoId, {
       lang: 'ko',
     });
     const videoTranscript = transcriptParts.map(part => part.text).join(' ');
@@ -89,7 +109,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return sendError('자막을 찾을 수 없습니다. 다른 영상을 시도해주세요.');
     }
 
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!); 
 
     // 토큰 수에 따라 동적으로 모델 선택 및 알림
     const tokenCount = Math.round(videoTranscript.length / 2.5);
@@ -128,7 +148,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error("API 함수 처리 중 오류:", error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     // 🚀 에러 메시지를 좀 더 사용자 친화적으로 변경
-    if (errorMessage.includes('Could not find a transcript for this video')) {
+    if (errorMessage.includes('Transcript not available')) {
         sendError('이 영상의 한국어 자막을 자동으로 생성할 수 없습니다. 다른 영상을 시도해주세요.');
     } else {
         sendError(`요청 처리 중 오류가 발생했습니다: ${errorMessage}`);
