@@ -51,18 +51,16 @@ ${summaryText}
 // --- 헬퍼 함수: yt-dlp 실행하여 자막 추출 ---
 async function getTranscriptWithYtDlp(youtubeUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    const ytDlpPath = process.env.VERCEL
-      ? path.join(process.cwd(), 'bin', 'yt-dlp')
-      : 'yt-dlp';
-    const cookiesPath = path.join(process.cwd(), 'bin', 'cookies.txt');
-    const proxyUrl = process.env.PROXY_URL;
+    const ytdlpCookieString = process.env.YTDLP_COOKIE_STRING; // Get cookie string from environment variable
 
-    // ✨ 요청을 위장하기 위한 고급 옵션 추가
     const args = [
       '--no-check-certificate', // SSL 인증서 확인 비활성화
       '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36', // 최신 크롬 User-Agent
-      '--cookie', cookiesPath,  // 쿠키 파일 사용
     ];
+
+    if (ytdlpCookieString) {
+      args.push('--cookie-string', ytdlpCookieString); // Use --cookie-string argument
+    }
 
     if (proxyUrl) {
       args.push('--proxy', proxyUrl);
