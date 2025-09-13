@@ -59,16 +59,21 @@ async function getTranscriptWithYtDlp(youtubeUrl: string): Promise<string> {
     const ytdlpCookieString = process.env.YTDLP_COOKIE_STRING;
     const proxyUrl = process.env.PROXY_URL;
 
+    // Create a unique ID for temporary files to avoid race conditions
+    const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2)}`;
+    
+    const videoOutputPath = path.join(os.tmpdir(), uniqueId);
+    const subtitlePath = `${videoOutputPath}.ko.vtt`;
+    let cookieFilePath: string | null = null;
+
     const args = [
       '--no-check-certificate',
       '--user-agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      '--cache-dir', '/tmp/ytdlp-cache' // Add cache directory for serverless environment
+      '--cache-dir', '/tmp/ytdlp-cache'
     ];
 
-    let cookieFilePath: string | null = null;
-
     if (ytdlpCookieString) {
-      cookieFilePath = path.join(os.tmpdir(), `cookies_${Date.now()}.txt`);
+      cookieFilePath = path.join(os.tmpdir(), `cookies_${uniqueId}.txt`);
       try {
         fs.writeFileSync(cookieFilePath, ytdlpCookieString);
         args.push('--cookies', cookieFilePath);
@@ -86,38 +91,51 @@ async function getTranscriptWithYtDlp(youtubeUrl: string): Promise<string> {
         '--sub-lang', 'ko',
         '--skip-download',
         '--sub-format', 'vtt',
-        '-o', '-',
+        '-o', videoOutputPath, // Use a temporary file path in a writable directory
         youtubeUrl
     );
 
     execFile(ytDlpPath, args, { maxBuffer: 1024 * 1024 * 5 }, (error, stdout, stderr) => {
-      if (cookieFilePath) {
-        fs.unlink(cookieFilePath, (unlinkErr) => {
-          if (unlinkErr) {
-            console.error('Failed to delete temporary cookie file:', unlinkErr);
-          }
+      const cleanup = () => {
+        if (cookieFilePath) {
+          fs.unlink(cookieFilePath, (err) => { if (err) console.error('Failed to delete temp cookie file:', err); });
+        }
+        fs.unlink(subtitlePath, (err) => { 
+            if (err && err.code !== 'ENOENT') { // Ignore "file not found" errors
+                console.error('Failed to delete temp subtitle file:', err); 
+            }
         });
-      }
+      };
 
       if (error) {
         console.error('yt-dlp stderr:', stderr);
+        cleanup();
         if (stderr.toLowerCase().includes('proxy')) {
           return reject(new Error(`yt-dlp failed, likely due to a proxy error: ${stderr}`));
         }
         return reject(new Error(`yt-dlp execution failed: ${error.message}`));
       }
       
-      const transcript = stdout.split('\n').filter(line => !line.startsWith('WEBVTT') && !/-->/.test(line) && line.trim() !== '').map(line => line.trim()).join(' ');
-      
-      if (!transcript) {
-        if (stderr.includes('subtitles not available')) {
-          return reject(new Error('Subtitles not available for this video in the requested language.'));
+      fs.readFile(subtitlePath, 'utf-8', (readErr, vttContent) => {
+        cleanup(); // Cleanup after reading or on error
+
+        if (readErr) {
+            return reject(new Error(`Failed to read subtitle file: ${readErr.message}`));
         }
-      }
-      resolve(transcript);
+
+        const transcript = vttContent.split('\n').filter(line => !line.startsWith('WEBVTT') && !/-->/.test(line) && line.trim() !== '').map(line => line.trim()).join(' ');
+        
+        if (!transcript) {
+            if (stderr.includes('subtitles not available')) {
+                return reject(new Error('Subtitles not available for this video in the requested language.'));
+            }
+        }
+        resolve(transcript);
+      });
     });
   });
 }
+
 
 // --- 메인 서버리스 함수 핸들러 ---
 export default async function handler(
