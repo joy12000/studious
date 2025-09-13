@@ -85,60 +85,51 @@ export function useNotes() {
   };
 
   // 🚀 SSE를 처리하도록 addNote 함수 수정
-  const addNote = (payload: AddNotePayload) => {
+  const addNote = async (payload: AddNotePayload) => {
     const { youtubeUrl, onProgress, onComplete, onError } = payload;
 
-    // POST 요청을 사용하므로 EventSource 대신 fetch 스트림을 직접 처리해야 합니다.
-    // 하지만 Vercel의 서버리스 환경과 요청 본문(body)의 필요성 때문에
-    // EventSource를 사용하기 위해 GET 요청으로 다시 전환합니다.
-    const eventSource = new EventSource(`/api/summarize-youtube?youtubeUrl=${encodeURIComponent(youtubeUrl)}`);
+    onProgress("오디오를 처리하여 요약을 생성하는 중입니다...");
 
-    eventSource.onmessage = async (event) => {
-      const data = JSON.parse(event.data);
+    try {
+      const response = await fetch(`/api/summarize_audio?youtubeUrl=${encodeURIComponent(youtubeUrl)}`);
 
-      if (data.error) {
-        onError(data.error);
-        eventSource.close();
-        return;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      if (data.status === "완료" && data.payload) {
-        const result = data.payload;
-        const newNote: Note = {
-          id: crypto.randomUUID(),
-          title: result.title,
-          content: result.summary,
-          key_insights: result.key_insights,
-          tag: result.tag,
-          sourceUrl: result.sourceUrl,
-          sourceType: 'youtube',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().getTime(),
-          topics: [result.tag], 
-          labels: [],
-          highlights: [],
-          todo: [],
-          favorite: false,
-          attachments: [],
-        };
+      const result = await response.json();
 
-        await db.notes.add(newNote);
-        setNotes(prevNotes => [newNote, ...prevNotes]);
-        onComplete(newNote);
-        eventSource.close();
-      } else {
-        onProgress(data.status);
+      if (result.error) {
+        throw new Error(result.error);
       }
-    };
 
-    eventSource.onerror = (err) => {
-      console.error("EventSource failed:", err);
-      onError("요약 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.");
-      eventSource.close();
-    };
+      const newNote: Note = {
+        id: crypto.randomUUID(),
+        title: result.title,
+        content: result.summary,
+        key_insights: result.key_insights,
+        tag: result.tag,
+        sourceUrl: result.sourceUrl,
+        sourceType: 'youtube',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().getTime(),
+        topics: [result.tag],
+        labels: [],
+        highlights: [],
+        todo: [],
+        favorite: false,
+        attachments: [],
+      };
 
-    // addNote 함수는 이제 eventSource를 반환하여 호출 측에서 닫을 수 있도록 할 수 있습니다.
-    return eventSource;
+      await db.notes.add(newNote);
+      setNotes(prevNotes => [newNote, ...prevNotes]);
+      onComplete(newNote);
+
+    } catch (err) {
+      console.error("Summarization failed:", err);
+      const message = err instanceof Error ? err.message : "요약 중 알 수 없는 오류가 발생했습니다.";
+      onError(message);
+    }
   };
   
   const updateNote = async (id: string, patch: Partial<Note>) => {
