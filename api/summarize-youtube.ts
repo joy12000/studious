@@ -11,8 +11,8 @@ const SUMMARY_PROMPT_TEMPLATE = `
 당신은 영상 콘텐츠 요약을 전문으로 하는 요약 전문가입니다. 
 사용자가 제공한 유튜브 영상의 전사 내용을 꼼꼼히 분석한 뒤, 영상의 핵심 메시지와 중요한 인사이트를 빠짐없이 담아 체계적으로 요약해주세요.
 
-- 요약 스타일: 전문 요약가로서 객관적이고 정확한 어조로 작성합니다.
-- 특히 강조할 점: 영상에서 강조된 통찰이나 시사점이 있다면 이를 요약에 반드시 포함합니다.
+- **요약 스타일:** 전문 요약가로서 객관적이고 정확한 어조로 작성합니다.
+- **특히 강조할 점:** 영상에서 강조된 통찰이나 시사점이 있다면 이를 요약에 반드시 포함합니다.
 
 [결과 출력 형식]
 아래와 같은 JSON 형식에 맞춰 한국어로 결과를 반환해주세요.
@@ -113,6 +113,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           } : undefined,
         };
         transcriptClient = new TranscriptClient({ axiosOptions: { proxy: proxyConfig } });
+        await transcriptClient.ready; // 클라이언트 초기화 대기
         sendProgress("프록시를 사용하여 자막 추출 중...");
       } catch (e) {
         console.error("프록시 URL 파싱 오류:", e);
@@ -120,6 +121,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     } else {
       transcriptClient = new TranscriptClient();
+      await transcriptClient.ready; // 클라이언트 초기화 대기
       sendProgress("자막 추출 중...");
     }
 
