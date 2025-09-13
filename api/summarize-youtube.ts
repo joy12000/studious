@@ -50,7 +50,7 @@ ${summaryText}
 '''
 `;
 
-// --- 헬퍼 함수: yt-dlp 실행하여 자막 추출 ---
+// --- 헬퍼 함수: yt-dlp 실행하여 자막 추출 (기존과 동일) ---
 async function getTranscriptWithYtDlp(youtubeUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const ytDlpPath = process.env.VERCEL
@@ -58,10 +58,7 @@ async function getTranscriptWithYtDlp(youtubeUrl: string): Promise<string> {
       : 'yt-dlp';
     const ytdlpCookieString = process.env.YTDLP_COOKIE_STRING;
     const proxyUrl = process.env.PROXY_URL;
-
-    // Create a unique ID for temporary files to avoid race conditions
     const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2)}`;
-    
     const videoOutputPath = path.join(os.tmpdir(), uniqueId);
     const subtitlePath = `${videoOutputPath}.ko.vtt`;
     let cookieFilePath: string | null = null;
@@ -87,102 +84,92 @@ async function getTranscriptWithYtDlp(youtubeUrl: string): Promise<string> {
     }
 
     args.push(
-        '--write-auto-sub',
-        '--sub-lang', 'ko',
-        '--skip-download',
-        '--sub-format', 'vtt',
-        '-o', videoOutputPath, // Use a temporary file path in a writable directory
-        youtubeUrl
+        '--write-auto-sub', '--sub-lang', 'ko', '--skip-download', '--sub-format', 'vtt',
+        '-o', videoOutputPath, youtubeUrl
     );
 
     execFile(ytDlpPath, args, { maxBuffer: 1024 * 1024 * 5 }, (error, stdout, stderr) => {
       const cleanup = () => {
-        if (cookieFilePath) {
-          fs.unlink(cookieFilePath, (err) => { if (err) console.error('Failed to delete temp cookie file:', err); });
-        }
-        fs.unlink(subtitlePath, (err) => { 
-            if (err && err.code !== 'ENOENT') { // Ignore "file not found" errors
-                console.error('Failed to delete temp subtitle file:', err); 
-            }
-        });
+        if (cookieFilePath) fs.unlink(cookieFilePath, (err) => { if (err) console.error('Failed to delete temp cookie file:', err); });
+        fs.unlink(subtitlePath, (err) => { if (err && err.code !== 'ENOENT') console.error('Failed to delete temp subtitle file:', err); });
       };
 
       if (error) {
         console.error('yt-dlp stderr:', stderr);
         cleanup();
-        if (stderr.toLowerCase().includes('proxy')) {
-          return reject(new Error(`yt-dlp failed, likely due to a proxy error: ${stderr}`));
-        }
         return reject(new Error(`yt-dlp execution failed: ${error.message}`));
       }
       
       fs.readFile(subtitlePath, 'utf-8', (readErr, vttContent) => {
-        cleanup(); // Cleanup after reading or on error
-
-        if (readErr) {
-            return reject(new Error(`Failed to read subtitle file: ${readErr.message}`));
-        }
-
+        cleanup();
+        if (readErr) return reject(new Error(`Failed to read subtitle file: ${readErr.message}`));
         const transcript = vttContent.split('\n').filter(line => !line.startsWith('WEBVTT') && !/-->/.test(line) && line.trim() !== '').map(line => line.trim()).join(' ');
-        
-        if (!transcript) {
-            if (stderr.includes('subtitles not available')) {
-                return reject(new Error('Subtitles not available for this video in the requested language.'));
-            }
-        }
+        if (!transcript && stderr.includes('subtitles not available')) return reject(new Error('Subtitles not available for this video in the requested language.'));
         resolve(transcript);
       });
     });
   });
 }
 
+// 🚀 Gemini 응답을 파싱하기 위한 헬퍼 함수
+function cleanAndParseJson(rawText: string): any {
+  const cleanedText = rawText.replace(/^```json\n/, '').replace(/\n```$/, '');
+  return JSON.parse(cleanedText);
+}
 
-// --- 메인 서버리스 함수 핸들러 ---
-export default async function handler(
-  req: VercelRequest,
-  res: VercelResponse
-) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', ['POST']);
+// --- 메인 핸들러 (SSE 지원, GET 요청 처리) ---
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method !== 'GET') {
+    res.setHeader('Allow', ['GET']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.flushHeaders();
+
+  const sendProgress = (status: string, data?: any) => {
+    res.write(`data: ${JSON.stringify({ status, ...data })}\n\n`);
+  };
+
+  const sendError = (message: string) => {
+    res.write(`data: ${JSON.stringify({ error: message })}\n\n`);
+    res.end();
+  };
+
   try {
-    const { youtubeUrl } = req.body;
-    if (!youtubeUrl) {
-      return res.status(400).json({ error: 'youtubeUrl is required.' });
-    }
+    const youtubeUrl = req.query.youtubeUrl as string;
+    if (!youtubeUrl) return sendError('youtubeUrl is required.');
 
-    // --- 🚀 yt-dlp로 자막 데이터 가져오기 ---
+    sendProgress("자막 추출 중...");
     const videoTranscript = await getTranscriptWithYtDlp(youtubeUrl);
-
     if (!videoTranscript || videoTranscript.trim().length === 0) {
-      return res.status(404).json({ error: 'Transcript not found using yt-dlp.' });
+      return sendError('Transcript not found using yt-dlp.');
     }
 
-    // --- Gemini API 호출 및 데이터 처리 (기존 로직과 동일) ---
+    sendProgress("영상 내용 요약 중...");
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
     const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
     const summaryPrompt = `${SUMMARY_PROMPT_TEMPLATE}\n\n[영상 스크립트]\n${videoTranscript}`;
     const summaryResult = await model.generateContent(summaryPrompt);
-    const summaryData: SummaryData = JSON.parse(summaryResult.response.text());
+    // 🚀 파싱 전 데이터 정제
+    const summaryData: SummaryData = cleanAndParseJson(summaryResult.response.text());
 
+    sendProgress("제목 및 태그 생성 중...");
     const taggingPrompt = TAGGING_PROMPT_TEMPLATE(summaryData.summary);
     const taggingResult = await model.generateContent(taggingPrompt);
-    const taggingData: TaggingData = JSON.parse(taggingResult.response.text());
+    // 🚀 파싱 전 데이터 정제
+    const taggingData: TaggingData = cleanAndParseJson(taggingResult.response.text());
 
-    const finalData = {
-      ...summaryData,
-      ...taggingData,
-      sourceUrl: youtubeUrl,
-    };
+    const finalData = { ...summaryData, ...taggingData, sourceUrl: youtubeUrl };
 
-    return res.status(200).json(finalData);
+    sendProgress("완료", { payload: finalData });
+    res.end();
 
   } catch (error) {
     console.error("API 함수 처리 중 오류:", error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    return res.status(500).json({ error: 'Failed to process request.', details: errorMessage });
+    sendError(`Failed to process request: ${errorMessage}`);
   }
 }

@@ -1,17 +1,20 @@
 import { useEffect, useState, useCallback } from 'react';
 import { db } from './db';
-import { Note, SourceType, Attachment } from './types';
+import { Note } from './types';
 
 export type Filters = {
   search?: string;
-  tag?: string; // topics -> tag로 변경
+  tag?: string;
   favorite?: boolean;
   dateRange?: 'today' | '7days' | '30days' | 'all';
 };
 
-// 🚀 기존 AddNotePayload 인터페이스를 youtubeUrl만 받도록 수정
+// 🚀 addNote의 인자 타입을 확장하여 콜백 함수들을 포함
 export interface AddNotePayload {
   youtubeUrl: string;
+  onProgress: (status: string) => void;
+  onComplete: (note: Note) => void;
+  onError: (error: string) => void;
 }
 
 export function useNotes() {
@@ -19,6 +22,7 @@ export function useNotes() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<Filters>({ dateRange: 'all' });
 
+  // ... (loadNotes, toggleFavorite 등 다른 함수는 거의 동일) ...
   const loadNotes = useCallback(async () => {
     setLoading(true);
     try {
@@ -48,7 +52,6 @@ export function useNotes() {
         );
       }
 
-      // 🚀 tag 필터링 적용
       if (filters.tag) {
         notesFromDb = notesFromDb.filter(n => n.tag === filters.tag);
       }
@@ -82,45 +85,55 @@ export function useNotes() {
     );
   };
 
+  // 🚀 SSE를 처리하도록 addNote 함수 수정
   const addNote = async (payload: AddNotePayload) => {
-    // 🚀 서버리스 함수 호출 로직
-    const response = await fetch('/api/summarize-youtube', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ youtubeUrl: payload.youtubeUrl })
-    });
+    const { youtubeUrl, onProgress, onComplete, onError } = payload;
 
-    if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to summarize video.');
-    }
+    const eventSource = new EventSource(`/api/summarize-youtube?youtubeUrl=${encodeURIComponent(youtubeUrl)}`);
 
-    const result = await response.json();
+    eventSource.onmessage = async (event) => {
+      const data = JSON.parse(event.data);
 
-    // 🚀 서버로부터 받은 데이터로 최종 Note 객체 생성
-    const newNote: Note = {
-      id: crypto.randomUUID(),
-      title: result.title,
-      content: result.summary,
-      key_insights: result.key_insights,
-      tag: result.tag,
-      sourceUrl: result.sourceUrl,
-      sourceType: 'youtube',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().getTime(),
-      topics: [result.tag], // 레거시 호환성을 위해 tag를 topics 배열에 넣어줌
-      labels: [],
-      highlights: [],
-      todo: [],
-      favorite: false,
-      attachments: [],
+      if (data.error) {
+        onError(data.error);
+        eventSource.close();
+        return;
+      }
+
+      if (data.status === "완료" && data.payload) {
+        const result = data.payload;
+        const newNote: Note = {
+          id: crypto.randomUUID(),
+          title: result.title,
+          content: result.summary,
+          key_insights: result.key_insights,
+          tag: result.tag,
+          sourceUrl: result.sourceUrl,
+          sourceType: 'youtube',
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().getTime(),
+          topics: [result.tag], 
+          labels: [],
+          highlights: [],
+          todo: [],
+          favorite: false,
+          attachments: [],
+        };
+
+        await db.notes.add(newNote);
+        setNotes(prevNotes => [newNote, ...prevNotes]);
+        onComplete(newNote);
+        eventSource.close();
+      } else {
+        onProgress(data.status);
+      }
     };
 
-    await db.notes.add(newNote);
-    
-    // 로컬 상태 업데이트
-    setNotes(prevNotes => [newNote, ...prevNotes]);
-    return newNote;
+    eventSource.onerror = (err) => {
+      console.error("EventSource failed:", err);
+      onError("요약 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.");
+      eventSource.close();
+    };
   };
   
   const updateNote = async (id: string, patch: Partial<Note>) => {
