@@ -22,8 +22,45 @@ except Exception as e:
     print(f"[ERROR] Failed to configure Gemini API: {e}")
 
 # --- Prompts ---
-SUMMARY_PROMPT = """..." # (Content is long, assuming it's correct from previous steps)
-TAGGING_PROMPT_TEMPLATE = """..." # (Content is long, assuming it's correct)
+SUMMARY_PROMPT = """
+You are a professional summarizer specializing in audio content. 
+Listen carefully to the provided audio and create a concise, well-structured summary.
+Your summary should capture the main topics, key arguments, and important insights from the audio.
+
+Output the result in Korean, following this JSON format:
+'''json
+{
+  "summary": "오디오 전체 내용을 아우르는 3~4 문단의 핵심 요약문",
+  "key_insights": [
+    "오디오의 가장 중요한 통찰 또는 시사점 1",
+    "오디오의 가장 중요한 통찰 또는 시사점 2",
+    "그 외 주목할 만한 핵심 정보나 주장"
+  ]
+}
+'''
+"""
+
+TAGGING_PROMPT_TEMPLATE = """
+You are an expert at identifying the main theme of a piece of content and categorizing it.
+Based on the provided summary, generate a single 'title' and a single 'tag' that best represent the content.
+All output text, including the title and tag, must be in Korean.
+
+[Rules]
+1. Title: Create a concise title in Korean that captures the core message of the summary.
+2. Tag: You must generate a single, very broad, and general Korean word for the tag. (Examples: IT, 경제, 과학, 역사, 자기계발, 건강, 문화, 시사, 예능, 교육)
+
+[Summary]
+{summary_text}
+
+[Output Format]
+You must return the result in the following JSON format:
+'''json
+{
+  "title": "AI가 생성한 영상 제목",
+  "tag": "AI가 생성한 포괄적 주제 태그"
+}
+'''
+"""
 
 def clean_and_parse_json(raw_text):
     cleaned_text = raw_text.replace('```json', '').replace('```', '').strip()
