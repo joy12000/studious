@@ -22,9 +22,9 @@ export default function HomePage() {
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [progressMessage, setProgressMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  
 
-  const handleSave = () => { // async 제거
+  const handleSave = async () => {
     if (!youtubeUrl.trim()) {
       setError("유튜브 URL을 입력해주세요.");
       return;
@@ -37,13 +37,7 @@ export default function HomePage() {
     setProgressMessage("요약을 준비하는 중...");
     setError(null);
 
-    // 이전 EventSource가 있다면 닫기
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-    }
-
-    // 콜백을 사용하는 새로운 addNote 호출 방식
-    const newEventSource = addNote({
+    await addNote({
       youtubeUrl,
       onProgress: (status) => {
         setProgressMessage(status);
@@ -51,21 +45,12 @@ export default function HomePage() {
       onComplete: (newNote) => {
         setProgressMessage(null);
         navigate(`/note/${newNote.id}`);
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close();
-          eventSourceRef.current = null;
-        }
       },
       onError: (err) => {
         setError(err);
         setProgressMessage(null);
-        if (eventSourceRef.current) {
-          eventSourceRef.current.close();
-          eventSourceRef.current = null;
-        }
       },
     });
-    eventSourceRef.current = newEventSource;
   };
 
   const isLoading = progressMessage !== null;

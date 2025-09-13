@@ -78,29 +78,37 @@ class Handler(http.server.BaseHTTPRequestHandler):
         
         try:
             # 1. Pytube로 오디오 다운로드
-            print(f"Downloading audio for: {youtube_url}")
+            print(f"[AUDIO_DL] Start downloading for: {youtube_url}")
             yt = YouTube(youtube_url)
             audio_stream = yt.streams.get_audio_only()
             audio_path = audio_stream.download(output_path=temp_dir)
-            print(f"Audio downloaded to: {audio_path}")
+            print(f"[AUDIO_DL] Success. File path: {audio_path}")
 
-            # 2. Gemini File API에 오디오 파일 업로드
-            print("Uploading audio file to Gemini...")
-            audio_file = genai.upload_file(path=audio_path, display_name=yt.title)
-            print("Audio file uploaded successfully.")
+            audio_file = None
+            try:
+                # 2. Gemini File API에 오디오 파일 업로드
+                print(f"[GEMINI_UPLOAD] Start uploading: {audio_path}")
+                audio_file = genai.upload_file(path=audio_path, display_name=yt.title)
+                print(f"[GEMINI_UPLOAD] Success. File URI: {audio_file.uri}")
+            except Exception as e:
+                # This is where the 400 Bad Request is likely happening
+                print(f"[GEMINI_UPLOAD] Failed. Error: {str(e)}")
+                raise Exception(f"Gemini file upload failed. It might be an unsupported audio format. Error: {str(e)}")
 
             # 3. Gemini로 오디오 요약
-            print("Generating summary with Gemini...")
+            print("[GEMINI_SUMMARY] Start generating summary...")
             model = genai.GenerativeModel(model_name='models/gemini-1.5-flash-latest')
             summary_response = model.generate_content([SUMMARY_PROMPT, audio_file])
             summary_data = clean_and_parse_json(summary_response.text)
+            print("[GEMINI_SUMMARY] Success.")
             
             # 4. Gemini로 제목/태그 생성
-            print("Generating title and tag with Gemini...")
+            print("[GEMINI_TAGGING] Start generating title and tag...")
             tagging_model = genai.GenerativeModel(model_name='models/gemini-1.5-flash-latest')
             tagging_prompt = TAGGING_PROMPT_TEMPLATE.format(summary_text=summary_data['summary'])
             tagging_response = tagging_model.generate_content(tagging_prompt)
             tagging_data = clean_and_parse_json(tagging_response.text)
+            print("[GEMINI_TAGGING] Success.")
 
             # 5. 최종 데이터 조합 및 전송
             final_data = {**summary_data, **tagging_data, "sourceUrl": youtube_url}
@@ -108,7 +116,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         except Exception as e:
             error_message = f"An error occurred: {str(e)}"
-            print(error_message)
+            print(f"[ERROR] {error_message}")
             self.wfile.write(json.dumps({"error": error_message}).encode('utf-8'))
         
         finally:
