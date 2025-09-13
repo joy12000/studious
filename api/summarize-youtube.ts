@@ -120,4 +120,61 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     } else {
       transcriptClient = new TranscriptClient();
-      sendProgress(
+      sendProgress("자막 추출 중...");
+    }
+
+    const transcriptParts = await transcriptClient.getTranscript(videoId, {
+      lang: 'ko',
+    });
+    const videoTranscript = transcriptParts.map(part => part.text).join(' ');
+
+    if (!videoTranscript || videoTranscript.trim().length === 0) {
+      return sendError('자막을 찾을 수 없습니다. 다른 영상을 시도해주세요.');
+    }
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!); 
+
+    // 토큰 수에 따라 동적으로 모델 선택 및 알림
+    const tokenCount = Math.round(videoTranscript.length / 2.5);
+    let modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.0-flash";
+    let usingProModel = false;
+
+    if (tokenCount <= 250000) {
+      modelName = "gemini-2.5-pro";
+      usingProModel = true;
+    }
+    
+    if (usingProModel) {
+        sendProgress(`토큰(약 ${tokenCount.toLocaleString()}개)이 많아 Gemini 2.5 Pro로 요약합니다.`);
+    } else {
+        sendProgress(`기본 모델로 요약을 시작합니다.`);
+    }
+
+    const model = genAI.getGenerativeModel({ model: modelName });
+
+    const summaryPrompt = `${SUMMARY_PROMPT_TEMPLATE}\n\n[영상 스크립트]\n${videoTranscript}`;
+    const summaryResult = await model.generateContent(summaryPrompt);
+    const summaryData = cleanAndParseJson<SummaryData>(summaryResult.response.text());
+
+    sendProgress("제목 및 태그 생성 중...");
+    const taggingModel = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL_NAME || "gemini-2.0-flash" });
+    const taggingPrompt = TAGGING_PROMPT_TEMPLATE(summaryData.summary);
+    const taggingResult = await taggingModel.generateContent(taggingPrompt);
+    const taggingData = cleanAndParseJson<TaggingData>(taggingResult.response.text());
+
+    const finalData = { ...summaryData, ...taggingData, sourceUrl: youtubeUrl };
+
+    sendProgress("완료", { payload: finalData });
+    res.end();
+
+  } catch (error) {
+    console.error("API 함수 처리 중 오류:", error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    // 🚀 에러 메시지를 좀 더 사용자 친화적으로 변경
+    if (errorMessage.includes('Transcript not available') || (error as any)?.cause?.toString()?.includes('404')) {
+        sendError('이 영상의 한국어 자막을 자동으로 생성할 수 없습니다. 다른 영상을 시도해주세요.');
+    } else {
+        sendError(`요청 처리 중 오류가 발생했습니다: ${errorMessage}`);
+    }
+  }
+}
