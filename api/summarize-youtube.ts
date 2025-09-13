@@ -111,72 +111,58 @@ async function getTranscriptWithYtDlp(youtubeUrl: string): Promise<string> {
   });
 }
 
-// 🚀 Gemini 응답을 파싱하기 위한 헬퍼 함수
+// Gemini 응답을 파싱하기 위한 헬퍼 함수
 function cleanAndParseJson(rawText: string): any {
   const cleanedText = rawText.replace(/^```json\n/, '').replace(/\n```$/, '');
   return JSON.parse(cleanedText);
 }
 
-// --- 메인 핸들러 (SSE 지원, GET 요청 처리) ---
+// --- 메인 핸들러 (단일 POST 요청) ---
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'GET') {
-    res.setHeader('Allow', ['GET']);
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', ['POST']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  res.flushHeaders();
-
-  const sendProgress = (status: string, data?: any) => {
-    res.write(`data: ${JSON.stringify({ status, ...data })}\n\n`);
-  };
-
-  const sendError = (message: string) => {
-    res.write(`data: ${JSON.stringify({ error: message })}\n\n`);
-    res.end();
-  };
-
   try {
-    const youtubeUrl = req.query.youtubeUrl as string;
-    if (!youtubeUrl) return sendError('youtubeUrl is required.');
-
-    sendProgress("자막 추출 중...");
-    const videoTranscript = await getTranscriptWithYtDlp(youtubeUrl);
-    if (!videoTranscript || videoTranscript.trim().length === 0) {
-      return sendError('Transcript not found using yt-dlp.');
+    const { youtubeUrl } = req.body;
+    if (!youtubeUrl) {
+      return res.status(400).json({ error: 'youtubeUrl is required.' });
     }
 
-    sendProgress("영상 내용 요약 중...");
+    const videoTranscript = await getTranscriptWithYtDlp(youtubeUrl);
+    if (!videoTranscript || videoTranscript.trim().length === 0) {
+      return res.status(404).json({ error: 'Transcript not found using yt-dlp.' });
+    }
+
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-    // 🚀 자막 길이에 따라 동적으로 모델 선택
+    // 🚀 토큰 수에 따라 동적으로 모델 선택
+    const tokenCount = Math.round(videoTranscript.length / 2.5); // 한국어 글자 수 기반 근사치
     let modelName = process.env.GEMINI_MODEL_NAME || "gemini-2.0-flash";
-    if (videoTranscript.length <= 250000) {
-      modelName = "gemini-1.5-pro";
+    if (tokenCount <= 250000) {
+      modelName = "gemini-2.5-pro"; // 사용자가 요청한 모델명
     }
 
     const model = genAI.getGenerativeModel({ model: modelName });
+
     const summaryPrompt = `${SUMMARY_PROMPT_TEMPLATE}\n\n[영상 스크립트]\n${videoTranscript}`;
     const summaryResult = await model.generateContent(summaryPrompt);
-    // 🚀 파싱 전 데이터 정제
     const summaryData: SummaryData = cleanAndParseJson(summaryResult.response.text());
 
-    sendProgress("제목 및 태그 생성 중...");
     const taggingPrompt = TAGGING_PROMPT_TEMPLATE(summaryData.summary);
-    const taggingResult = await model.generateContent(taggingPrompt);
-    // 🚀 파싱 전 데이터 정제
+    // 태그 생성은 비용 효율적인 모델을 사용하도록 고정할 수 있습니다.
+    const taggingModel = genAI.getGenerativeModel({ model: process.env.GEMINI_MODEL_NAME || "gemini-2.0-flash" });
+    const taggingResult = await taggingModel.generateContent(taggingPrompt);
     const taggingData: TaggingData = cleanAndParseJson(taggingResult.response.text());
 
     const finalData = { ...summaryData, ...taggingData, sourceUrl: youtubeUrl };
 
-    sendProgress("완료", { payload: finalData });
-    res.end();
+    return res.status(200).json(finalData);
 
   } catch (error) {
     console.error("API 함수 처리 중 오류:", error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    sendError(`Failed to process request: ${errorMessage}`);
+    return res.status(500).json({ error: 'Failed to process request.', details: errorMessage });
   }
 }

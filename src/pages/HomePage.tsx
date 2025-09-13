@@ -3,13 +3,12 @@ import { useNotes } from "../lib/useNotes";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Youtube } from "lucide-react";
 
-// 🚀 진행 메시지를 표시하도록 수정
-function LoadingOverlay({ message }: { message: string }) {
+function LoadingOverlay() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="flex flex-col items-center gap-4 rounded-lg bg-card p-8 text-card-foreground shadow-xl">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-lg font-medium">{message}</p>
+        <p className="text-lg font-medium">AI가 노트를 생성하고 있습니다.</p>
         <p className="text-sm text-muted-foreground">잠시만 기다려주세요...</p>
       </div>
     </div>
@@ -20,8 +19,7 @@ export default function HomePage() {
   const { addNote } = useNotes();
   const navigate = useNavigate();
   const [youtubeUrl, setYoutubeUrl] = useState("");
-  // 🚀 isLoading 대신 progressMessage로 로딩 상태 관리
-  const [progressMessage, setProgressMessage] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = async () => {
@@ -34,31 +32,22 @@ export default function HomePage() {
       return;
     }
     
-    setProgressMessage("요약을 준비하는 중..."); // 초기 메시지 설정
+    setIsLoading(true);
     setError(null);
 
-    // 🚀 콜백을 사용하는 새로운 addNote 호출 방식
-    addNote({
-      youtubeUrl,
-      onProgress: (status) => {
-        setProgressMessage(status);
-      },
-      onComplete: (newNote) => {
-        setProgressMessage(null);
-        navigate(`/note/${newNote.id}`);
-      },
-      onError: (err) => {
-        setError(err);
-        setProgressMessage(null);
-      },
-    });
+    try {
+      const newNote = await addNote({ youtubeUrl });
+      navigate(`/note/${newNote.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "요약에 실패했습니다.");
+    } finally {
+      setIsLoading(false);
+    }
   };
-
-  const isLoading = progressMessage !== null;
 
   return (
     <>
-      {isLoading && <LoadingOverlay message={progressMessage} />}
+      {isLoading && <LoadingOverlay />}
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4">
         <div className="w-full max-w-3xl text-center">
           
