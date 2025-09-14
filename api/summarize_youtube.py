@@ -3,7 +3,7 @@ import requests
 import google.generativeai as genai
 import tempfile
 import certifi
-from urllib.parse import urlparse, parse_qs, quote
+from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, quote
 from http.server import BaseHTTPRequestHandler
 
 # ==============================================================================
@@ -58,12 +58,19 @@ def _make_request(url, params=None):
     target_url = url
     if params:
         # requests.get handles params encoding, but we need to build the full URL for ScraperAPI
-        param_str = "&" + "&".join([f"{k}={v}" for k, v in params.items()])
+        param_str = "&" + urlencode(params)
         target_url += param_str
 
     if PROXY_URL:
-        final_url = f"{PROXY_URL}&url={quote(target_url)}&keep_headers=true"
-        # When using ScraperAPI, params are part of the target URL, so we don't pass them to requests
+        # Robustly add the target url to the proxy url
+        base_proxy_parts = urlparse(PROXY_URL)
+        proxy_query_params = parse_qs(base_proxy_parts.query)
+        proxy_query_params['url'] = target_url
+        proxy_query_params['keep_headers'] = 'true'
+        
+        new_query = urlencode(proxy_query_params, doseq=True)
+        final_url = urlunparse(base_proxy_parts._replace(query=new_query))
+        
         return requests.get(final_url, timeout=HTTP_TIMEOUT, verify=certifi.where())
     else:
         return requests.get(url, params=params, timeout=HTTP_TIMEOUT, verify=certifi.where())
@@ -87,7 +94,7 @@ def extract_first_json(text: str):
     if not text:
         raise ValueError("Empty response from model.")
     
-    match = re.search(r"\{{.*\}}", text, re.DOTALL)
+    match = re.search(r"{{.*}}", text, re.DOTALL)
     if not match:
         raise ValueError("No JSON object found in the model's response.")
     
@@ -199,7 +206,6 @@ def _get_summary_data(youtube_url: str, requested_mode: str):
     # --- Attempt 2: Audio (Fallback) ---
     audio_url = get_best_audio_url(video_id)
     
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; AIBookBeta/1.0)"}
     # Use the ScraperAPI-aware request function for the audio binary download
     r = _make_request(audio_url)
     r.raise_for_status()
