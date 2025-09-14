@@ -91,7 +91,7 @@ export function useNotes() {
     onProgress("오디오를 처리하여 요약을 생성하는 중입니다...");
 
     try {
-      const response = await fetch(`https://momentum.jeonguk1203.workers.dev/?youtubeUrl=${encodeURIComponent(youtubeUrl)}`);
+      const response = await fetch(`https://momentum-414725494996.asia-northeast3.run.app/extract?youtubeUrl=${encodeURIComponent(youtubeUrl)}`);
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
