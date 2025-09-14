@@ -21,7 +21,7 @@ PROXY_URL = os.getenv("PROXY_URL")
 
 # ==============================================================================
 # PROMPTS
-# ============================================================================== 
+# ==============================================================================
 SUMMARY_PROMPT = """You are a professional Korean summarizer. Summarize the content for a busy professional.
 - Write in Korean.
 - Keep the most important facts, numbers, and named entities.
@@ -65,7 +65,8 @@ def _get_from_any_host(base_urls, path, params=None):
     proxies = get_proxies()
     for base in base_urls:
         try:
-            r = requests.get(f"{base}{path}", timeout=HTTP_TIMEOUT, params=params, proxies=proxies, verify=certifi.where())
+            # WARNING: INSECURE - SSL verification disabled for diagnostics.
+            r = requests.get(f"{base}{path}", timeout=HTTP_TIMEOUT, params=params, proxies=proxies, verify=False)
             if r.status_code == 200:
                 return r.json()
             last_err = f"host {base} returned status {r.status_code}"
@@ -192,7 +193,8 @@ def _get_summary_data(youtube_url: str, requested_mode: str):
     
     headers = {"User-Agent": "Mozilla/5.0 (compatible; AIBookBeta/1.0)"}
     proxies = get_proxies()
-    with requests.get(audio_url, headers=headers, stream=True, timeout=HTTP_TIMEOUT, proxies=proxies, verify=certifi.where()) as r:
+    # WARNING: INSECURE - SSL verification disabled for diagnostics.
+    with requests.get(audio_url, headers=headers, stream=True, timeout=HTTP_TIMEOUT, proxies=proxies, verify=False) as r:
         r.raise_for_status()
         audio_bytes = r.content
         if len(audio_bytes) > MAX_AUDIO_BYTES:
