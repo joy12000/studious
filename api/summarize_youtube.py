@@ -6,6 +6,7 @@ import certifi
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, quote
 from http.server import BaseHTTPRequestHandler
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
 
 # ==============================================================================
 # CONFIGURATION
@@ -92,7 +93,7 @@ def extract_first_json(text: str):
     if not text:
         raise ValueError("Empty response from model.")
     
-    match = re.search(r"\{{.*?\}}", text, re.DOTALL)
+    match = re.search(r"\{\{.*?\}"", text, re.DOTALL)
     if not match:
         raise ValueError("No JSON object found in the model's response.")
     
@@ -119,14 +120,42 @@ def extract_video_id(url: str) -> str:
 # ==============================================================================
 
 def get_transcript_text(video_id: str) -> str:
-    """Gets transcript text using youtube-transcript-api."""
+    """Gets transcript text using youtube-transcript-api, with robust fallbacks."""
+    transcript = None
     try:
-        transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=PREFERRED_LANGS)
-        text = " ".join([d['text'] for d in transcript_list])
+        # 1. Try to find a manual transcript in preferred languages
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        for lang in PREFERRED_LANGS:
+            try:
+                transcript = transcript_list.find_transcript([lang])
+                break # Found one, exit loop
+            except NoTranscriptFound:
+                continue # Try next language
+        
+        # If no preferred manual transcript, try generated ones
+        if not transcript:
+            for lang in PREFERRED_LANGS:
+                try:
+                    transcript = transcript_list.find_generated_transcript([lang])
+                    break
+                except NoTranscriptFound:
+                    continue
+
+        if not transcript:
+             raise NoTranscriptFound("No suitable transcript found.")
+
+        # Fetch and combine text
+        segments = transcript.fetch()
+        text = " ".join([d['text'] for d in segments])
         if len(text) < 50:
             raise RuntimeError("Transcript text is too short to be meaningful.")
         return text
+
+    except (TranscriptsDisabled, VideoUnavailable) as e:
+        # If transcripts are disabled or video is unavailable, no point in falling back.
+        raise RuntimeError(f"Cannot fetch transcript: {e}")
     except Exception as e:
+        # For any other error (including NoTranscriptFound), re-raise to allow fallback to audio.
         raise RuntimeError(f"youtube-transcript-api failed: {e}")
 
 def get_best_audio_url(video_id: str) -> str:
