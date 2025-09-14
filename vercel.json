@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/summarize_youtube.py": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   },
   "rewrites": [
