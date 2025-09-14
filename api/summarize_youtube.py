@@ -107,7 +107,12 @@ def invidious_transcript(video_id: str):
             if r.status_code != 200:
                 last_err = f"list {base} {r.status_code}"
                 continue
-            tracks = r.json()
+            try:
+                tracks = r.json()
+            except json.JSONDecodeError:
+                last_err = f"list {base} returned invalid JSON"
+                continue
+
             # choose preferred language
             chosen = None
             # normalize language codes in data: they have \'language\' and \'languageCode\'
@@ -124,11 +129,16 @@ def invidious_transcript(video_id: str):
                 continue
             lang_code = chosen.get("languageCode") or chosen.get("language") or "en"
             # 2) fetch captions
-            r2 = requests.get(f"{base}/api/v1/captions/{video_id}", params={"lang": lang_code, "format": "json3"}, timeout=HTTP_TIMEOUT)
+            r2 = requests.get(f"{base}/api/v1/captions/{video_id}", params={"lang": lang_code, "format": "json3"}, timeout=HTTP_HTTP_TIMEOUT)
             if r2.status_code != 200:
                 last_err = f"fetch {base} {r2.status_code}"
                 continue
-            data = r2.json()
+            try:
+                data = r2.json()
+            except json.JSONDecodeError:
+                last_err = f"fetch {base} returned invalid JSON for lang"
+                continue
+            
             # Convert json3 events to text
             lines = []
             for ev in data.get("events", []):
@@ -156,7 +166,12 @@ def piped_best_audio_url(video_id: str):
             if r.status_code != 200:
                 last_err = f"streams {base} {r.status_code}"
                 continue
-            j = r.json()
+            try:
+                j = r.json()
+            except json.JSONDecodeError:
+                last_err = f"streams {base} returned invalid JSON"
+                continue
+            
             audio = j.get("audioStreams") or []
             # pick highest bitrate m4a/mp4a first
             def score(a):
