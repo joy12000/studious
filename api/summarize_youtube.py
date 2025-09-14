@@ -3,7 +3,7 @@ import requests
 import google.generativeai as genai
 import tempfile
 import certifi
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, quote
 from http.server import BaseHTTPRequestHandler
 
 # ==============================================================================
@@ -17,7 +17,7 @@ PIPED_BASE_URLS = [u.strip() for u in os.getenv("PIPED_BASE_URLS", "https://pipe
 HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", "25"))
 MAX_AUDIO_BYTES = int(os.getenv("MAX_AUDIO_BYTES", str(120 * 1024 * 1024)))
 PREFERRED_LANGS = [s.strip() for s in os.getenv("PREFERRED_LANGS", "ko,en,en-US").split(",")]
-PROXY_URL = os.getenv("PROXY_URL")
+PROXY_URL = os.getenv("PROXY_URL") # Expected to be a ScraperAPI URL, e.g., http://api.scraperapi.com?api_key=...
 
 # ==============================================================================
 # PROMPTS
@@ -53,23 +53,31 @@ TAGGING_PROMPT_TEMPLATE = """다음 요약문을 보고 한국어 제목과 해�
 # HELPER FUNCTIONS
 # ==============================================================================
 
-def get_proxies():
-    """Fetches proxy settings from environment variables."""
-    if not PROXY_URL:
-        return None
-    return {"http": PROXY_URL, "https": PROXY_URL}
+def _make_request(url, params=None):
+    """Makes a request, wrapping the URL with ScraperAPI if PROXY_URL is set."""
+    target_url = url
+    if params:
+        # requests.get handles params encoding, but we need to build the full URL for ScraperAPI
+        param_str = "&" + "&".join([f"{k}={v}" for k, v in params.items()])
+        target_url += param_str
+
+    if PROXY_URL:
+        final_url = f"{PROXY_URL}&url={quote(target_url)}&keep_headers=true"
+        # When using ScraperAPI, params are part of the target URL, so we don't pass them to requests
+        return requests.get(final_url, timeout=HTTP_TIMEOUT, verify=certifi.where())
+    else:
+        return requests.get(url, params=params, timeout=HTTP_TIMEOUT, verify=certifi.where())
 
 def _get_from_any_host(base_urls, path, params=None):
     """Iterates through a list of base URLs and returns the first successful JSON response."""
     last_err = None
-    proxies = get_proxies()
     for base in base_urls:
         try:
-            # WARNING: INSECURE - SSL verification disabled for diagnostics.
-            r = requests.get(f"{base}{path}", timeout=HTTP_TIMEOUT, params=params, proxies=proxies, verify=False)
+            target_url = f"{base}{path}"
+            r = _make_request(target_url, params)
             if r.status_code == 200:
                 return r.json()
-            last_err = f"host {base} returned status {r.status_code}"
+            last_err = f"host {base} returned status {r.status_code}: {r.text[:100]}"
         except Exception as e:
             last_err = str(e)
     raise RuntimeError(f"All hosts failed. Last error: {last_err}")
@@ -192,13 +200,12 @@ def _get_summary_data(youtube_url: str, requested_mode: str):
     audio_url = get_best_audio_url(video_id)
     
     headers = {"User-Agent": "Mozilla/5.0 (compatible; AIBookBeta/1.0)"}
-    proxies = get_proxies()
-    # WARNING: INSECURE - SSL verification disabled for diagnostics.
-    with requests.get(audio_url, headers=headers, stream=True, timeout=HTTP_TIMEOUT, proxies=proxies, verify=False) as r:
-        r.raise_for_status()
-        audio_bytes = r.content
-        if len(audio_bytes) > MAX_AUDIO_BYTES:
-            raise ValueError(f"Audio file is too large (> {MAX_AUDIO_BYTES // 1024 // 1024}MB).")
+    # Use the ScraperAPI-aware request function for the audio binary download
+    r = _make_request(audio_url)
+    r.raise_for_status()
+    audio_bytes = r.content
+    if len(audio_bytes) > MAX_AUDIO_BYTES:
+        raise ValueError(f"Audio file is too large (> {MAX_AUDIO_BYTES // 1024 // 1024}MB).")
 
     result = summarize_content(model, audio_bytes, is_audio=True)
     return {**result, "mode": "audio", "sourceUrl": youtube_url}
