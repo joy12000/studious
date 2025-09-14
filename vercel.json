@@ -1,6 +1,6 @@
 {
   "functions": {
-    "api/summarize_audio.py": {
+    "api/summarize_youtube.py": {
       "maxDuration": 60
     }
   }

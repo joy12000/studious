@@ -53,13 +53,35 @@ TAGGING_PROMPT_TEMPLATE = '''
 {summary_text}
 '''
 
-JSON_OBJECT_RE = re.compile(r'\'{(?:[^\'{}]|(?R))*\}', re.DOTALL)
-
 def parse_first_json_block(text: str):
-    m = JSON_OBJECT_RE.search(text or "")
-    if not m:
-        raise ValueError("모델 출력에서 JSON 블록을 찾지 못했습니다.")
-    return json.loads(m.group(0))
+    """
+    Finds the first valid JSON object block in a string by balancing braces.
+    """
+    text = text or ""
+    # Handle markdown code blocks
+    if '```json' in text:
+        text = text.split('```json')[1].split('```')[0]
+
+    start_index = text.find('{')
+    if start_index == -1:
+        raise ValueError("모델 출력에서 JSON 시작(`{`)을 찾지 못했습니다.")
+
+    brace_count = 0
+    for i in range(start_index, len(text)):
+        if text[i] == '{':
+            brace_count += 1
+        elif text[i] == '}':
+            brace_count -= 1
+        
+        if brace_count == 0:
+            end_index = i + 1
+            json_str = text[start_index:end_index]
+            try:
+                return json.loads(json_str)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"JSON 디코딩 실패: {e}. 내용: {json_str[:100]}...")
+    
+    raise ValueError("모델 출력에서 완전한 JSON 객체를 찾지 못했습니다.")
 
 def extract_video_id(url: str) -> str:
     u = urlparse(url)
