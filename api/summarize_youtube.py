@@ -16,8 +16,8 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 FETCH_MODE = os.getenv("YOUTUBE_FETCH_MODE", "auto")  # "auto" | "transcript" | "audio"
 
 # Comma-separated lists (you can reorder or add more)
-INVIDIOUS_BASE_URLS = [u.strip() for u in os.getenv("INVIDIOUS_BASE_URLS", "https://yewtu.be,https://invidious.projectsegfau.lt").split(",") if u.strip()]
-PIPED_BASE_URLS     = [u.strip() for u in os.getenv("PIPED_BASE_URLS", "https://piped.video,https://piped.projectsegfau.lt").split(",") if u.strip()]
+INVIDIOUS_BASE_URLS = [u.strip() for u in os.getenv("INVIDIOUS_BASE_URLS", "https://yewtu.be,https://invidious.projectsegfau.lt,https://inv.nadeko.net,https://invidious.nerdvpn.de,https://invidious.f5.si").split(",") if u.strip()]
+PIPED_BASE_URLS     = [u.strip() for u in os.getenv("PIPED_BASE_URLS", "https://piped.video,https://piped.projectsegfau.lt,https://pipedapi.kavin.rocks").split(",") if u.strip()]
 
 HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", "25"))  # per request
 MAX_AUDIO_BYTES = int(os.getenv("MAX_AUDIO_BYTES", str(120 * 1024 * 1024)))  # 120MB default
