@@ -3,7 +3,7 @@ import requests
 import google.generativeai as genai
 import tempfile
 import certifi
-from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, quote
+from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
@@ -18,7 +18,7 @@ PIPED_BASE_URLS     = [u.strip() for u in os.getenv("PIPED_BASE_URLS", "https://
 HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", "90"))
 MAX_AUDIO_BYTES = int(os.getenv("MAX_AUDIO_BYTES", str(120 * 1024 * 1024)))
 PREFERRED_LANGS = [s.strip() for s in os.getenv("PREFERRED_LANGS", "ko,en,en-US").split(",")]
-PROXY_URL = os.getenv("PROXY_URL") # Expected to be a ScraperAPI URL, e.g., http://api.scraperapi.com?api_key=...
+PROXY_URL = os.getenv("PROXY_URL")
 
 # ==============================================================================
 # PROMPTS
@@ -54,33 +54,20 @@ TAGGING_PROMPT_TEMPLATE = """다음 요약문을 보고 한국어 제목과 해�
 # HELPER FUNCTIONS
 # ==============================================================================
 
-def _make_request(url, params=None):
-    """Makes a request, wrapping the URL with ScraperAPI if PROXY_URL is set."""
-    target_url = url
-    if params:
-        param_str = "&" + urlencode(params)
-        target_url += param_str
-
-    if PROXY_URL:
-        base_proxy_parts = urlparse(PROXY_URL)
-        proxy_query_params = parse_qs(base_proxy_parts.query)
-        proxy_query_params['url'] = target_url
-        proxy_query_params['keep_headers'] = 'true'
-        
-        new_query = urlencode(proxy_query_params, doseq=True)
-        final_url = urlunparse(base_proxy_parts._replace(query=new_query))
-        
-        return requests.get(final_url, timeout=HTTP_TIMEOUT, verify=certifi.where())
-    else:
-        return requests.get(url, params=params, timeout=HTTP_TIMEOUT, verify=certifi.where())
+def get_proxies():
+    """Builds a proxy dictionary for requests if PROXY_URL is set."""
+    if not PROXY_URL:
+        return None
+    return {"http": PROXY_URL, "https": PROXY_URL}
 
 def _get_from_any_host(base_urls, path, params=None):
     """Iterates through a list of base URLs and returns the first successful JSON response."""
     last_err = None
+    proxies = get_proxies()
     for base in base_urls:
         try:
             target_url = f"{base}{path}"
-            r = _make_request(target_url, params)
+            r = requests.get(target_url, params=params, timeout=HTTP_TIMEOUT, proxies=proxies, verify=certifi.where())
             if r.status_code == 200:
                 return r.json()
             last_err = f"host {base} returned status {r.status_code}: {r.text[:100]}"
@@ -93,7 +80,7 @@ def extract_first_json(text: str):
     if not text:
         raise ValueError("Empty response from model.")
     
-    match = re.search(r"\{\{.*?\}"", text, re.DOTALL)
+    match = re.search(r"\{\*\}", text, re.DOTALL)
     if not match:
         raise ValueError("No JSON object found in the model's response.")
     
@@ -119,20 +106,20 @@ def extract_video_id(url: str) -> str:
 # CORE LOGIC: FETCHING & SUMMARIZING
 # ==============================================================================
 
-def get_transcript_text(video_id: str) -> str:
-    """Gets transcript text using youtube-transcript-api, with robust fallbacks."""
-    transcript = None
+def get_transcript_text(video_id: str, proxies: dict = None) -> str:
+    """Gets transcript text using youtube-transcript-api, with robust fallbacks and proxy support."""
     try:
-        # 1. Try to find a manual transcript in preferred languages
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        # The library accepts a proxies dict directly.
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id, proxies=proxies)
+        
+        transcript = None
         for lang in PREFERRED_LANGS:
             try:
                 transcript = transcript_list.find_transcript([lang])
-                break # Found one, exit loop
+                break
             except NoTranscriptFound:
-                continue # Try next language
+                continue
         
-        # If no preferred manual transcript, try generated ones
         if not transcript:
             for lang in PREFERRED_LANGS:
                 try:
@@ -144,7 +131,6 @@ def get_transcript_text(video_id: str) -> str:
         if not transcript:
              raise NoTranscriptFound("No suitable transcript found.")
 
-        # Fetch and combine text
         segments = transcript.fetch()
         text = " ".join([d['text'] for d in segments])
         if len(text) < 50:
@@ -152,10 +138,8 @@ def get_transcript_text(video_id: str) -> str:
         return text
 
     except (TranscriptsDisabled, VideoUnavailable) as e:
-        # If transcripts are disabled or video is unavailable, no point in falling back.
         raise RuntimeError(f"Cannot fetch transcript: {e}")
     except Exception as e:
-        # For any other error (including NoTranscriptFound), re-raise to allow fallback to audio.
         raise RuntimeError(f"youtube-transcript-api failed: {e}")
 
 def get_best_audio_url(video_id: str) -> str:
@@ -200,11 +184,13 @@ def _get_summary_data(youtube_url: str, requested_mode: str):
     genai.configure(api_key=API_KEY)
     model = genai.GenerativeModel(GENAI_MODEL)
     video_id = extract_video_id(youtube_url)
+    proxies = get_proxies()
     
     # --- Attempt 1: Transcript ---
     if requested_mode in ("auto", "transcript"):
         try:
-            transcript = get_transcript_text(video_id)
+            # Pass proxies to the transcript function
+            transcript = get_transcript_text(video_id, proxies=proxies)
             result = summarize_content(model, transcript, is_audio=False)
             return {**result, "mode": "transcript", "sourceUrl": youtube_url}
         except Exception as e:
@@ -215,12 +201,12 @@ def _get_summary_data(youtube_url: str, requested_mode: str):
     # --- Attempt 2: Audio (Fallback) ---
     audio_url = get_best_audio_url(video_id)
     
-    # Use the ScraperAPI-aware request function for the audio binary download
-    r = _make_request(audio_url)
-    r.raise_for_status()
-    audio_bytes = r.content
-    if len(audio_bytes) > MAX_AUDIO_BYTES:
-        raise ValueError(f"Audio file is too large (> {MAX_AUDIO_BYTES // 1024 // 1024}MB).")
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; AIBookBeta/1.0)"}
+    with requests.get(audio_url, headers=headers, stream=True, timeout=HTTP_TIMEOUT, proxies=proxies, verify=certifi.where()) as r:
+        r.raise_for_status()
+        audio_bytes = r.content
+        if len(audio_bytes) > MAX_AUDIO_BYTES:
+            raise ValueError(f"Audio file is too large (> {MAX_AUDIO_BYTES // 1024 // 1024}MB).")
 
     result = summarize_content(model, audio_bytes, is_audio=True)
     return {**result, "mode": "audio", "sourceUrl": youtube_url}
