@@ -12,8 +12,8 @@ from http.server import BaseHTTPRequestHandler
 GENAI_MODEL = os.getenv("GENAI_MODEL", "models/gemini-1.5-flash-latest")
 API_KEY = os.getenv("GEMINI_API_KEY")
 FETCH_MODE = os.getenv("YOUTUBE_FETCH_MODE", "auto")  # "auto" | "transcript" | "audio"
-INVIDIOUS_BASE_URLS = [u.strip() for u in os.getenv("INVIDIOUS_BASE_URLS", "https://yewtu.be,https://invidious.projectsegfau.lt,https://vid.puffyan.us").split(",") if u.strip()]
-PIPED_BASE_URLS = [u.strip() for u in os.getenv("PIPED_BASE_URLS", "https://piped.video,https://piped.projectsegfau.lt,https://piped.mha.fi").split(",") if u.strip()]
+INVIDIOUS_BASE_URLS = [u.strip() for u in os.getenv("INVIDIOUS_BASE_URLS", "https://yewtu.be,https://invidious.projectsegfau.lt,https://vid.puffyan.us,https://invidious.kavin.rocks,https://invidious.slipfox.xyz,https://iv.ggtyler.dev").split(",") if u.strip()]
+PIPED_BASE_URLS     = [u.strip() for u in os.getenv("PIPED_BASE_URLS", "https://piped.video,https://piped.kavin.rocks,https://piped.projectsegfau.lt,https://piped.garudalinux.org,https://piped.privacydev.net,https://p.plibre.com").split(",") if u.strip()]
 HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", "25"))
 MAX_AUDIO_BYTES = int(os.getenv("MAX_AUDIO_BYTES", str(120 * 1024 * 1024)))
 PREFERRED_LANGS = [s.strip() for s in os.getenv("PREFERRED_LANGS", "ko,en,en-US").split(",")]
