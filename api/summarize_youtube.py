@@ -16,6 +16,7 @@ PIPED_BASE_URLS = [u.strip() for u in os.getenv("PIPED_BASE_URLS", "https://pipe
 HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", "25"))
 MAX_AUDIO_BYTES = int(os.getenv("MAX_AUDIO_BYTES", str(120 * 1024 * 1024)))
 PREFERRED_LANGS = [s.strip() for s in os.getenv("PREFERRED_LANGS", "ko,en,en-US").split(",")]
+PROXY_URL = os.getenv("PROXY_URL")
 
 # ==============================================================================
 # PROMPTS
@@ -51,12 +52,19 @@ TAGGING_PROMPT_TEMPLATE = """다음 요약문을 보고 한국어 제목과 해�
 # HELPER FUNCTIONS
 # ==============================================================================
 
+def get_proxies():
+    """Fetches proxy settings from environment variables."""
+    if not PROXY_URL:
+        return None
+    return {"http": PROXY_URL, "https": PROXY_URL}
+
 def _get_from_any_host(base_urls, path, params=None):
     """Iterates through a list of base URLs and returns the first successful JSON response."""
     last_err = None
+    proxies = get_proxies()
     for base in base_urls:
         try:
-            r = requests.get(f"{base}{path}", timeout=HTTP_TIMEOUT, params=params)
+            r = requests.get(f"{base}{path}", timeout=HTTP_TIMEOUT, params=params, proxies=proxies)
             if r.status_code == 200:
                 return r.json()
             last_err = f"host {base} returned status {r.status_code}"
@@ -182,7 +190,8 @@ def _get_summary_data(youtube_url: str, requested_mode: str):
     audio_url = get_best_audio_url(video_id)
     
     headers = {"User-Agent": "Mozilla/5.0 (compatible; AIBookBeta/1.0)"}
-    with requests.get(audio_url, headers=headers, stream=True, timeout=HTTP_TIMEOUT) as r:
+    proxies = get_proxies()
+    with requests.get(audio_url, headers=headers, stream=True, timeout=HTTP_TIMEOUT, proxies=proxies) as r:
         r.raise_for_status()
         audio_bytes = r.content
         if len(audio_bytes) > MAX_AUDIO_BYTES:
