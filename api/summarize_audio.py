@@ -1,150 +1,264 @@
 import http.server
 import json
 import os
-import ssl
-import subprocess
+import re
 import tempfile
+import time
 from urllib.parse import urlparse, parse_qs
+import requests
 import google.generativeai as genai
 
-# --- SSL Certificate Verification Workaround ---
-try:
-    _create_unverified_https_context = ssl._create_unverified_context
-except AttributeError:
-    pass
-else:
-    ssl._create_default_https_context = _create_unverified_https_context
+# --------- CONFIG ---------
+GENAI_MODEL = os.getenv("GENAI_MODEL", "models/gemini-1.5-flash-latest")
+API_KEY = os.getenv("GEMINI_API_KEY")
 
-# --- Gemini API Configuration ---
-try:
-    genai.configure(api_key=os.environ.get("GEMINI_API_KEY"))
-except Exception as e:
-    print(f"[ERROR] Failed to configure Gemini API: {e}")
+# Prefer captions to avoid audio download (Vercel-friendly)
+FETCH_MODE = os.getenv("YOUTUBE_FETCH_MODE", "auto")  # "auto" | "transcript" | "audio"
 
-# --- Prompts ---
-SUMMARY_PROMPT = """
-You are a professional summarizer specializing in audio content. 
-Listen carefully to the provided audio and create a concise, well-structured summary.
-Your summary should capture the main topics, key arguments, and important insights from the audio.
+# Comma-separated lists (you can reorder or add more)
+INVIDIOUS_BASE_URLS = [u.strip() for u in os.getenv("INVIDIOUS_BASE_URLS", "https://yewtu.be,https://invidious.projectsegfau.lt").split(",") if u.strip()]
+PIPED_BASE_URLS     = [u.strip() for u in os.getenv("PIPED_BASE_URLS", "https://piped.video,https://piped.projectsegfau.lt").split(",") if u.strip()]
 
-Output the result in Korean, following this JSON format:
-'''json
+HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", "25"))  # per request
+MAX_AUDIO_BYTES = int(os.getenv("MAX_AUDIO_BYTES", str(120 * 1024 * 1024)))  # 120MB default
+
+PREFERRED_LANGS = [s.strip() for s in os.getenv("PREFERRED_LANGS", "ko,en,en-US").split(",")]
+
+SUMMARY_PROMPT = '''
+You are a professional Korean summarizer. Summarize the content for a busy professional.
+- Write in Korean.
+- Keep the most important facts, numbers, and named entities.
+- Structure:
+  1) 3~5문장 개요
+  2) 핵심 포인트 3~5개 (불릿)
+  3) 시사점/활용 아이디어 2~3개 (불릿)
+Return ONLY valid JSON using this schema:
 {
-  "summary": "오디오 전체 내용을 아우르는 3~4 문단의 핵심 요약문",
-  "key_insights": [
-    "오디오의 가장 중요한 통찰 또는 시사점 1",
-    "오디오의 가장 중요한 통찰 또는 시사점 2",
-    "그 외 주목할 만한 핵심 정보나 주장"
-  ]
+  "summary": "<개요 3~5문장>",
+  "key_insights": ["...", "...", "..."],
+  "actionable": ["...", "..."]
 }
 '''
-"""
 
-TAGGING_PROMPT_TEMPLATE = """
-You are an expert at identifying the main theme of a piece of content and categorizing it.
-Based on the provided summary, generate a single 'title' and a single 'tag' that best represent the content.
-All output text, including the title and tag, must be in Korean.
-
-[Rules]
-1. Title: Create a concise title in Korean that captures the core message of the summary.
-2. Tag: You must generate a single, very broad, and general Korean word for the tag. (Examples: IT, 경제, 과학, 역사, 자기계발, 건강, 문화, 시사, 예능, 교육)
-
-[Summary]
+TAGGING_PROMPT_TEMPLATE = '''
+다음 요약문을 보고 한국어 제목과 해시태그를 생성하세요.
+- 제목은 30자 이내로 간결하게
+- 해시태그는 5~8개, 소문자, 공백 없이, #표시 제외
+반드시 아래 JSON만 출력하세요.
+{
+  "title": "<30자 이내 제목>",
+  "tags": ["tag1","tag2","tag3","tag4","tag5"]
+}
+[요약]
 {summary_text}
-
-[Output Format]
-You must return the result in the following JSON format:
-'''json
-{
-  "title": "AI가 생성한 영상 제목",
-  "tag": "AI가 생성한 포괄적 주제 태그"
-}
 '''
-"""
 
-def clean_and_parse_json(raw_text):
-    cleaned_text = raw_text.replace('```json', '').replace('```', '').strip()
-    return json.loads(cleaned_text)
+JSON_OBJECT_RE = re.compile(r'\'{(?:[^\'{}]|(?R))*\}', re.DOTALL)
+
+def parse_first_json_block(text: str):
+    m = JSON_OBJECT_RE.search(text or "")
+    if not m:
+        raise ValueError("모델 출력에서 JSON 블록을 찾지 못했습니다.")
+    return json.loads(m.group(0))
+
+def extract_video_id(url: str) -> str:
+    u = urlparse(url)
+    if u.netloc.endswith("youtu.be"):
+        return u.path.strip("/")
+    qs = parse_qs(u.query)
+    if "v" in qs and qs["v"]:
+        return qs["v"][0]
+    # Shorts or other forms
+    m = re.search(r"/shorts/([A-Za-z0-9_-]{6,})", u.path or "")
+    if m: return m.group(1)
+    # Fallback: last path segment
+    seg = (u.path or "").rstrip("/").split("/")[-1]
+    if seg: return seg
+    raise ValueError("video_id 추출 실패")
+
+def invidious_transcript(video_id: str):
+    # 1) list captions
+    last_err = None
+    for base in INVIDIOUS_BASE_URLS:
+        try:
+            r = requests.get(f"{base}/api/v1/captions/{video_id}", timeout=HTTP_TIMEOUT)
+            if r.status_code != 200:
+                last_err = f"list {base} {r.status_code}"
+                continue
+            tracks = r.json()
+            # choose preferred language
+            chosen = None
+            # normalize language codes in data: they have \'language\' and \'languageCode\'
+            for pref in PREFERRED_LANGS:
+                for t in tracks:
+                    if t.get("languageCode") == pref or t.get("language") == pref:
+                        chosen = t
+                        break
+                if chosen: break
+            if not chosen and tracks:
+                chosen = tracks[0]
+            if not chosen:
+                last_err = "no captions"
+                continue
+            lang_code = chosen.get("languageCode") or chosen.get("language") or "en"
+            # 2) fetch captions
+            r2 = requests.get(f"{base}/api/v1/captions/{video_id}", params={"lang": lang_code, "format": "json3"}, timeout=HTTP_TIMEOUT)
+            if r2.status_code != 200:
+                last_err = f"fetch {base} {r2.status_code}"
+                continue
+            data = r2.json()
+            # Convert json3 events to text
+            lines = []
+            for ev in data.get("events", []):
+                seg = ""
+                for se in (ev.get("segs", []) or []):
+                    seg += se.get("utf8", "")
+                seg = seg.replace("\n", " ").strip()
+                if seg:
+                    lines.append(seg)
+            text = " ".join(lines)
+            if len(text) < 40:  # too short => treat as missing
+                last_err = "captions too short"
+                continue
+            return text
+        except Exception as e:
+            last_err = str(e)
+            continue
+    raise RuntimeError(f"Invidious 캡션 실패: {last_err}")
+
+def piped_best_audio_url(video_id: str):
+    last_err = None
+    for base in PIPED_BASE_URLS:
+        try:
+            r = requests.get(f"{base}/api/v1/streams/{video_id}", timeout=HTTP_TIMEOUT)
+            if r.status_code != 200:
+                last_err = f"streams {base} {r.status_code}"
+                continue
+            j = r.json()
+            audio = j.get("audioStreams") or []
+            # pick highest bitrate m4a/mp4a first
+            def score(a):
+                br = a.get("bitrate") or 0
+                # prefer m4a/mp4a over webm/opus for compatibility
+                c = (a.get("codec") or "").lower()
+                mime = (a.get("mimeType") or "").lower()
+                pref = 1 if ("mp4a" in c or "m4a" in mime) else 0
+                return (pref, br)
+            if not audio:
+                last_err = "no audio streams"
+                continue
+            best = sorted(audio, key=score, reverse=True)[0]
+            return best.get("url")
+        except Exception as e:
+            last_err = str(e)
+            continue
+    raise RuntimeError(f"Piped 오디오 URL 실패: {last_err}")
+
+def download_to_temp(url: str, max_bytes=MAX_AUDIO_BYTES) -> str:
+    # stream download
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; AIBookBeta/1.0)"}
+    with requests.get(url, headers=headers, stream=True, timeout=HTTP_TIMEOUT) as r:
+        r.raise_for_status()
+        suffix = ".m4a"
+        tmpf = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        total = 0
+        for chunk in r.iter_content(chunk_size=1024*256):
+            if not chunk: continue
+            tmpf.write(chunk)
+            total += len(chunk)
+            if total > max_bytes:
+                tmpf.close()
+                os.unlink(tmpf.name)
+                raise ValueError("오디오가 너무 큽니다 (MAX_AUDIO_BYTES 초과).")
+        tmpf.close()
+        return tmpf.name
+
+def summarize_text(model, text: str):
+    resp = model.generate_content([SUMMARY_PROMPT, f"[Transcript]\n{text}"])
+    data = parse_first_json_block(resp.text)
+    tag_resp = model.generate_content(
+        TAGGING_PROMPT_TEMPLATE.format(summary_text=data["summary"])
+    )
+    tags = parse_first_json_block(tag_resp.text)
+    return {**data, **tags}
+
+def summarize_audio(model, audio_path: str):
+    # Upload then wait for ACTIVE
+    f = genai.upload_file(path=audio_path, display_name=os.path.basename(audio_path))
+    start = time.time()
+    while True:
+        check = genai.get_file(f.name)
+        state = getattr(getattr(check, "state", None), "name", "")
+        if state == "ACTIVE":
+            break
+        if time.time() - start > 120:
+            raise TimeoutError(f"파일 처리 지연(state={state})")
+        time.sleep(1)
+    resp = model.generate_content([SUMMARY_PROMPT, check])
+    data = parse_first_json_block(resp.text)
+    tag_resp = model.generate_content(
+        TAGGING_PROMPT_TEMPLATE.format(summary_text=data["summary"])
+    )
+    tags = parse_first_json_block(tag_resp.text)
+    return {**data, **tags}
 
 class Handler(http.server.BaseHTTPRequestHandler):
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
+    def _json(self, code: int, payload: dict):
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
         self.end_headers()
+        self.wfile.write(json.dumps(payload, ensure_ascii=False).encode("utf-8"))
 
-        query_components = parse_qs(urlparse(self.path).query)
-        youtube_url = query_components.get("youtubeUrl", [None])[0]
+    def do_GET(self):
+        if not API_KEY:
+            return self._json(500, {"error": "GEMINI_API_KEY 환경변수가 필요합니다."})
+        genai.configure(api_key=API_KEY)
+        model = genai.GenerativeModel(GENAI_MODEL)
 
-        if not youtube_url:
-            self.wfile.write(json.dumps({"error": "youtubeUrl is required."}).encode('utf-8'))
-            return
+        qs = parse_qs(urlparse(self.path).query)
+        url = qs.get("youtubeUrl", [None])[0]
+        if not url:
+            return self._json(400, {"error": "youtubeUrl is required."})
 
-        temp_dir = tempfile.gettempdir()
+        mode = qs.get("mode", [FETCH_MODE])[0]  # override via query
+        video_id = None
         audio_path = None
-        
         try:
-            # 1. yt-dlp로 오디오 다운로드
-            print(f"[YTDLP_DL] Start downloading for: {youtube_url}")
-            
-            # Define a unique output filename
-            video_id = parse_qs(urlparse(youtube_url).query).get('v', [os.path.basename(urlparse(youtube_url).path)])[0]
-            output_filename = os.path.join(temp_dir, f"{video_id}.%(ext)s")
+            video_id = extract_video_id(url)
+            result = None
 
-            yt_dlp_path = os.path.join(os.path.dirname(__file__), 'yt-dlp')
-            command = [
-                yt_dlp_path,
-                '-f', 'bestaudio',
-                '-o', output_filename,
-                '--no-check-certificate',
-                '--no-cache-dir',
-                youtube_url
-            ]
+            if mode in ("auto", "transcript"):
+                try:
+                    text = invidious_transcript(video_id)
+                    result = summarize_text(model, text)
+                    return self._json(200, {**result, "mode": "transcript", "sourceUrl": url})
+                except Exception as e:
+                    if mode == "transcript":
+                        raise
+                    # else fall through to audio
 
-            proxy_url = os.environ.get("PROXY_URL")
-            if proxy_url:
-                print(f"[PROXY] Using proxy: {proxy_url}")
-                command.extend(['--proxy', proxy_url])
+            # Audio path (Piped proxy)
+            audio_url = piped_best_audio_url(video_id)
+            audio_path = download_to_temp(audio_url)
+            result = summarize_audio(model, audio_path)
+            return self._json(200, {**result, "mode": "audio", "sourceUrl": url})
 
-            process = subprocess.run(command, capture_output=True, text=True, timeout=180) # 3-minute timeout
-
-            if process.returncode != 0:
-                print(f"[YTDLP_DL] Failed. Stderr: {process.stderr}")
-                raise Exception(f"yt-dlp failed: {process.stderr}")
-            
-            # Find the actual downloaded file path (extension is unknown)
-            downloaded_files = [f for f in os.listdir(temp_dir) if f.startswith(video_id)]
-            if not downloaded_files:
-                raise Exception("Downloaded audio file not found.")
-            audio_path = os.path.join(temp_dir, downloaded_files[0])
-            print(f"[YTDLP_DL] Success. File path: {audio_path}")
-
-            # 2. Gemini 처리 (이하 동일)
-            print(f"[GEMINI_UPLOAD] Start uploading: {audio_path}")
-            audio_file = genai.upload_file(path=audio_path, display_name=video_id)
-            print(f"[GEMINI_UPLOAD] Success. File URI: {audio_file.uri}")
-
-            print("[GEMINI_SUMMARY] Start generating summary...")
-            model = genai.GenerativeModel(model_name='models/gemini-1.5-flash-latest')
-            summary_response = model.generate_content([SUMMARY_PROMPT, audio_file])
-            summary_data = clean_and_parse_json(summary_response.text)
-            print("[GEMINI_SUMMARY] Success.")
-            
-            print("[GEMINI_TAGGING] Start generating title and tag...")
-            tagging_model = genai.GenerativeModel(model_name='models/gemini-1.5-flash-latest')
-            tagging_prompt = TAGGING_PROMPT_TEMPLATE.format(summary_text=summary_data['summary'])
-            tagging_response = tagging_model.generate_content(tagging_prompt)
-            tagging_data = clean_and_parse_json(tagging_response.text)
-            print("[GEMINI_TAGGING] Success.")
-
-            final_data = {**summary_data, **tagging_data, "sourceUrl": youtube_url}
-            self.wfile.write(json.dumps(final_data).encode('utf-8'))
-
+        except ValueError as e:
+            return self._json(400, {"error": str(e)})
+        except TimeoutError as e:
+            return self._json(504, {"error": str(e)})
+        except requests.HTTPError as e:
+            return self._json(502, {"error": f"HTTP {e.response.status_code} while fetching media."})
         except Exception as e:
-            error_message = f"An error occurred: {str(e)}"
-            print(f"[ERROR] {error_message}")
-            self.wfile.write(json.dumps({"error": error_message}).encode('utf-8'))
-        
+            return self._json(502, {"error": f"Unhandled: {str(e)}"})
         finally:
             if audio_path and os.path.exists(audio_path):
-                os.remove(audio_path)
-                print(f"Cleaned up temporary file: {audio_path}")
+                try: os.remove(audio_path)
+                except: pass
+
+if __name__ == "__main__":
+    from http.server import HTTPServer
+    PORT = int(os.getenv("PORT", "8080"))
+    httpd = HTTPServer(("0.0.0.0", PORT), Handler)
+    print(f"Serving on :{PORT}")
+    httpd.serve_forever()
