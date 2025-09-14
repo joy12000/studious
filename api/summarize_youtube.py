@@ -5,6 +5,7 @@ import tempfile
 import certifi
 from urllib.parse import urlparse, parse_qs, urlencode, urlunparse, quote
 from http.server import BaseHTTPRequestHandler
+from youtube_transcript_api import YouTubeTranscriptApi
 
 # ==============================================================================
 # CONFIGURATION
@@ -12,7 +13,6 @@ from http.server import BaseHTTPRequestHandler
 GENAI_MODEL = os.getenv("GENAI_MODEL", "models/gemini-1.5-flash-latest")
 API_KEY = os.getenv("GEMINI_API_KEY")
 FETCH_MODE = os.getenv("YOUTUBE_FETCH_MODE", "auto")  # "auto" | "transcript" | "audio"
-INVIDIOUS_BASE_URLS = [u.strip() for u in os.getenv("INVIDIOUS_BASE_URLS", "https://yewtu.be,https://invidious.projectsegfau.lt,https://vid.puffyan.us,https://invidious.kavin.rocks,https://invidious.slipfox.xyz,https://iv.ggtyler.dev").split(",") if u.strip()]
 PIPED_BASE_URLS     = [u.strip() for u in os.getenv("PIPED_BASE_URLS", "https://piped.video,https://piped.kavin.rocks,https://piped.projectsegfau.lt,https://piped.garudalinux.org,https://piped.privacydev.net,https://p.plibre.com").split(",") if u.strip()]
 HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", "90"))
 MAX_AUDIO_BYTES = int(os.getenv("MAX_AUDIO_BYTES", str(120 * 1024 * 1024)))
@@ -57,12 +57,10 @@ def _make_request(url, params=None):
     """Makes a request, wrapping the URL with ScraperAPI if PROXY_URL is set."""
     target_url = url
     if params:
-        # requests.get handles params encoding, but we need to build the full URL for ScraperAPI
         param_str = "&" + urlencode(params)
         target_url += param_str
 
     if PROXY_URL:
-        # Robustly add the target url to the proxy url
         base_proxy_parts = urlparse(PROXY_URL)
         proxy_query_params = parse_qs(base_proxy_parts.query)
         proxy_query_params['url'] = target_url
@@ -94,7 +92,7 @@ def extract_first_json(text: str):
     if not text:
         raise ValueError("Empty response from model.")
     
-    match = re.search(r"{{.*}}", text, re.DOTALL)
+    match = re.search(r"\{{.*?\}}", text, re.DOTALL)
     if not match:
         raise ValueError("No JSON object found in the model's response.")
     
@@ -121,33 +119,15 @@ def extract_video_id(url: str) -> str:
 # ==============================================================================
 
 def get_transcript_text(video_id: str) -> str:
-    """Gets transcript text from any available Invidious instance."""
-    tracks = _get_from_any_host(INVIDIOUS_BASE_URLS, f"/api/v1/captions/{video_id}")
-    
-    chosen_track = None
-    for lang in PREFERRED_LANGS:
-        for track in tracks:
-            if track.get("language_code") == lang:
-                chosen_track = track
-                break
-        if chosen_track:
-            break
-    
-    if not chosen_track:
-        chosen_track = tracks[0] if tracks else None
-    
-    if not chosen_track:
-        raise RuntimeError("No captions available for this video.")
-
-    lang_code = chosen_track.get("language_code", "en")
-    caption_data = _get_from_any_host(INVIDIOUS_BASE_URLS, f"/api/v1/captions/{video_id}", params={"lang": lang_code, "format": "json3"})
-    
-    lines = [seg.get("utf8", "") for ev in caption_data.get("events", []) for seg in ev.get("segs", [])]
-    text = " ".join(line.strip() for line in lines if line.strip())
-    
-    if len(text) < 50:
-        raise RuntimeError("Transcript text is too short to be meaningful.")
-    return text
+    """Gets transcript text using youtube-transcript-api."""
+    try:
+        transcript_list = YouTubeTranscriptApi.get_transcript(video_id, languages=PREFERRED_LANGS)
+        text = " ".join([d['text'] for d in transcript_list])
+        if len(text) < 50:
+            raise RuntimeError("Transcript text is too short to be meaningful.")
+        return text
+    except Exception as e:
+        raise RuntimeError(f"youtube-transcript-api failed: {e}")
 
 def get_best_audio_url(video_id: str) -> str:
     """Gets the best audio stream URL from any available Piped instance."""

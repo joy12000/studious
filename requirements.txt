@@ -1,3 +1,4 @@
 requests
 google-generativeai
 certifi
+youtube-transcript-api
