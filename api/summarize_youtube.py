@@ -1,31 +1,37 @@
-import json, os, time, re
+import json, os, time, re, traceback
 from urllib.parse import urlparse, parse_qs
 import requests
 import google.generativeai as genai
+import tempfile
+from http.server import BaseHTTPRequestHandler
 
-# ---- CONFIG ----
-GENAI_MODEL = os.getenv("GENAI_MODEL", "models/gemini-2.0-flash")
+# ==============================================================================
+# CONFIGURATION
+# ==============================================================================
+GENAI_MODEL = os.getenv("GENAI_MODEL", "models/gemini-1.5-flash-latest")
 API_KEY = os.getenv("GEMINI_API_KEY")
-
-FETCH_MODE = os.getenv("YOUTUBE_FETCH_MODE", "auto")  # auto|transcript|audio
+FETCH_MODE = os.getenv("YOUTUBE_FETCH_MODE", "auto")  # "auto" | "transcript" | "audio"
 INVIDIOUS_BASE_URLS = [u.strip() for u in os.getenv("INVIDIOUS_BASE_URLS", "https://yewtu.be,https://invidious.projectsegfau.lt,https://vid.puffyan.us").split(",") if u.strip()]
-PIPED_BASE_URLS     = [u.strip() for u in os.getenv("PIPED_BASE_URLS", "https://piped.video,https://piped.projectsegfau.lt,https://piped.mha.fi").split(",") if u.strip()]
+PIPED_BASE_URLS = [u.strip() for u in os.getenv("PIPED_BASE_URLS", "https://piped.video,https://piped.projectsegfau.lt,https://piped.mha.fi").split(",") if u.strip()]
 HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", "25"))
 MAX_AUDIO_BYTES = int(os.getenv("MAX_AUDIO_BYTES", str(120 * 1024 * 1024)))
 PREFERRED_LANGS = [s.strip() for s in os.getenv("PREFERRED_LANGS", "ko,en,en-US").split(",")]
 
+# ==============================================================================
+# PROMPTS
+# ==============================================================================
 SUMMARY_PROMPT = """You are a professional Korean summarizer. Summarize the content for a busy professional.
 - Write in Korean.
 - Keep the most important facts, numbers, and named entities.
 - Structure:
-1) 3~5문장 개요
-2) 핵심 포인트 3~5개 (불릿)
-3) 시사점/활용 아이디어 2~3개 (불릿)
+  1) 3~5문장 개요
+  2) 핵심 포인트 3~5개 (불릿)
+  3) 시사점/활용 아이디어 2~3개 (불릿)
 Return ONLY valid JSON using this schema:
 {
-"summary": "<개요 3~5문장>",
-"key_insights": ["...", "...", "..."],
-"actionable": ["...", "..."]
+  "summary": "<개요 3~5문장>",
+  "key_insights": ["...", "...", "..."],
+  "actionable": ["...", "..."]
 }
 """
 
@@ -34,210 +40,189 @@ TAGGING_PROMPT_TEMPLATE = """다음 요약문을 보고 한국어 제목과 해�
 - 해시태그는 5~8개, 소문자, 공백 없이, #표시 제외
 반드시 아래 JSON만 출력하세요.
 {
-"title": "<30자 이내 제목>",
-"tags": ["tag1","tag2","tag3","tag4","tag5"]
+  "title": "<30자 이내 제목>",
+  "tags": ["tag1","tag2","tag3","tag4","tag5"]
 }
 [요약]
 {summary_text}
 """
 
+# ==============================================================================
+# HELPER FUNCTIONS
+# ==============================================================================
+
+def _get_from_any_host(base_urls, path, params=None):
+    """Iterates through a list of base URLs and returns the first successful JSON response."""
+    last_err = None
+    for base in base_urls:
+        try:
+            r = requests.get(f"{base}{path}", timeout=HTTP_TIMEOUT, params=params)
+            if r.status_code == 200:
+                return r.json()
+            last_err = f"host {base} returned status {r.status_code}"
+        except Exception as e:
+            last_err = str(e)
+    raise RuntimeError(f"All hosts failed. Last error: {last_err}")
+
 def extract_first_json(text: str):
+    """Finds and decodes the first valid JSON object block in a string."""
     if not text:
-        raise ValueError("빈 응답입니다.")
-    t = text.replace('```json', '```').replace('```JSON', '```')
-    while '```' in t:
-        a = t.find('```'); b = t.find('```', a+3)
-        if b == -1: break
-        t = t[:a] + t[b+3:]
-    start_obj = t.find('{'); start_arr = t.find('[')
-    starts = [i for i in [start_obj, start_arr] if i != -1]
-    if not starts: raise ValueError("JSON 시작 문자({ 또는 [)를 찾지 못했습니다.")
-    i = min(starts)
-    stack = []; in_str = False; esc = False; quote = ''
-    for j in range(i, len(t)):
-        c = t[j]
-        if in_str:
-            if esc: esc = False
-            elif c == '\\': esc = True
-            elif c == quote: in_str = False
-        else:
-            if c in ('"', "'"):
-                in_str = True; quote = c
-            elif c in '{[': stack.append(c)
-            elif c in '}]':
-                if not stack: break
-                top = stack[-1]
-                if (top == '{' and c == '}') or (top == '[' and c == ']'):
-                    stack.pop()
-                    if not stack:
-                        candidate = t[i:j+1]
-                        candidate = candidate.replace(',}', '}').replace(',]', ']')
-                        return json.loads(candidate)
-                else:
-                    break
-    raise ValueError("유효한 JSON 블록을 조립하지 못했습니다.")
+        raise ValueError("Empty response from model.")
+    
+    match = re.search(r"\{{.*\}}", text, re.DOTALL)
+    if not match:
+        raise ValueError("No JSON object found in the model's response.")
+    
+    try:
+        return json.loads(match.group(0))
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Failed to decode JSON: {e}")
 
 def extract_video_id(url: str) -> str:
+    """Extracts YouTube video ID from various URL formats."""
     u = urlparse(url)
-    if (u.netloc or "").endswith("youtu.be"):
+    if "youtu.be" in u.netloc:
         return u.path.strip("/")
-    qs = parse_qs(u.query or "")
-    if "v" in qs and qs["v"]:
+    qs = parse_qs(u.query)
+    if "v" in qs:
         return qs["v"][0]
-    m = re.search(r"/shorts/([A-Za-z0-9_-]{6,})", u.path or "")
-    if m: return m.group(1)
-    seg = (u.path or "").rstrip("/").split("/")[-1]
-    if seg: return seg
-    raise ValueError("video_id 추출 실패")
+    m = re.search(r"/shorts/([A-Za-z0-9_-]+)", u.path)
+    if m:
+        return m.group(1)
+    raise ValueError("Failed to extract video_id from URL.")
 
-def invidious_transcript(video_id: str):
-    last_err = None
-    for base in INVIDIOUS_BASE_URLS:
+# ==============================================================================
+# CORE LOGIC: FETCHING & SUMMARIZING
+# ==============================================================================
+
+def get_transcript_text(video_id: str) -> str:
+    """Gets transcript text from any available Invidious instance."""
+    tracks = _get_from_any_host(INVIDIOUS_BASE_URLS, f"/api/v1/captions/{video_id}")
+    
+    chosen_track = None
+    for lang in PREFERRED_LANGS:
+        for track in tracks:
+            if track.get("language_code") == lang:
+                chosen_track = track
+                break
+        if chosen_track:
+            break
+    
+    if not chosen_track:
+        chosen_track = tracks[0] if tracks else None
+    
+    if not chosen_track:
+        raise RuntimeError("No captions available for this video.")
+
+    lang_code = chosen_track.get("language_code", "en")
+    caption_data = _get_from_any_host(INVIDIOUS_BASE_URLS, f"/api/v1/captions/{video_id}", params={"lang": lang_code, "format": "json3"})
+    
+    lines = [seg.get("utf8", "") for ev in caption_data.get("events", []) for seg in ev.get("segs", [])]
+    text = " ".join(line.strip() for line in lines if line.strip())
+    
+    if len(text) < 50:
+        raise RuntimeError("Transcript text is too short to be meaningful.")
+    return text
+
+def get_best_audio_url(video_id: str) -> str:
+    """Gets the best audio stream URL from any available Piped instance."""
+    streams = _get_from_any_host(PIPED_BASE_URLS, f"/api/v1/streams/{video_id}")
+    audio_streams = streams.get("audioStreams", [])
+    if not audio_streams:
+        raise RuntimeError("No audio streams found.")
+
+    def score(stream):
+        is_m4a = "m4a" in stream.get("mimeType", "").lower()
+        bitrate = stream.get("bitrate", 0)
+        return (is_m4a, bitrate)
+
+    best_stream = sorted(audio_streams, key=score, reverse=True)[0]
+    return best_stream["url"]
+
+def summarize_content(model, content, is_audio=False, audio_filename="audio.m4a"):
+    """Summarizes text or audio content using the Gemini API."""
+    if is_audio:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".m4a") as f:
+            f.write(content)
+            temp_path = f.name
         try:
-            r = requests.get(f"{base}/api/v1/captions/{video_id}", timeout=HTTP_TIMEOUT)
-            if r.status_code != 200:
-                last_err = f"list {base} {r.status_code}"
-                continue
-            tracks = r.json()
-            chosen = None
-            for pref in PREFERRED_LANGS:
-                for t in tracks:
-                    if t.get("languageCode") == pref or t.get("language") == pref:
-                        chosen = t
-                        break
-                if chosen: break
-            if not chosen and tracks:
-                chosen = tracks[0]
-            if not chosen:
-                last_err = "no captions"
-                continue
-            lang_code = chosen.get("languageCode") or chosen.get("language") or "en"
-            r2 = requests.get(f"{base}/api/v1/captions/{video_id}", params={"lang": lang_code, "format": "json3"}, timeout=HTTP_TIMEOUT)
-            if r2.status_code != 200:
-                last_err = f"fetch {base} {r2.status_code}"
-                continue
-            data = r2.json()
-            lines = []
-            for ev in data.get("events", []):
-                seg = ""
-                for se in (ev.get("segs", []) or []):
-                    seg += se.get("utf8", "")
-                seg = seg.replace("\\n", " ").strip()
-                if seg:
-                    lines.append(seg)
-            text = " ".join(lines)
-            if len(text) < 40:
-                last_err = "captions too short"
-                continue
-            return text
-        except Exception as e:
-            last_err = str(e)
-            continue
-    raise RuntimeError(f"Invidious 캡션 실패: {last_err}")
+            audio_file = genai.upload_file(path=temp_path, display_name=audio_filename)
+            prompt_content = audio_file
+        finally:
+            os.remove(temp_path)
+    else:
+        prompt_content = f"[Transcript]\n{content}"
 
-def piped_best_audio_url(video_id: str):
-    last_err = None
-    for base in PIPED_BASE_URLS:
+    resp = model.generate_content([SUMMARY_PROMPT, prompt_content])
+    summary_data = extract_first_json(resp.text)
+    
+    tag_resp = model.generate_content(TAGGING_PROMPT_TEMPLATE.format(summary_text=summary_data["summary"]))
+    tag_data = extract_first_json(tag_resp.text)
+    
+    return {**summary_data, **tag_data}
+
+def _get_summary_data(youtube_url: str, requested_mode: str):
+    """Orchestrates the fetching and summarizing process."""
+    genai.configure(api_key=API_KEY)
+    model = genai.GenerativeModel(GENAI_MODEL)
+    video_id = extract_video_id(youtube_url)
+    
+    # --- Attempt 1: Transcript ---
+    if requested_mode in ("auto", "transcript"):
         try:
-            r = requests.get(f"{base}/api/v1/streams/{video_id}", timeout=HTTP_TIMEOUT)
-            if r.status_code != 200:
-                last_err = f"streams {base} {r.status_code}"
-                continue
-            j = r.json()
-            audio = j.get("audioStreams") or []
-            if not audio:
-                last_err = "no audio streams"
-                continue
-            def score(a):
-                br = a.get("bitrate") or 0
-                c = (a.get("codec") or "").lower()
-                mime = (a.get("mimeType") or "").lower()
-                pref = 1 if ("mp4a" in c or "m4a" in mime) else 0
-                return (pref, br)
-            best = sorted(audio, key=score, reverse=True)[0]
-            return best.get("url")
+            transcript = get_transcript_text(video_id)
+            result = summarize_content(model, transcript, is_audio=False)
+            return {**result, "mode": "transcript", "sourceUrl": youtube_url}
         except Exception as e:
-            last_err = str(e)
-            continue
-    raise RuntimeError(f"Piped 오디오 URL 실패: {last_err}")
-
-def download_to_bytes(url: str, max_bytes=MAX_AUDIO_BYTES) -> bytes:
+            if requested_mode == "transcript":
+                raise RuntimeError(f"Transcript-only mode failed: {e}")
+            # In "auto" mode, we fall through to audio
+    
+    # --- Attempt 2: Audio (Fallback) ---
+    audio_url = get_best_audio_url(video_id)
+    
     headers = {"User-Agent": "Mozilla/5.0 (compatible; AIBookBeta/1.0)"}
-    with requests.get(url, headers=headers, stream=True, timeout=HTTP_TIMEOUT) as r:
+    with requests.get(audio_url, headers=headers, stream=True, timeout=HTTP_TIMEOUT) as r:
         r.raise_for_status()
-        buf = bytearray()
-        for chunk in r.iter_content(262144):  # 256KB
-            buf.extend(chunk)
-            if len(buf) > max_bytes:
-                raise ValueError("오디오가 너무 큽니다 (MAX_AUDIO_BYTES 초과).")
-        return bytes(buf)
+        audio_bytes = r.content
+        if len(audio_bytes) > MAX_AUDIO_BYTES:
+            raise ValueError(f"Audio file is too large (> {MAX_AUDIO_BYTES // 1024 // 1024}MB).")
 
-def summarize_text(model, text: str):
-    resp = model.generate_content([SUMMARY_PROMPT, f"[Transcript]\n{text}"])
-    data = extract_first_json(resp.text)
-    tag_resp = model.generate_content(TAGGING_PROMPT_TEMPLATE.format(summary_text=data["summary"]))
-    tags = extract_first_json(tag_resp.text)
-    return {**data, **tags}
+    result = summarize_content(model, audio_bytes, is_audio=True)
+    return {**result, "mode": "audio", "sourceUrl": youtube_url}
 
-def summarize_audio_bytes(model, audio_bytes: bytes, filename="audio.m4a"):
-    import tempfile, os as _os
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".m4a") as f:
-        f.write(audio_bytes)
-        temp_path = f.name
-    try:
-        up = genai.upload_file(path=temp_path, display_name=filename)
-        start = time.time()
-        while True:
-            chk = genai.get_file(up.name)
-            state = getattr(getattr(chk, "state", None), "name", "")
-            if state == "ACTIVE": break
-            if time.time() - start > 120:
-                raise TimeoutError(f"파일 처리 지연(state={state})")
-            time.sleep(1)
-            resp = model.generate_content([SUMMARY_PROMPT, chk])
-            data = extract_first_json(resp.text)
-            tag_resp = model.generate_content(TAGGING_PROMPT_TEMPLATE.format(summary_text=data["summary"]))
-            tags = extract_first_json(tag_resp.text)
-            return {**data, **tags}
-    finally:
-        try: _os.remove(temp_path)
-        except: pass
+# ==============================================================================
+# VERCEL HANDLER CLASS
+# ==============================================================================
 
-def handler(request, response):
-    try:
-        if not API_KEY:
-            return response.status(500).json({"error": "GEMINI_API_KEY 환경변수가 필요합니다."})
-        genai.configure(api_key=API_KEY)
-        model = genai.GenerativeModel(GENAI_MODEL)
+class Handler(BaseHTTPRequestHandler):
+    def _send_json(self, status_code, body):
+        self.send_response(status_code)
+        self.send_header("Content-type", "application/json; charset=utf-8")
+        self.end_headers()
+        self.wfile.write(json.dumps(body, ensure_ascii=False).encode("utf-8"))
 
-        qs = parse_qs(urlparse(request.url).query)
-        url = (qs.get("youtubeUrl") or [None])[0]
-        if not url:
-            return response.status(400).json({"error": "youtubeUrl is required."})
+    def do_GET(self):
+        try:
+            if not API_KEY:
+                return self._send_json(500, {"error": "GEMINI_API_KEY environment variable is not set."})
 
-        mode = (qs.get("mode") or [FETCH_MODE])[0]
+            qs = parse_qs(urlparse(self.path).query)
+            url = (qs.get("youtubeUrl") or [None])[0]
+            if not url:
+                return self._send_json(400, {"error": "youtubeUrl is required."})
 
-        vid = extract_video_id(url)
-        if mode in ("auto", "transcript"):
-            try:
-                text = invidious_transcript(vid)
-                data = summarize_text(model, text)
-                return response.status(200).json({**data, "mode": "transcript", "sourceUrl": url})
-            except Exception as e:
-                if mode == "transcript":
-                    return response.status(502).json({"error": f"transcript failed: {str(e)}"})
-        audio_url = piped_best_audio_url(vid)
-        audio_bytes = download_to_bytes(audio_url)
-        data = summarize_audio_bytes(model, audio_bytes)
-        return response.status(200).json({**data, "mode": "audio", "sourceUrl": url})
+            mode = (qs.get("mode") or [FETCH_MODE])[0]
+            
+            data = _get_summary_data(url, mode)
+            return self._send_json(200, data)
 
-    except ValueError as e:
-        return response.status(400).json({"error": str(e)})
-    except TimeoutError as e:
-        return response.status(504).json({"error": str(e)})
-    except requests.HTTPError as e:
-        code = getattr(getattr(e, "response", None), "status_code", 502)
-        return response.status(502).json({"error": f"HTTP {code} while fetching media."})
-    except Exception as e:
-        import traceback
-        return response.status(502).json({"error": f"Unhandled: {str(e)}", "trace": traceback.format_exc()})
+        except (ValueError, TypeError) as e:
+            return self._send_json(400, {"error": f"Invalid request: {e}"})
+        except TimeoutError as e:
+            return self._send_json(504, {"error": f"A timeout occurred: {e}"})
+        except requests.HTTPError as e:
+            return self._send_json(e.response.status_code, {"error": f"Failed to fetch media: {e}"})
+        except Exception as e:
+            print(f"Unhandled Exception: {e}\n{traceback.format_exc()}")
+            return self._send_json(500, {"error": "An internal server error occurred."})
