@@ -338,7 +338,7 @@ export default function NotePage() {
                 </div>
               ) : (
                 <div>
-                  <div className="prose prose-slate max-w-none dark:prose-invert prose-p:[line-height:2.0] prose-headings:font-semibold" 
+                  <div className="note-content-line-height prose prose-slate max-w-none dark:prose-invert prose-headings:font-semibold" 
                        dangerouslySetInnerHTML={{ __html: note.content }} />
 
                   {/* 🚀 핵심 인사이트 섹션 추가 */}

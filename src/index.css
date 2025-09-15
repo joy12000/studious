@@ -76,6 +76,10 @@
   html, #root {
     @apply h-full;
   }
+
+  .note-content-line-height p {
+    line-height: 2.5 !important;
+  }
 }
 
 /* TipTap Editor Styles */
