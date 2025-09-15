@@ -2,7 +2,7 @@ import React, { useRef } from 'react';
 import { FileUp } from 'lucide-react'; // 아이콘 변경
 import { Note } from '../lib/types';
 import { decryptJSON, EncryptedPayload } from '../lib/crypto';
-import { importPlain, importEncrypted } from '../lib/backup'; // 🚀 GEMINI: importPlain, importEncrypted 임포트
+import { addPlainNotesFromFile, addEncryptedNotesFromFile } from '../lib/backup'; // 🚀 GEMINI: addPlainNotesFromFile, addEncryptedNotesFromFile 임포트
 
 interface ImportButtonProps {
   // onImport: (note: Partial<Note>) => Promise<void>; // 🚀 GEMINI: onImport prop 제거
@@ -46,9 +46,9 @@ export default function ImportButton(/* 🚀 GEMINI: onImport prop 제거 */) {
             alert('비밀번호가 입력되지 않아 가져오기를 취소합니다.');
             return;
           }
-          importedCount = await importEncrypted(file, passphrase); // 🚀 GEMINI: importEncrypted 호출
+          importedCount = await addEncryptedNotesFromFile(file, passphrase); // 🚀 GEMINI: addEncryptedNotesFromFile 호출
         } else {
-          importedCount = await importPlain(file); // 🚀 GEMINI: importPlain 호출
+          importedCount = await addPlainNotesFromFile(file); // 🚀 GEMINI: addPlainNotesFromFile 호출
         }
 
         alert(`${importedCount}개의 노트를 성공적으로 가져왔습니다!`);

@@ -84,7 +84,7 @@ export default function SettingsPage(){
               <Menu className="h-6 w-6" />
             </Button>
             <div>
-              <h1 className="text-2xl font-bold tracking-tight">앱 설정</h1>
+              <h1 className="text-xl font-semibold tracking-tight">앱 설정</h1>
               <p className="text-sm text-muted-foreground">테마, 데이터 관리, 백업 등을 설정합니다.</p>
             </div>
           </div>

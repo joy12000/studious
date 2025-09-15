@@ -2,6 +2,7 @@
 import { db } from './db';
 import { encryptJSON, decryptJSON, EncryptedPayload } from './crypto';
 import type { Note, AppSettings } from './types';
+import { v4 as uuidv4 } from 'uuid'; // 🚀 GEMINI: uuid 임포트
 
 /**
  * Defines the structure for the exported data, ensuring versioning.
@@ -104,6 +105,62 @@ async function restore(data: ExportedData): Promise<number> {
   }
 
   return data.notes.length;
+}
+
+/**
+ * Adds notes from a backup data object to the database. This operation merges notes and does not clear existing data. It generates new IDs for imported notes to avoid conflicts.
+ * @param data The backup data containing notes to add.
+ * @returns The number of notes added.
+ */
+export async function addNotesFromBackup(data: ExportedData): Promise<number> {
+  if (data?.version !== 1 || !Array.isArray(data.notes)) {
+    throw new Error('Unknown or invalid backup format for adding notes.');
+  }
+
+  let addedCount = 0;
+  await db.transaction('rw', db.notes, async () => {
+    for (const note of data.notes) {
+      // Generate a new ID for the imported note to avoid conflicts with existing notes
+      const newNote = { ...note, id: uuidv4(), createdAt: Date.now(), updatedAt: Date.now() };
+      await db.notes.add(newNote);
+      addedCount++;
+    }
+  });
+  return addedCount;
+}
+
+/**
+ * Imports notes from a plain JSON file and adds them to the database.
+ * @param file The File object to import.
+ * @returns The number of notes added.
+ */
+export async function addPlainNotesFromFile(file: File): Promise<number> {
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text) as ExportedData;
+    return await addNotesFromBackup(data);
+  } catch (error) {
+    console.error('Failed to add plain notes from file:', error);
+    throw new Error('Invalid file or format for adding notes.');
+  }
+}
+
+/**
+ * Imports notes from an encrypted JSON file, decrypts them, and adds them to the database.
+ * @param file The File object to import.
+ * @param passphrase The password to decrypt the file.
+ * @returns The number of notes added.
+ */
+export async function addEncryptedNotesFromFile(file: File, passphrase: string): Promise<number> {
+  try {
+    const text = await file.text();
+    const encryptedPayload = JSON.parse(text) as EncryptedPayload;
+    const data = await decryptJSON<ExportedData>(encryptedPayload, passphrase);
+    return await addNotesFromBackup(data);
+  } catch (error) {
+    console.error('Failed to add encrypted notes from file:', error);
+    throw new Error('Invalid file, format, or incorrect passphrase for adding notes.');
+  }
 }
 
 /**
