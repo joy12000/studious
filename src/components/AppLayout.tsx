@@ -140,7 +140,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               size="icon"
               className="absolute top-3 left-4 z-20 md:hidden" // 모바일에서만 보이도록
             >
-              <Menu className="h-7 w-7" />
+              <Menu className="h-6 w-6" /> {/* 아이콘 크기 조정 */}
             </Button>
           )}
           {children}
