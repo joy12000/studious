@@ -4,6 +4,12 @@
       "maxDuration": 300
     }
   },
+  "routes": [
+    {
+      "src": "/api/summarize_youtube",
+      "dest": "/api/summarize_youtube.py"
+    }
+  ],
   "rewrites": [
     { "source": "/((?!/api/|.*\\..*).*) ", "destination": "/index.html" }
   ]
