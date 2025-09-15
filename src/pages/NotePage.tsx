@@ -6,6 +6,7 @@ import ShareModal from '../components/ShareModal';
 import AttachmentPanel from '../components/AttachmentPanel';
 import { exportEncrypted, exportPlain } from '../lib/backup';
 import { v4 as uuidv4 } from 'uuid';
+import { marked } from 'marked';
 import { 
   ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube
 } from 'lucide-react';
@@ -338,8 +339,8 @@ export default function NotePage() {
                 </div>
               ) : (
                 <div>
-                  <div className="note-content-line-height prose prose-slate max-w-none dark:prose-invert prose-headings:font-semibold" 
-                       dangerouslySetInnerHTML={{ __html: note.content }} />
+                  <div className="note-content-line-height prose prose-slate max-w-none dark:prose-invert prose-headings:font-semibold leading-relaxed" 
+                       dangerouslySetInnerHTML={{ __html: marked(note.content) as string }} />
 
                   {/* 🚀 핵심 인사이트 섹션 추가 */}
                   {note.key_insights && note.key_insights.length > 0 && (
