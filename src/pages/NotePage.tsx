@@ -340,7 +340,7 @@ export default function NotePage() {
               ) : (
                 <div>
                   <div className="note-content-line-height prose prose-slate max-w-none dark:prose-invert prose-headings:font-semibold leading-relaxed" 
-                       dangerouslySetInnerHTML={{ __html: marked(note.content) as string }} />
+                       dangerouslySetInnerHTML={{ __html: marked(note.content, { breaks: true }) as string }} />
 
                   {/* 🚀 핵심 인사이트 섹션 추가 */}
                   {note.key_insights && note.key_insights.length > 0 && (
