@@ -1,11 +1,11 @@
-
 import React, { useRef } from 'react';
 import { FileUp } from 'lucide-react'; // 아이콘 변경
 import { Note } from '../lib/types';
 import { decryptJSON, EncryptedPayload } from '../lib/crypto';
+import { importPlain, importEncrypted } from '../lib/backup'; // 🚀 GEMINI: importPlain, importEncrypted 임포트
 
 interface ImportButtonProps {
-  onImport: (note: Partial<Note>) => Promise<void>;
+  // onImport: (note: Partial<Note>) => Promise<void>; // 🚀 GEMINI: onImport prop 제거
 }
 
 function isEncryptedPayload(data: unknown): data is EncryptedPayload {
@@ -22,7 +22,7 @@ function isEncryptedPayload(data: unknown): data is EncryptedPayload {
   );
 }
 
-export default function ImportButton({ onImport }: ImportButtonProps) {
+export default function ImportButton(/* 🚀 GEMINI: onImport prop 제거 */) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -38,7 +38,7 @@ export default function ImportButton({ onImport }: ImportButtonProps) {
         }
         const data = JSON.parse(text);
 
-        let noteToImport: Partial<Note>;
+        let importedCount: number; // 🚀 GEMINI: 가져온 노트 수를 저장할 변수
 
         if (isEncryptedPayload(data)) {
           const passphrase = prompt('이 노트는 암호화되어 있습니다. 복호화 비밀번호를 입력하세요:');
@@ -46,38 +46,14 @@ export default function ImportButton({ onImport }: ImportButtonProps) {
             alert('비밀번호가 입력되지 않아 가져오기를 취소합니다.');
             return;
           }
-          try {
-            const decryptedData = await decryptJSON<Partial<Note>>(data, passphrase);
-            noteToImport = {
-              title: decryptedData.title || '가져온 노트',
-              content: decryptedData.content || '',
-              topics: decryptedData.topics || [],
-              labels: decryptedData.labels || [],
-              sourceUrl: decryptedData.sourceUrl || '',
-              sourceType: decryptedData.sourceType || 'web',
-            };
-          } catch (decryptError) {
-            console.error('복호화 실패:', decryptError);
-            alert('복호화에 실패했습니다. 비밀번호가 정확한지 확인해주세요.');
-            return;
-          }
+          importedCount = await importEncrypted(file, passphrase); // 🚀 GEMINI: importEncrypted 호출
         } else {
-          if (!data.content) {
-            alert('가져오기 실패: 파일에 "content" 필드가 필요합니다.');
-            return;
-          }
-          noteToImport = {
-            title: data.title || '가져온 노트',
-            content: data.content,
-            topics: data.topics || [],
-            labels: data.labels || [],
-            sourceUrl: data.sourceUrl || '',
-            sourceType: data.sourceType || 'web',
-          };
+          importedCount = await importPlain(file); // 🚀 GEMINI: importPlain 호출
         }
 
-        await onImport(noteToImport);
-        alert('노트를 성공적으로 가져왔습니다!');
+        alert(`${importedCount}개의 노트를 성공적으로 가져왔습니다!`);
+        // 🚀 GEMINI: 페이지 새로고침하여 변경사항 반영
+        location.reload();
 
       } catch (error) {
         console.error('노트 가져오기 오류:', error);

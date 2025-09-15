@@ -125,7 +125,7 @@ export default function NoteListPage() { // 이름 변경: HomePage -> NoteListP
 
       {/* 플로팅 액션 버튼 */}
       <div className="fixed bottom-4 right-4 flex flex-row items-center gap-3">
-        <ImportButton onImport={addNote} />
+        <ImportButton />
       </div>
     </div>
   );
