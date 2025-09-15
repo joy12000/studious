@@ -39,6 +39,14 @@ export default defineConfig({
           
           enctype: 'application/x-www-form-urlencoded',params: { title: 'title', text: 'text', url: 'url' }
         }
+      },
+      workbox: {
+        runtimeCaching: [
+          {
+            urlPattern: /^\/api\//, // API 요청은 네트워크만 사용
+            handler: 'NetworkOnly'
+          }
+        ]
       }
     })
   ],
