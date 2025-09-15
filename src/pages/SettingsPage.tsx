@@ -1,15 +1,16 @@
-
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Home, Smartphone, RefreshCcw, Sun, Moon, Trash2 } from 'lucide-react';
+import { ArrowLeft, Home, Smartphone, RefreshCcw, Sun, Moon, Trash2, Menu } from 'lucide-react'; // GEMINI: Menu 아이콘 추가
 import { canInstall, onCanInstallChange, promptInstall } from '../lib/install';
 import { useNotes } from '../lib/useNotes';
 import BackupPanel from '../components/BackupPanel';
 import DataUsagePanel from '../components/DataUsagePanel';
+import { useSidebar } from '../components/AppLayout'; // GEMINI: useSidebar 훅 임포트
 
 import { db } from '../lib/db';
 import type { AppSettings } from '../lib/types';
 import { autoBackupIfNeeded } from '../lib/backup';
 import VersionBadge from '../components/VersionBadge';
+import { Button } from '@/components/ui/button'; // GEMINI: Button 임포트
 
 type TabKey = 'general'|'backup'|'data'|'app';
 
@@ -29,6 +30,7 @@ export default function SettingsPage(){
   const [tab, setTab] = useState<TabKey>('general');
   const [installable, setInstallable] = useState(canInstall());
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const { setIsSidebarOpen } = useSidebar(); // GEMINI: useSidebar 훅 사용
 
   useEffect(()=>{ const off = onCanInstallChange(setInstallable); return off; }, []);
   useEffect(()=>{ (async ()=>{ const s = await db.settings.get('default'); setSettings(s || null); })(); }, []);
@@ -72,6 +74,15 @@ export default function SettingsPage(){
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b p-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-4">
+            {/* 🚀 GEMINI: 메뉴 버튼 추가 */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden" // 데스크탑에서는 숨김
+              onClick={() => setIsSidebarOpen(true)}
+            >
+              <Menu className="h-6 w-6" />
+            </Button>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">앱 설정</h1>
               <p className="text-sm text-muted-foreground">테마, 데이터 관리, 백업 등을 설정합니다.</p>
