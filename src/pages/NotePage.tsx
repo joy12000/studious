@@ -255,20 +255,20 @@ export default function NotePage() {
       <div className="flex h-full flex-col bg-background">
         {/* Header */}
         <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 p-2 backdrop-blur-lg md:p-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} aria-label="뒤로 가기">
+          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} aria-label="뒤로 가기">
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" onClick={handleToggleFavorite} title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}>
+            <Button variant="ghost" size="sm" onClick={handleToggleFavorite} title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}>
               <Star className={`h-5 w-5 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => setEditing(v => !v)} title="편집">
+            <Button variant="ghost" size="sm" onClick={() => setEditing(v => !v)} title="편집">
               <Edit className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => setIsShareModalOpen(true)} title="공유/내보내기">
+            <Button variant="ghost" size="sm" onClick={() => setIsShareModalOpen(true)} title="공유/내보내기">
               <Share2 className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" onClick={handleDelete} className="text-destructive hover:text-destructive" title="삭제">
+            <Button variant="ghost" size="sm" onClick={handleDelete} className="text-destructive hover:text-destructive" title="삭제">
               <Trash2 className="h-5 w-5" />
             </Button>
           </div>
