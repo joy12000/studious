@@ -1,4 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
 import { Note } from './types';
 
@@ -18,70 +19,52 @@ export interface AddNotePayload {
 }
 
 export function useNotes() {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<Filters>({ dateRange: 'all' });
 
-  const loadNotes = useCallback(async () => {
-    setLoading(true);
-    try {
-      let query;
-      if (filters.dateRange && filters.dateRange !== 'all') {
-        const now = new Date();
-        let cutoffDate: Date;
-        if (filters.dateRange === 'today') {
-          cutoffDate = new Date(now.setDate(now.getDate() - 1));
-        } else if (filters.dateRange === '7days') {
-          cutoffDate = new Date(now.setDate(now.getDate() - 7));
-        } else { // 30days
-          cutoffDate = new Date(now.setDate(now.getDate() - 30));
-        }
-        query = db.notes.where('createdAt').above(cutoffDate.toISOString());
-      } else {
-        query = db.notes.toCollection();
+  const notes = useLiveQuery(async () => {
+    let query;
+    if (filters.dateRange && filters.dateRange !== 'all') {
+      const now = new Date();
+      let cutoffDate: Date;
+      if (filters.dateRange === 'today') {
+        cutoffDate = new Date(now.setDate(now.getDate() - 1));
+      } else if (filters.dateRange === '7days') {
+        cutoffDate = new Date(now.setDate(now.getDate() - 7));
+      } else { // 30days
+        cutoffDate = new Date(now.setDate(now.getDate() - 30));
       }
-
-      let notesFromDb = await query.reverse().sortBy('updatedAt');
-
-      if (filters.search) {
-        const searchQuery = filters.search.toLowerCase();
-        notesFromDb = notesFromDb.filter(n =>
-          n.title.toLowerCase().includes(searchQuery) ||
-          n.content.toLowerCase().includes(searchQuery)
-        );
-      }
-
-      if (filters.tag) {
-        notesFromDb = notesFromDb.filter(n => n.tag === filters.tag);
-      }
-
-      if (filters.favorite) {
-        notesFromDb = notesFromDb.filter(n => n.favorite);
-      }
-
-      setNotes(notesFromDb);
-    } catch (error) {
-      console.error("Failed to load notes:", error);
-      setNotes([]);
-    } finally {
-      setLoading(false);
+      query = db.notes.where('createdAt').above(cutoffDate.toISOString());
+    } else {
+      query = db.notes.toCollection();
     }
+
+    let notesFromDb = await query.reverse().sortBy('updatedAt');
+
+    if (filters.search) {
+      const searchQuery = filters.search.toLowerCase();
+      notesFromDb = notesFromDb.filter(n =>
+        n.title.toLowerCase().includes(searchQuery) ||
+        n.content.toLowerCase().includes(searchQuery)
+      );
+    }
+
+    if (filters.tag) {
+      notesFromDb = notesFromDb.filter(n => n.tag === filters.tag);
+    }
+
+    if (filters.favorite) {
+      notesFromDb = notesFromDb.filter(n => n.favorite);
+    }
+
+    return notesFromDb;
   }, [filters]);
 
-  useEffect(() => {
-    loadNotes();
-  }, [loadNotes]);
+  const loading = notes === undefined;
 
   const toggleFavorite = async (id: string) => {
-    const note = notes.find(n => n.id === id);
+    const note = await db.notes.get(id);
     if (!note) return;
-    
-    const updatedFavoriteStatus = !note.favorite;
-    await db.notes.update(id, { favorite: updatedFavoriteStatus });
-
-    setNotes(prevNotes =>
-      prevNotes.map(n => n.id === id ? { ...n, favorite: updatedFavoriteStatus } : n)
-    );
+    await db.notes.update(id, { favorite: !note.favorite });
   };
 
   // 🚀 SSE를 처리하도록 addNote 함수 수정
@@ -135,7 +118,6 @@ ${errorBody.substring(0, 1000)}`);
       };
 
       await db.notes.add(newNote);
-      setNotes(prevNotes => [newNote, ...prevNotes]);
       onComplete(newNote);
 
     } catch (err) {
@@ -147,19 +129,15 @@ ${errorBody.substring(0, 1000)}`);
   
   const updateNote = async (id: string, patch: Partial<Note>) => {
     await db.notes.update(id, { ...patch, updatedAt: new Date().getTime() });
-    setNotes(prevNotes =>
-      prevNotes.map(n => n.id === id ? { ...n, ...patch, updatedAt: new Date().getTime() } : n)
-    );
   };
 
   const deleteNote = async (id: string) => {
     await db.notes.delete(id);
-    setNotes(prevNotes => prevNotes.filter(n => n.id !== id));
   };
 
   const getNote = useCallback(async (id: string): Promise<Note | undefined> => {
     return await db.notes.get(id);
   }, []);
 
-  return { notes, loading, filters, setFilters, toggleFavorite, addNote, updateNote, deleteNote, getNote };
+  return { notes: notes || [], loading, filters, setFilters, toggleFavorite, addNote, updateNote, deleteNote, getNote };
 }

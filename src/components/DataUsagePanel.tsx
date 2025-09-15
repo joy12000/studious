@@ -32,14 +32,34 @@ export default function DataUsagePanel(){
     })();
   }, []);
 
-  async function purgeEmpty(){
+  async function deduplicateNotesByUrl(){
     const notes = await db.notes.toArray();
-    const empties = notes.filter(n => !String(n?.content||'').trim());
-    if (!empties.length) { alert('삭제할 빈 노트가 없습니다.'); return; }
-    if (!confirm(`빈 노트 ${empties.length}개를 삭제할까요?`)) return;
-    await db.transaction('rw', db.notes, async () => {
-      for (const n of empties) await db.notes.delete(n.id);
-    });
+    const notesWithUrl = notes.filter(n => n.sourceUrl);
+
+    const notesByUrl = new Map<string, any[]>();
+    for (const note of notesWithUrl) {
+      if (!notesByUrl.has(note.sourceUrl!)) {
+        notesByUrl.set(note.sourceUrl!, []);
+      }
+      notesByUrl.get(note.sourceUrl!)!.push(note);
+    }
+
+    const duplicatesToDelete: any[] = [];
+    for (const [url, groupedNotes] of notesByUrl.entries()) {
+      if (groupedNotes.length > 1) {
+        groupedNotes.sort((a, b) => b.updatedAt - a.updatedAt);
+        duplicatesToDelete.push(...groupedNotes.slice(1));
+      }
+    }
+
+    if (!duplicatesToDelete.length) {
+      alert('삭제할 중복 노트가 없습니다.');
+      return;
+    }
+
+    if (!confirm(`중복된 노트 ${duplicatesToDelete.length}개를 삭제할까요? 가장 최근에 업데이트된 노트만 남깁니다.`)) return;
+
+    await db.notes.bulkDelete(duplicatesToDelete.map(n => n.id));
     location.reload();
   }
 
@@ -71,9 +91,9 @@ export default function DataUsagePanel(){
       </div>
 
       <div className="flex items-center justify-between pt-2">
-        <div className="text-xs text-muted-foreground/90">빈 노트 정리로 약간의 공간을 확보할 수 있습니다.</div>
-        <button onClick={purgeEmpty} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-card/50 hover:bg-card/80 text-sm transition-colors">
-          <Trash2 className="h-4 w-4" /> 빈 노트 삭제
+        <div className="text-xs text-muted-foreground/90">유튜브 링크가 동일한 노트 중 가장 최신 버전을 남기고 정리합니다.</div>
+        <button onClick={deduplicateNotesByUrl} className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-card/50 hover:bg-card/80 text-sm transition-colors">
+          <Trash2 className="h-4 w-4" /> 중복 노트 삭제
         </button>
       </div>
     </div>
