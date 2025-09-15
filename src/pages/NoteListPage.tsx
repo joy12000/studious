@@ -4,7 +4,6 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useNotes } from '../lib/useNotes';
 import NoteCard from '../components/NoteCard';
 import FilterBar from '../components/FilterBar';
-import PasteFAB from '../components/PasteFAB';
 import ImportButton from '../components/ImportButton';
 import { Pin, Plus, LayoutGrid, List, Menu } from 'lucide-react'; // GEMINI: Menu 아이콘 추가
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -44,20 +43,6 @@ export default function NoteListPage() { // 이름 변경: HomePage -> NoteListP
     const rest = arr.filter(n => !n.favorite);
     return [...favs, ...rest];
   }, [notes]);
-
-  const handlePaste = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) {
-        navigate(`/capture?text=${encodeURIComponent(text)}`);
-      } else {
-        alert('클립보드에 텍스트가 없습니다.');
-      }
-    } catch (err) {
-      console.error('클립보드 읽기 실패:', err);
-      alert('클립보드를 읽는 데 실패했습니다. 브라우저 권한을 확인해주세요.');
-    }
-  };
 
   return (
     <div className="flex h-full flex-col">
@@ -141,7 +126,6 @@ export default function NoteListPage() { // 이름 변경: HomePage -> NoteListP
       {/* 플로팅 액션 버튼 */}
       <div className="fixed bottom-4 right-4 flex flex-row items-center gap-3">
         <ImportButton onImport={addNote} />
-        <PasteFAB onClick={handlePaste} />
       </div>
     </div>
   );
