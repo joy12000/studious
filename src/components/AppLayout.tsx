@@ -109,10 +109,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
 
   // 노트 상세 페이지, 노트 목록, 설정 페이지에서는 메뉴 버튼 숨김
-  const showMenuButton = 
-    !location.pathname.startsWith('/note/') && 
-    location.pathname !== '/notes' && 
-    location.pathname !== '/settings';
+  const isNotePage = location.pathname.startsWith('/note/');
+  const isNoteListPage = location.pathname === '/notes';
+  const isSettingsPage = location.pathname === '/settings';
+
+  const showMenuButton = !(isNotePage || isNoteListPage || isSettingsPage);
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, setIsSidebarOpen }}>
@@ -140,7 +141,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               size="icon"
               className="absolute top-3 left-4 z-20 md:hidden" // 모바일에서만 보이도록
             >
-              <Menu className="h-6 w-6" /> {/* 아이콘 크기 조정 */}
+              <Menu className="h-7 w-7" />
             </Button>
           )}
           {children}
