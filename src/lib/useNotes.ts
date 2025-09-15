@@ -96,7 +96,7 @@ export function useNotes() {
 
       onProgress("AI가 핵심 내용을 요약하고 있습니다...");
 
-      const response = await fetch(`/api/summarize_youtube?youtubeUrl=${encodeURIComponent(youtubeUrl)}`);
+      const response = await fetch(`/api/summarize_youtube?youtubeUrl=${encodeURIComponent(youtubeUrl)}&_cacheBust=${Date.now()}`);
       
       const contentType = response.headers.get("content-type");
       const isJson = contentType && contentType.includes("application/json");
