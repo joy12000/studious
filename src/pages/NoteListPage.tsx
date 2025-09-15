@@ -99,8 +99,12 @@ export default function NoteListPage() { // 이름 변경: HomePage -> NoteListP
                     </Tooltip>
                   </ToggleGroup>
                   <Tooltip>
-                    <TooltipTrigger asChild><Link to="/capture" className="p-2 text-foreground hover:bg-muted rounded-lg transition-colors"><Plus className="h-5 w-5" /></Link></TooltipTrigger>
-                    <TooltipContent><p>새 노트</p></TooltipContent>
+                    <TooltipTrigger asChild>
+                      <button onClick={() => navigate('/', { state: { focusInput: true } })} className="p-2 text-foreground hover:bg-muted rounded-lg transition-colors">
+                        <Plus className="h-5 w-5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>새 영상 요약</p></TooltipContent>
                   </Tooltip>
                   <Tooltip>
                     <TooltipTrigger asChild><button onClick={()=>setPinFav(v=>!v)} className={`p-2 rounded-lg transition-colors ${pinFav ? 'text-primary bg-primary/10' : 'text-foreground hover:bg-muted'}`}><Pin className={`h-5 w-5 ${pinFav ? 'fill-current' : ''}`} /></button></TooltipTrigger>

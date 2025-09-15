@@ -38,7 +38,7 @@ const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolea
       <Button asChild variant={isActive ? "secondary" : "ghost"} className="justify-start" onClick={handleLinkClick}>
         <Link to={to} className="flex items-center w-full">
           {icon}
-          {!isCollapsed && <span className="ml-2 truncate">{children}</span>}
+          {!isCollapsed && <span className="ml-2 truncate min-w-0">{children}</span>}
         </Link>
       </Button>
     );
@@ -96,7 +96,7 @@ const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolea
           </Button>
         )}
         <p className={`text-xs text-muted-foreground mt-2 text-center w-full transition-opacity ${isCollapsed ? 'opacity-0' : 'opacity-100'}`}>
-          v1.0.0
+          
         </p>
       </div>
     </div>
@@ -106,6 +106,10 @@ const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolea
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false); // 데스크탑 접기 상태
+  const location = useLocation();
+
+  // 노트 상세 페이지에서는 메뉴 버튼 숨김
+  const showMenuButton = !location.pathname.startsWith('/note/');
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, setIsSidebarOpen }}>
@@ -118,7 +122,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         )}
 
         <aside
-          className={`fixed inset-y-0 left-0 z-40 border-r bg-background/95 backdrop-blur-lg p-4 transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 shadow-xl
+          className={`w-4/5 max-w-sm fixed inset-y-0 left-0 z-40 border-r bg-background/95 backdrop-blur-lg p-4 transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 shadow-xl
             ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
             ${isCollapsed ? 'md:w-20' : 'md:w-64'}`}
         >
@@ -126,14 +130,16 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
         </aside>
 
         <main className="flex-1 overflow-y-auto relative">
-          <Button
-            onClick={() => setIsSidebarOpen(true)}
-            variant="ghost"
-            size="icon"
-            className="absolute top-4 left-4 z-20 md:hidden" // 모바일에서만 보이도록
-          >
-            <Menu className="h-6 w-6" />
-          </Button>
+          {showMenuButton && (
+            <Button
+              onClick={() => setIsSidebarOpen(true)}
+              variant="ghost"
+              size="icon"
+              className="absolute top-4 left-4 z-20 md:hidden" // 모바일에서만 보이도록
+            >
+              <Menu className="h-7 w-7" />
+            </Button>
+          )}
           {children}
         </main>
       </div>

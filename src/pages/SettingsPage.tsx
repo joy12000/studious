@@ -71,9 +71,6 @@ export default function SettingsPage(){
       <header className="sticky top-0 z-10 px-4 py-3">
         <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-y-3">
           <div className="flex items-center gap-4">
-            <button onClick={goBack} className="p-2 rounded-lg border bg-card/80 hover:bg-card transition-colors" title="뒤로가기">
-              <ArrowLeft className="h-5 w-5" />
-            </button>
             <div>
               <h1 className="text-2xl font-bold tracking-tight">앱 설정</h1>
               <p className="text-sm text-muted-foreground">테마, 데이터 관리, 백업 등을 설정합니다.</p>

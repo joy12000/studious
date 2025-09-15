@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNotes } from "../lib/useNotes";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Loader2, Youtube, ArrowRight } from "lucide-react";
 
 // 진행 메시지를 표시하도록 수정
@@ -27,6 +27,9 @@ const HEADLINES = [
 export default function HomePage() {
   const { addNote } = useNotes();
   const navigate = useNavigate();
+  const location = useLocation();
+  const inputRef = useRef<HTMLInputElement>(null);
+
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [progressMessage, setProgressMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +38,12 @@ export default function HomePage() {
   useEffect(() => {
     setHeadline(HEADLINES[Math.floor(Math.random() * HEADLINES.length)]);
   }, []);
+
+  useEffect(() => {
+    if (location.state?.focusInput) {
+      inputRef.current?.focus();
+    }
+  }, [location.state]);
 
   const handleSave = async () => {
     if (!youtubeUrl.trim()) {
@@ -81,6 +90,7 @@ export default function HomePage() {
             <div className="relative flex items-center w-full">
               <Youtube className="absolute left-6 h-6 w-6 text-muted-foreground" />
               <input
+                ref={inputRef}
                 type="url"
                 value={youtubeUrl}
                 onChange={(e) => setYoutubeUrl(e.target.value)}
