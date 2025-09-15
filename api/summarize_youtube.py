@@ -7,6 +7,7 @@ from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
+from youtube_transcript_api.proxies import GenericProxyConfig
 
 # ==============================================================================
 # CONFIGURATION
@@ -109,8 +110,12 @@ def extract_video_id(url: str) -> str:
 def get_transcript_text(video_id: str, proxies: dict = None) -> str:
     """Gets transcript text using youtube-transcript-api, with robust fallbacks and proxy support."""
     try:
-        # The library accepts a proxies dict directly.
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id, proxies=proxies)
+        proxy_config = None
+        if proxies and proxies.get('https'):
+            proxy_config = GenericProxyConfig(https_url=proxies['https'])
+        
+        api = YouTubeTranscriptApi(proxy_config=proxy_config)
+        transcript_list = api.list_transcripts(video_id)
         
         transcript = None
         for lang in PREFERRED_LANGS:
