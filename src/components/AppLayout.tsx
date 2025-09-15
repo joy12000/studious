@@ -1,10 +1,10 @@
 import React, { useState, createContext, useContext, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Home, Settings, X, List, ChevronsLeft, ChevronsRight, Notebook } from 'lucide-react';
-import { useNotes } from '../lib/useNotes'; // 🚀 노트 목록을 가져오기 위해 추가
+import { Home, Settings, X, List, ChevronsLeft, ChevronsRight, Notebook, Menu } from 'lucide-react';
+import { useNotes } from '../lib/useNotes';
 
-// 사이드바 상태 공유를 위한 Context (기존과 동일)
+// 사이드바 상태 공유를 위한 Context
 interface SidebarContextType {
   isSidebarOpen: boolean;
   setIsSidebarOpen: React.Dispatch<React.SetStateAction<boolean>>;
@@ -19,7 +19,6 @@ export const useSidebar = () => {
   return context;
 };
 
-// 🚀 사이드바 컨텐츠를 별도 컴포넌트로 분리하여 로직을 더 명확하게 관리
 const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean, onToggleCollapse: () => void }) => {
   const { notes } = useNotes();
   const { setIsSidebarOpen } = useSidebar();
@@ -31,7 +30,6 @@ const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolea
     }
   };
 
-  // 🚀 최신 노트 7개만 선택
   const recentNotes = useMemo(() => notes, [notes]);
 
   const NavLink = ({ to, icon, children }: { to: string, icon: React.ReactNode, children: React.ReactNode }) => {
@@ -49,9 +47,18 @@ const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolea
   return (
     <div className="flex h-full flex-col">
       <div className="mb-8 flex items-center justify-between">
-        <div className={`font-bold text-primary transition-all duration-300 ${isCollapsed ? 'text-lg' : 'text-2xl'}`}>
+        <div className={`font-bold text-primary transition-all duration-300 ${isCollapsed ? 'w-full flex justify-center text-2xl' : 'text-2xl'}`}>
           <Link to="/" onClick={handleLinkClick}>{isCollapsed ? 'A' : 'Aibrary'}</Link>
         </div>
+        
+        {/* 펼친 상태의 데스크탑 접기 버튼 (상단) */}
+        {!isCollapsed && (
+          <Button variant="ghost" onClick={onToggleCollapse} className="hidden md:flex items-center px-2 py-1 h-auto">
+            <ChevronsLeft className="h-5 w-5" />
+          </Button>
+        )}
+
+        {/* 모바일 닫기 버튼 */}
         <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(false)}>
           <X className="h-6 w-6" />
         </Button>
@@ -66,9 +73,11 @@ const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolea
 
       <hr className="my-6" />
 
-      {/* 🚀 최근 노트 목록 */}
+      {/* 최근 노트 목록 */}
       <div className="flex-1 overflow-y-auto">
-        <h2 className={`text-sm font-semibold text-muted-foreground mb-3 px-4 transition-opacity ${isCollapsed ? 'opacity-0' : 'opacity-100'}`}>최근 노트</h2>
+        <h2 className={`text-sm font-semibold text-muted-foreground mb-3 px-4 transition-opacity ${isCollapsed ? 'opacity-0' : 'opacity-100'}`}>
+          최근 노트
+        </h2>
         <nav className="flex flex-col space-y-2">
           {recentNotes.map(note => (
             <NavLink key={note.id} to={`/note/${note.id}`} icon={<Notebook className="h-4 w-4 flex-shrink-0" />}>
@@ -80,20 +89,23 @@ const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolea
 
       {/* 사이드바 하단 */}
       <div className="mt-auto pt-4">
-        <Button variant="ghost" onClick={onToggleCollapse} className="w-full justify-start hidden md:flex">
-          {isCollapsed ? <ChevronsRight className="h-4 w-4" /> : <ChevronsLeft className="h-4 w-4" />}
-          {!isCollapsed && <span className="ml-2">Collapse</span>}
-        </Button>
-        <p className={`text-xs text-muted-foreground mt-2 transition-opacity ${isCollapsed ? 'opacity-0' : 'opacity-100'}`}>v1.0.0</p>
+        {/* 접힌 상태의 데스크탑 펼치기 버튼 (하단) */}
+        {isCollapsed && (
+          <Button variant="ghost" onClick={onToggleCollapse} className="hidden md:flex w-full justify-center">
+            <ChevronsRight className="h-5 w-5" />
+          </Button>
+        )}
+        <p className={`text-xs text-muted-foreground mt-2 text-center w-full transition-opacity ${isCollapsed ? 'opacity-0' : 'opacity-100'}`}>
+          v1.0.0
+        </p>
       </div>
     </div>
   );
 };
 
-
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false); // 🚀 데스크탑 접기 상태
+  const [isCollapsed, setIsCollapsed] = useState(false); // 데스크탑 접기 상태
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, setIsSidebarOpen }}>
@@ -105,17 +117,23 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
           />
         )}
 
-        {/* 🚀 사이드바 스타일 및 기능 개선 */}
         <aside
           className={`fixed inset-y-0 left-0 z-40 border-r bg-background/95 backdrop-blur-lg p-4 transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 shadow-xl
             ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-            ${isCollapsed ? 'md:w-20' : 'md:w-64'}` // 데스크탑 접기/펼치기 너비
-          }
+            ${isCollapsed ? 'md:w-20' : 'md:w-64'}`}
         >
           <SidebarContent isCollapsed={isCollapsed} onToggleCollapse={() => setIsCollapsed(!isCollapsed)} />
         </aside>
 
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto relative">
+          <Button
+            onClick={() => setIsSidebarOpen(true)}
+            variant="ghost"
+            size="icon"
+            className="absolute top-4 left-4 z-20 md:hidden" // 모바일에서만 보이도록
+          >
+            <Menu className="h-6 w-6" />
+          </Button>
           {children}
         </main>
       </div>

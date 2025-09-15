@@ -88,23 +88,27 @@ export function useNotes() {
   const addNote = async (payload: AddNotePayload) => {
     const { youtubeUrl, onProgress, onComplete, onError } = payload;
 
-    // UX 개선을 위한 비동기 딜레이 헬퍼 함수
     const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     try {
-      // 1단계: 자막 추출 메시지 표시
       onProgress("유튜브 자막을 추출하고 있습니다...");
-      await sleep(1200); // 사용자가 메시지를 인지할 시간을 줌
+      await sleep(1200);
 
-      // 2단계: AI 요약 메시지 표시 후 실제 API 호출
       onProgress("AI가 핵심 내용을 요약하고 있습니다...");
 
       const response = await fetch(`/api/summarize_youtube?youtubeUrl=${encodeURIComponent(youtubeUrl)}`);
 
       if (!response.ok) {
-        // 백엔드에서 오는 JSON 형식의 에러 메시지를 우선적으로 파싱
-        const errorData = await response.json().catch(() => null);
-        const errorMessage = errorData?.error || `요청 처리 중 오류가 발생했습니다. (상태: ${response.status})`;
+        let errorMessage;
+        const contentType = response.headers.get("content-type");
+        
+        if (contentType && contentType.includes("application/json")) {
+          const errorData = await response.json();
+          errorMessage = errorData.error || `서버에서 JSON 오류 응답이 왔습니다. (상태: ${response.status})`;
+        } else {
+          // HTML 에러 페이지나 일반 텍스트 응답을 처리
+          errorMessage = `서버에서 예기치 않은 응답이 왔습니다. (상태: ${response.status}). 모바일 환경에서 이 오류가 발생하면 서버 타임아웃일 가능성이 높습니다.`;
+        }
         throw new Error(errorMessage);
       }
 

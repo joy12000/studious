@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNotes } from "../lib/useNotes";
 import { useNavigate } from "react-router-dom";
-import { Loader2, Youtube } from "lucide-react";
+import { Loader2, Youtube, ArrowRight } from "lucide-react";
 
 // 진행 메시지를 표시하도록 수정
 function LoadingOverlay({ message }: { message: string }) {
@@ -21,7 +21,7 @@ const HEADLINES = [
   "어떤 영상을 요약해 드릴까요?",
   "분석하고 싶은 영상이 있으신가요?",
   "여기에 유튜브 링크를 입력하세요.",
-  "오늘 탐색할 지식은 무엇인가요? 영상 링크로 알려주세요."
+  "오늘 탐색할 지식은 무엇인가요?"
 ];
 
 export default function HomePage() {
@@ -73,7 +73,7 @@ export default function HomePage() {
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4">
         <div className="w-full max-w-3xl text-center">
           
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-12">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-medium tracking-tight text-foreground mb-12">
             {headline}
           </h1>
 
@@ -85,16 +85,16 @@ export default function HomePage() {
                 value={youtubeUrl}
                 onChange={(e) => setYoutubeUrl(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-                className="w-full pl-16 pr-32 py-4 text-lg border bg-card rounded-full shadow-md focus:ring-2 focus:ring-primary focus:border-transparent focus:shadow-lg transition-all disabled:opacity-70"
+                className="w-full pl-16 pr-32 py-3 text-lg border bg-card rounded-full shadow-md focus:ring-2 focus:ring-primary focus:border-transparent focus:shadow-lg transition-all disabled:opacity-70"
                 placeholder="유튜브 링크 붙여넣기"
                 disabled={isLoading}
               />
               <button 
                 onClick={handleSave} 
                 disabled={isLoading}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center bg-primary text-primary-foreground h-12 px-6 rounded-full font-semibold hover:bg-primary/90 disabled:opacity-50 transition-all"
+                className={`absolute right-2.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center bg-primary text-primary-foreground h-11 w-11 rounded-full font-semibold hover:bg-primary/90 disabled:opacity-50 transition-all duration-300 ${youtubeUrl.trim() ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}
               >
-                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : "요약"}
+                {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
               </button>
             </div>
             {error && <p className="text-destructive text-sm mt-4 text-center">{error}</p>}
