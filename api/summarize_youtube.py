@@ -1,121 +1,8 @@
-import json, os, time, re, traceback
-import requests
-import google.generativeai as genai
-from urllib.parse import urlparse, parse_qs
+import json, os
 from http.server import BaseHTTPRequestHandler
 
 # ==============================================================================
-# CONFIGURATION
-# ==============================================================================
-GENAI_MODEL = os.getenv("GENAI_MODEL", "models/gemini-1.5-flash-latest")
-API_KEY = os.getenv("GEMINI_API_KEY")
-APIFY_ENDPOINT = os.getenv("APIFY_ENDPOINT")
-APIFY_TOKEN = os.getenv("APIFY_TOKEN")
-HTTP_TIMEOUT = 240 # Apify can take a while, give it up to 4 minutes
-
-# ==============================================================================
-# PROMPTS
-# ==============================================================================
-SUMMARY_PROMPT = """You are a professional Korean summarizer. Summarize the content for a busy professional.
-- Write in Korean.
-- Keep the most important facts, numbers, and named entities.
-- Structure:
-  1) 3~5문장 개요
-  2) 핵심 포인트 3~5개 (불릿)
-  3) 시사점/활용 아이디어 2~3개 (불릿)
-Return ONLY valid JSON using this schema:
-{
-  "summary": "<개요 3~5문장>",
-  "key_insights": ["...", "...", "..."],
-  "actionable": ["...", "..."]
-}
-"""
-
-TAGGING_PROMPT_TEMPLATE = """다음 요약문을 보고 한국어 제목과 해시태그를 생성하세요.
-- 제목은 30자 이내로 간결하게
-- 해시태그는 5~8개, 소문자, 공백 없이, #표시 제외
-반드시 아래 JSON만 출력하세요.
-{
-  "title": "<30자 이내 제목>",
-  "tags": ["tag1","tag2","tag3","tag4","tag5"]
-}
-[요약]
-{summary_text}
-"""
-
-# ==============================================================================
-# HELPER FUNCTIONS
-# ==============================================================================
-
-def extract_first_json(text: str):
-    """Finds and decodes the first valid JSON object block in a string."""
-    if not text:
-        raise ValueError("Empty response from model.")
-    
-    match = re.search(r"\{{.*\}}", text, re.DOTALL)
-    if not match:
-        raise ValueError("No JSON object found in the model's response.")
-    
-    try:
-        return json.loads(match.group(0))
-    except json.JSONDecodeError as e:
-        raise ValueError(f"Failed to decode JSON: {e}")
-
-def extract_video_id(url: str) -> str:
-    """Extracts YouTube video ID from various URL formats."""
-    u = urlparse(url)
-    if "youtu.be" in u.netloc:
-        return u.path.strip("/")
-    qs = parse_qs(u.query)
-    if "v" in qs:
-        return qs["v"][0]
-    m = re.search(r"/shorts/([A-Za-z0-9_-]+)", u.path)
-    if m:
-        return m.group(1)
-    raise ValueError("Failed to extract video_id from URL.")
-
-# ==============================================================================
-# CORE LOGIC
-# ==============================================================================
-
-def get_transcript_from_apify(youtube_url: str) -> str:
-    """Calls the Apify Actor to get the transcript."""
-    if not APIFY_ENDPOINT or not APIFY_TOKEN:
-        raise ValueError("APIFY_ENDPOINT and APIFY_TOKEN must be set.")
-
-    api_url = f"{APIFY_ENDPOINT}?token={APIFY_TOKEN}"
-    payload = {"urls": [youtube_url]}
-    headers = {"Content-Type": "application/json"}
-
-    r = requests.post(api_url, json=payload, headers=headers, timeout=HTTP_TIMEOUT)
-    r.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
-
-    # The result is a list of dataset items. We need to extract the text.
-    # Assuming the actor returns a list of objects, each with a 'text' field.
-    results = r.json()
-    if not results or not isinstance(results, list):
-        raise ValueError("Apify returned no data or an unexpected format.")
-
-    # Combine all text fields from all items in the dataset
-    full_text = " ".join([item.get('text', '') for item in results])
-    
-    if len(full_text) < 50:
-        raise RuntimeError("Transcript text from Apify is too short.")
-
-    return full_text
-
-def summarize_text(model, text: str):
-    """Summarizes text content using the Gemini API."""
-    resp = model.generate_content([SUMMARY_PROMPT, f"[Transcript]\n{text}"])
-    summary_data = extract_first_json(resp.text)
-    
-    tag_resp = model.generate_content(TAGGING_PROMPT_TEMPLATE.format(summary_text=summary_data["summary"]))
-    tag_data = extract_first_json(tag_resp.text)
-    
-    return {**summary_data, **tag_data}
-
-# ==============================================================================
-# VERCEL HANDLER CLASS
+# DIAGNOSTIC HANDLER
 # ==============================================================================
 
 class Handler(BaseHTTPRequestHandler):
@@ -126,35 +13,20 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(json.dumps(body, ensure_ascii=False).encode("utf-8"))
 
     def do_GET(self):
-        try:
-            if not API_KEY or not APIFY_ENDPOINT or not APIFY_TOKEN:
-                return self._send_json(500, {"error": "Required environment variables (GEMINI, APIFY) are not set."})
+        apify_endpoint = os.getenv("APIFY_ENDPOINT", "NOT_SET")
+        apify_token = os.getenv("APIFY_TOKEN", "NOT_SET")
 
-            qs = parse_qs(urlparse(self.path).query)
-            url = (qs.get("youtubeUrl") or [None])[0]
-            if not url:
-                return self._send_json(400, {"error": "youtubeUrl is required."})
+        masked_token = "NOT_SET"
+        if apify_token and apify_token != "NOT_SET":
+            if len(apify_token) > 8:
+                masked_token = f"{apify_token[:4]}...{apify_token[-4:]} (total {len(apify_token)} chars)"
+            else:
+                masked_token = "Token is too short to mask properly."
 
-            genai.configure(api_key=API_KEY)
-            model = genai.GenerativeModel(GENAI_MODEL)
+        results = {
+            "APIFY_ENDPOINT_SEEN_BY_SERVER": apify_endpoint,
+            "APIFY_TOKEN_SEEN_BY_SERVER": masked_token,
+            "NOTE": "Please compare these values with your Apify dashboard. Check for typos or extra spaces."
+        }
 
-            # Get transcript from Apify
-            transcript = get_transcript_from_apify(url)
-            
-            # Summarize the transcript
-            result = summarize_text(model, transcript)
-            
-            return self._send_json(200, {**result, "mode": "transcript", "sourceUrl": url})
-
-        except (ValueError, TypeError) as e:
-            return self._send_json(400, {"error": f"Invalid request: {e}"})
-        except requests.HTTPError as e:
-            # Try to parse error from Apify if possible
-            try: 
-                error_details = e.response.json()
-            except:
-                error_details = e.response.text[:200]
-            return self._send_json(e.response.status_code, {"error": f"API call failed: {error_details}"})
-        except Exception as e:
-            print(f"Unhandled Exception: {e}\n{traceback.format_exc()}")
-            return self._send_json(500, {"error": "An internal server error occurred."})
+        return self._send_json(200, results)
