@@ -82,7 +82,7 @@ export default function HomePage() {
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4">
         <div className="w-full max-w-3xl text-center">
           
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-medium tracking-tight text-foreground mb-12">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-medium tracking-tight text-foreground mb-8">
             {headline}
           </h1>
 

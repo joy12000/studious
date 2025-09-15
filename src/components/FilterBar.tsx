@@ -42,7 +42,7 @@ export default function FilterBar({ filters, onFiltersChange, availableTags = []
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 border-b border-gray-500/20 pb-3">
+      <div className="flex items-center gap-3 border bg-background px-4 py-2 rounded-full">
         <Search className="h-5 w-5 text-gray-500" />
         <input
           value={localSearch}

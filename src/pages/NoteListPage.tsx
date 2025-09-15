@@ -114,7 +114,7 @@ export default function NoteListPage() { // 이름 변경: HomePage -> NoteListP
               </div>
             </div>
             {/* 하단 행: 필터 바 */}
-            <div className="w-full">
+            <div className="w-full mt-2">
               <FilterBar filters={filters} onFiltersChange={setFilters} availableTags={availableTags} />
             </div>
           </div>

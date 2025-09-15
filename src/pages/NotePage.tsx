@@ -276,7 +276,7 @@ export default function NotePage() {
         {/* Content */}
         <main className="flex-1 overflow-y-auto p-4 md:p-8">
           <article className="mx-auto max-w-3xl">
-            <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+            <div className="mt-8 mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
                 <span>{formatDate(note.createdAt)}</span>
@@ -338,7 +338,7 @@ export default function NotePage() {
                 </div>
               ) : (
                 <div>
-                  <div className="prose prose-slate max-w-none dark:prose-invert prose-p:leading-relaxed prose-headings:font-semibold" 
+                  <div className="prose prose-slate max-w-none dark:prose-invert prose-p:leading-loose prose-headings:font-semibold" 
                        dangerouslySetInnerHTML={{ __html: note.content }} />
 
                   {/* 🚀 핵심 인사이트 섹션 추가 */}

@@ -5,6 +5,13 @@
     }
   },
   "rewrites": [
-    { "source": "/((?!api/|.*\\..*).*) ", "destination": "/index.html" }
+    {
+      "source": "/api/:path*",
+      "destination": "/api/:path*"
+    },
+    {
+      "source": "/:path((?!.*\\..*).*) ",
+      "destination": "/index.html"
+    }
   ]
 }
