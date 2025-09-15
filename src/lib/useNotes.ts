@@ -97,21 +97,27 @@ export function useNotes() {
       onProgress("AI가 핵심 내용을 요약하고 있습니다...");
 
       const response = await fetch(`/api/summarize_youtube?youtubeUrl=${encodeURIComponent(youtubeUrl)}`);
+      
+      const contentType = response.headers.get("content-type");
+      const isJson = contentType && contentType.includes("application/json");
 
       if (!response.ok) {
         let errorMessage;
-        const contentType = response.headers.get("content-type");
-        
-        if (contentType && contentType.includes("application/json")) {
+        if (isJson) {
           const errorData = await response.json();
-          errorMessage = errorData.error || `서버에서 JSON 오류 응답이 왔습니다. (상태: ${response.status})`;
+          errorMessage = errorData.error || `서버 오류: ${response.status}`;
         } else {
-          // HTML 에러 페이지나 일반 텍스트 응답을 처리
-          errorMessage = `서버에서 예기치 않은 응답이 왔습니다. (상태: ${response.status}). 모바일 환경에서 이 오류가 발생하면 서버 타임아웃일 가능성이 높습니다.`;
+          errorMessage = `서버에서 예기치 않은 응답이 왔습니다. (상태: ${response.status}). PWA 앱에서 이 오류가 발생하면 서버 타임아웃일 수 있습니다.`;
         }
         throw new Error(errorMessage);
       }
+      
+      if (!isJson) {
+        // 200 OK 응답이지만 JSON이 아닌 경우 (HTML 에러 페이지 등)
+        throw new Error(`서버 응답 형식 오류입니다. (받은 형식: ${contentType || '없음'})`);
+      }
 
+      // 이제 응답이 JSON임이 보장됨
       const result = await response.json();
 
       if (result.error) {
