@@ -1,25 +1,17 @@
 import json, os, time, re, traceback
 import requests
 import google.generativeai as genai
-import tempfile
-import certifi
 from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler
-from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api._errors import NoTranscriptFound, TranscriptsDisabled, VideoUnavailable
-from youtube_transcript_api.proxies import GenericProxyConfig
 
 # ==============================================================================
 # CONFIGURATION
 # ==============================================================================
 GENAI_MODEL = os.getenv("GENAI_MODEL", "models/gemini-1.5-flash-latest")
 API_KEY = os.getenv("GEMINI_API_KEY")
-FETCH_MODE = os.getenv("YOUTUBE_FETCH_MODE", "auto")  # "auto" | "transcript" | "audio"
-PIPED_BASE_URLS     = [u.strip() for u in os.getenv("PIPED_BASE_URLS", "https://piped.video,https://piped.kavin.rocks,https://piped.projectsegfau.lt,https://piped.garudalinux.org,https://piped.privacydev.net,https://p.plibre.com").split(",") if u.strip()]
-HTTP_TIMEOUT = int(os.getenv("HTTP_TIMEOUT", "90"))
-MAX_AUDIO_BYTES = int(os.getenv("MAX_AUDIO_BYTES", str(120 * 1024 * 1024)))
-PREFERRED_LANGS = [s.strip() for s in os.getenv("PREFERRED_LANGS", "ko,en,en-US").split(",")]
-PROXY_URL = os.getenv("PROXY_URL")
+APIFY_ENDPOINT = os.getenv("APIFY_ENDPOINT")
+APIFY_TOKEN = os.getenv("APIFY_TOKEN")
+HTTP_TIMEOUT = 240 # Apify can take a while, give it up to 4 minutes
 
 # ==============================================================================
 # PROMPTS
@@ -55,27 +47,6 @@ TAGGING_PROMPT_TEMPLATE = """다음 요약문을 보고 한국어 제목과 해�
 # HELPER FUNCTIONS
 # ==============================================================================
 
-def get_proxies():
-    """Builds a proxy dictionary for requests if PROXY_URL is set."""
-    if not PROXY_URL:
-        return None
-    return {"http": PROXY_URL, "https": PROXY_URL}
-
-def _get_from_any_host(base_urls, path, params=None):
-    """Iterates through a list of base URLs and returns the first successful JSON response."""
-    last_err = None
-    proxies = get_proxies()
-    for base in base_urls:
-        try:
-            target_url = f"{base}{path}"
-            r = requests.get(target_url, params=params, timeout=HTTP_TIMEOUT, proxies=proxies, verify=certifi.where())
-            if r.status_code == 200:
-                return r.json()
-            last_err = f"host {base} returned status {r.status_code}: {r.text[:100]}"
-        except Exception as e:
-            last_err = str(e)
-    raise RuntimeError(f"All hosts failed. Last error: {last_err}")
-
 def extract_first_json(text: str):
     """Finds and decodes the first valid JSON object block in a string."""
     if not text:
@@ -104,117 +75,44 @@ def extract_video_id(url: str) -> str:
     raise ValueError("Failed to extract video_id from URL.")
 
 # ==============================================================================
-# CORE LOGIC: FETCHING & SUMMARIZING
+# CORE LOGIC
 # ==============================================================================
 
-def get_transcript_text(video_id: str, proxies: dict = None) -> str:
-    """Gets transcript text using youtube-transcript-api, with robust fallbacks and proxy support."""
-    try:
-        proxy_config = None
-        if proxies and proxies.get('https'):
-            proxy_config = GenericProxyConfig(https_url=proxies['https'])
-        
-        api = YouTubeTranscriptApi(proxy_config=proxy_config)
-        transcript_list = api.list_transcripts(video_id)
-        
-        transcript = None
-        for lang in PREFERRED_LANGS:
-            try:
-                transcript = transcript_list.find_transcript([lang])
-                break
-            except NoTranscriptFound:
-                continue
-        
-        if not transcript:
-            for lang in PREFERRED_LANGS:
-                try:
-                    transcript = transcript_list.find_generated_transcript([lang])
-                    break
-                except NoTranscriptFound:
-                    continue
+def get_transcript_from_apify(youtube_url: str) -> str:
+    """Calls the Apify Actor to get the transcript."""
+    if not APIFY_ENDPOINT or not APIFY_TOKEN:
+        raise ValueError("APIFY_ENDPOINT and APIFY_TOKEN must be set.")
 
-        if not transcript:
-             raise NoTranscriptFound("No suitable transcript found.")
+    api_url = f"{APIFY_ENDPOINT}?token={APIFY_TOKEN}"
+    payload = {"urls": [youtube_url]}
+    headers = {"Content-Type": "application/json"}
 
-        segments = transcript.fetch()
-        text = " ".join([d['text'] for d in segments])
-        if len(text) < 50:
-            raise RuntimeError("Transcript text is too short to be meaningful.")
-        return text
+    r = requests.post(api_url, json=payload, headers=headers, timeout=HTTP_TIMEOUT)
+    r.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
 
-    except (TranscriptsDisabled, VideoUnavailable) as e:
-        raise RuntimeError(f"Cannot fetch transcript: {e}")
-    except Exception as e:
-        raise RuntimeError(f"youtube-transcript-api failed: {e}")
+    # The result is a list of dataset items. We need to extract the text.
+    # Assuming the actor returns a list of objects, each with a 'text' field.
+    results = r.json()
+    if not results or not isinstance(results, list):
+        raise ValueError("Apify returned no data or an unexpected format.")
 
-def get_best_audio_url(video_id: str) -> str:
-    """Gets the best audio stream URL from any available Piped instance."""
-    streams = _get_from_any_host(PIPED_BASE_URLS, f"/api/v1/streams/{video_id}")
-    audio_streams = streams.get("audioStreams", [])
-    if not audio_streams:
-        raise RuntimeError("No audio streams found.")
+    # Combine all text fields from all items in the dataset
+    full_text = " ".join([item.get('text', '') for item in results])
+    
+    if len(full_text) < 50:
+        raise RuntimeError("Transcript text from Apify is too short.")
 
-    def score(stream):
-        is_m4a = "m4a" in stream.get("mimeType", "").lower()
-        bitrate = stream.get("bitrate", 0)
-        return (is_m4a, bitrate)
+    return full_text
 
-    best_stream = sorted(audio_streams, key=score, reverse=True)[0]
-    return best_stream["url"]
-
-def summarize_content(model, content, is_audio=False, audio_filename="audio.m4a"):
-    """Summarizes text or audio content using the Gemini API."""
-    if is_audio:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".m4a") as f:
-            f.write(content)
-            temp_path = f.name
-        try:
-            audio_file = genai.upload_file(path=temp_path, display_name=audio_filename)
-            prompt_content = audio_file
-        finally:
-            os.remove(temp_path)
-    else:
-        prompt_content = f"[Transcript]\n{content}"
-
-    resp = model.generate_content([SUMMARY_PROMPT, prompt_content])
+def summarize_text(model, text: str):
+    """Summarizes text content using the Gemini API."""
+    resp = model.generate_content([SUMMARY_PROMPT, f"[Transcript]\n{text}"])
     summary_data = extract_first_json(resp.text)
     
     tag_resp = model.generate_content(TAGGING_PROMPT_TEMPLATE.format(summary_text=summary_data["summary"]))
     tag_data = extract_first_json(tag_resp.text)
     
     return {**summary_data, **tag_data}
-
-def _get_summary_data(youtube_url: str, requested_mode: str):
-    """Orchestrates the fetching and summarizing process."""
-    genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel(GENAI_MODEL)
-    video_id = extract_video_id(youtube_url)
-    proxies = get_proxies()
-    
-    # --- Attempt 1: Transcript ---
-    if requested_mode in ("auto", "transcript"):
-        try:
-            # Pass proxies to the transcript function
-            transcript = get_transcript_text(video_id, proxies=proxies)
-            result = summarize_content(model, transcript, is_audio=False)
-            return {**result, "mode": "transcript", "sourceUrl": youtube_url}
-        except Exception as e:
-            if requested_mode == "transcript":
-                raise RuntimeError(f"Transcript-only mode failed: {e}")
-            # In "auto" mode, we fall through to audio
-    
-    # --- Attempt 2: Audio (Fallback) ---
-    audio_url = get_best_audio_url(video_id)
-    
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; AIBookBeta/1.0)"}
-    with requests.get(audio_url, headers=headers, stream=True, timeout=HTTP_TIMEOUT, proxies=proxies, verify=certifi.where()) as r:
-        r.raise_for_status()
-        audio_bytes = r.content
-        if len(audio_bytes) > MAX_AUDIO_BYTES:
-            raise ValueError(f"Audio file is too large (> {MAX_AUDIO_BYTES // 1024 // 1024}MB).")
-
-    result = summarize_content(model, audio_bytes, is_audio=True)
-    return {**result, "mode": "audio", "sourceUrl": youtube_url}
 
 # ==============================================================================
 # VERCEL HANDLER CLASS
@@ -229,25 +127,34 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
-            if not API_KEY:
-                return self._send_json(500, {"error": "GEMINI_API_KEY environment variable is not set."})
+            if not API_KEY or not APIFY_ENDPOINT or not APIFY_TOKEN:
+                return self._send_json(500, {"error": "Required environment variables (GEMINI, APIFY) are not set."})
 
             qs = parse_qs(urlparse(self.path).query)
             url = (qs.get("youtubeUrl") or [None])[0]
             if not url:
                 return self._send_json(400, {"error": "youtubeUrl is required."})
 
-            mode = (qs.get("mode") or [FETCH_MODE])[0]
+            genai.configure(api_key=API_KEY)
+            model = genai.GenerativeModel(GENAI_MODEL)
+
+            # Get transcript from Apify
+            transcript = get_transcript_from_apify(url)
             
-            data = _get_summary_data(url, mode)
-            return self._send_json(200, data)
+            # Summarize the transcript
+            result = summarize_text(model, transcript)
+            
+            return self._send_json(200, {**result, "mode": "transcript", "sourceUrl": url})
 
         except (ValueError, TypeError) as e:
             return self._send_json(400, {"error": f"Invalid request: {e}"})
-        except TimeoutError as e:
-            return self._send_json(504, {"error": f"A timeout occurred: {e}"})
         except requests.HTTPError as e:
-            return self._send_json(e.response.status_code, {"error": f"Failed to fetch media: {e}"})
+            # Try to parse error from Apify if possible
+            try: 
+                error_details = e.response.json()
+            except:
+                error_details = e.response.text[:200]
+            return self._send_json(e.response.status_code, {"error": f"API call failed: {error_details}"})
         except Exception as e:
             print(f"Unhandled Exception: {e}\n{traceback.format_exc()}")
             return self._send_json(500, {"error": "An internal server error occurred."})
