@@ -71,7 +71,7 @@ export default function SettingsPage(){
 
   return (
     <div className="flex h-full flex-col">
-      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b p-4">
+      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b p-4 pt-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-4">
             {/* 🚀 GEMINI: 메뉴 버튼 추가 */}
