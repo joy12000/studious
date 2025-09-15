@@ -84,12 +84,20 @@ def extract_first_json(text: str):
 
 def get_transcript_from_apify(youtube_url: str) -> str:
     """Calls the Apify Actor to get the transcript."""
+    print(f"--- DEBUGGING ---")
+    print(f"APIFY_ENDPOINT from env: {os.getenv("APIFY_ENDPOINT")}")
+    print(f"APIFY_TOKEN from env is set: {bool(os.getenv("APIFY_TOKEN"))}")
+    
     if not APIFY_ENDPOINT or not APIFY_TOKEN:
         raise ValueError("APIFY_ENDPOINT and APIFY_TOKEN must be set.")
 
     api_url = f"{APIFY_ENDPOINT}?token={APIFY_TOKEN}"
     payload = {"videoUrl": youtube_url}
     headers = {"Content-Type": "application/json"}
+
+    print(f"Final API URL being called: {APIFY_ENDPOINT}?token=...REDACTED...")
+    print(f"Payload being sent: {payload}")
+    print(f"--- END DEBUGGING ---")
 
     r = requests.post(api_url, json=payload, headers=headers, timeout=HTTP_TIMEOUT)
     r.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
