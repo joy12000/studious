@@ -16,31 +16,40 @@ HTTP_TIMEOUT = 240 # Apify can take a while, give it up to 4 minutes
 # ==============================================================================
 # PROMPTS
 # ==============================================================================
-SUMMARY_PROMPT = """You are a professional Korean summarizer. Summarize the content for a busy professional.
-- Write in Korean.
-- Keep the most important facts, numbers, and named entities.
-- Structure:
-  1) 3~5문장 개요
-  2) 핵심 포인트 3~5개 (불릿)
-  3) 시사점/활용 아이디어 2~3개 (불릿)
-Return ONLY valid JSON using this schema:
+SUMMARY_PROMPT = """당신은 영상 콘텐츠 요약을 전문으로 하는 요약 전문가입니다. 
+사용자가 제공한 유튜브 영상의 전사 내용을 꼼꼼히 분석한 뒤, 영상의 핵심 메시지와 중요한 인사이트를 빠짐없이 담아 체계적으로 요약해주세요.
+
+- **요약 스타일:** 전문 요약가로서 객관적이고 정확한 어조로 작성합니다.
+- **특히 강조할 점:** 영상에서 강조된 통찰이나 시사점이 있다면 이를 요약에 반드시 포함합니다.
+
+[결과 출력 형식]
+아래와 같은 JSON 형식에 맞춰 한국어로 결과를 반환해주세요.
 {
-  "summary": "<개요 3~5문장>",
-  "key_insights": ["...", "...", "..."],
-  "actionable": ["...", "..."]
+  "summary": "영상 전체 내용을 아우르는 3~4 문단의 핵심 요약문",
+  "key_insights": [
+    "영상이 강조하는 가장 중요한 통찰 또는 시사점 1",
+    "영상이 강조하는 가장 중요한 통찰 또는 시사점 2",
+    "그 외 주목할 만한 핵심 정보나 주장"
+  ]
 }
 """
 
-TAGGING_PROMPT_TEMPLATE = """다음 요약문을 보고 한국어 제목과 해시태그를 생성하세요.
-- 제목은 30자 이내로 간결하게
-- 해시태그는 5~8개, 소문자, 공백 없이, #표시 제외
-반드시 아래 JSON만 출력하세요.
-{
-  "title": "<30자 이내 제목>",
-  "tags": ["tag1","tag2","tag3","tag4","tag5"]
-}
-[요약]
+TAGGING_PROMPT_TEMPLATE = """당신은 콘텐츠의 핵심 주제를 파악하여 카테고리를 분류하는 분류 전문가입니다.
+제공된 요약문을 기반으로, 영상의 내용을 가장 잘 나타내는 '제목'과 '주제 태그'를 하나씩 생성해주세요.
+
+[규칙]
+1. 제목: 요약문의 핵심 내용을 담아 간결하게 생성합니다.
+2. 주제 태그: 반드시 아래 예시와 같이 매우 포괄적이고 일반적인 단 하나의 단어로 생성해야 합니다. (예시: IT, 경제, 과학, 역사, 자기계발, 건강, 문화, 시사, 예능, 교육)
+
+[요약문]
 {summary_text}
+
+[결과 출력 형식]
+결과는 반드시 아래 JSON 형식으로 반환해주세요.
+{
+  "title": "AI가 생성한 영상 제목",
+  "tag": "AI가 생성한 포괄적 주제 태그"
+}
 """
 
 # ==============================================================================
@@ -51,15 +60,23 @@ def extract_first_json(text: str):
     """Finds and decodes the first valid JSON object block in a string."""
     if not text:
         raise ValueError("Empty response from model.")
-    
-    match = re.search(r"\{\{.*\}}", text, re.DOTALL)
-    if not match:
-        raise ValueError("No JSON object found in the model's response.")
-    
+
+    # First, try to find a JSON object within a markdown code block
+    match = re.search(r"```json\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if match:
+        json_str = match.group(1)
+    else:
+        # If not found, try to find the first and last curly brace
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if not match:
+            raise ValueError("No JSON object found in the model's response.")
+        json_str = match.group(0)
+
     try:
-        return json.loads(match.group(0))
+        return json.loads(json_str)
     except json.JSONDecodeError as e:
-        raise ValueError(f"Failed to decode JSON: {e}")
+        # Add the problematic string to the error for easier debugging
+        raise ValueError(f"Failed to decode JSON: {e} - Response text was: '{text}'")
 
 # ==============================================================================
 # CORE LOGIC
