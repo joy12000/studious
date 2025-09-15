@@ -31,7 +31,7 @@ export default function VersionBadge() {
   const version = formatBuildTime();
 
   return (
-    <div className="fixed bottom-2 right-3 z-[9999]">
+    <div className="version-badge fixed bottom-2 right-3 z-[9999]">
       <span className="select-none text-[10px] px-2 py-1 rounded-full bg-black/70 text-white tracking-wider">
         {version}
       </span>

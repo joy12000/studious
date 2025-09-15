@@ -9,6 +9,7 @@ import DataUsagePanel from '../components/DataUsagePanel';
 import { db } from '../lib/db';
 import type { AppSettings } from '../lib/types';
 import { autoBackupIfNeeded } from '../lib/backup';
+import VersionBadge from '../components/VersionBadge';
 
 type TabKey = 'general'|'backup'|'data'|'app';
 
@@ -179,6 +180,7 @@ export default function SettingsPage(){
 
           <section className="text-xs text-muted-foreground px-1">
             <div>버전: <code>v{window.BUILD_VERSION || import.meta.env?.VITE_APP_VERSION || 'local'}</code></div>
+            <VersionBadge />
           </section>
         </div>
       )}
