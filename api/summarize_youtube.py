@@ -78,10 +78,10 @@ def get_transcript_from_apify(youtube_url: str) -> str:
     r.raise_for_status()
 
     results = r.json()
-    if not results or not isinstance(results, list):
+    # Correctly parse the nested data structure
+    if not results or not isinstance(results, list) or not results[0].get('data'):
         raise ValueError("Apify returned no transcript data. The video may not have captions.")
 
-    # Defensive parsing to handle inconsistent Apify output
     segments = results[0].get('data', [])
     if not segments:
         raise ValueError("Apify returned an empty data list. The video may not have captions.")
@@ -103,12 +103,8 @@ def get_transcript_from_apify(youtube_url: str) -> str:
 def summarize_text(model, text: str):
     """Summarizes text content using the Gemini API."""
     resp = model.generate_content([SUMMARY_PROMPT, f"[Transcript]\n{text}"])
-    summary_data = extract_first_json(resp.text)
-    
-    tag_resp = model.generate_content(TAGGING_PROMPT_TEMPLATE.format(summary_text=summary_data["summary"]))
-    tag_data = extract_first_json(tag_resp.text)
-    
-    return {**summary_data, **tag_data}
+    # --- DIAGNOSTIC CHANGE: Return raw Gemini response ---
+    return resp.text
 
 # ==============================================================================
 # VERCEL HANDLER CLASS
@@ -135,9 +131,13 @@ class Handler(BaseHTTPRequestHandler):
             model = genai.GenerativeModel(GENAI_MODEL)
 
             transcript = get_transcript_from_apify(url)
-            result = summarize_text(model, transcript)
-            
-            return self._send_json(200, {**result, "mode": "transcript", "sourceUrl": url})
+            # --- DIAGNOSTIC CHANGE: Call summarize_text and return its raw output ---
+            raw_gemini_response = summarize_text(model, transcript)
+            # We'll return this as a simple text response, not JSON, to see the raw output
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(raw_gemini_response.encode("utf-8"))
 
         except (ValueError, TypeError) as e:
             return self._send_json(400, {"error": str(e)})
