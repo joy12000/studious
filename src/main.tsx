@@ -2,7 +2,7 @@ import './index.css'
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import ErrorBoundary from './components/ErrorBoundary'
-import Root from './Root'
+import Root from './App'
 import { initInstallCapture } from './lib/install'
 
 initInstallCapture()
