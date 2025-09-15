@@ -108,8 +108,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [isCollapsed, setIsCollapsed] = useState(false); // 데스크탑 접기 상태
   const location = useLocation();
 
-  // 노트 상세 페이지에서는 메뉴 버튼 숨김
-  const showMenuButton = !location.pathname.startsWith('/note/');
+  // 노트 상세 페이지, 노트 목록, 설정 페이지에서는 메뉴 버튼 숨김
+  const showMenuButton = 
+    !location.pathname.startsWith('/note/') && 
+    location.pathname !== '/notes' && 
+    location.pathname !== '/settings';
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, setIsSidebarOpen }}>
