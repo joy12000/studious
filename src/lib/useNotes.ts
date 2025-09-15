@@ -157,5 +157,9 @@ ${errorBody.substring(0, 1000)}`);
     setNotes(prevNotes => prevNotes.filter(n => n.id !== id));
   };
 
-  return { notes, loading, filters, setFilters, toggleFavorite, addNote, updateNote, deleteNote };
+  const getNote = useCallback(async (id: string): Promise<Note | undefined> => {
+    return await db.notes.get(id);
+  }, []);
+
+  return { notes, loading, filters, setFilters, toggleFavorite, addNote, updateNote, deleteNote, getNote };
 }
