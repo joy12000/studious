@@ -68,7 +68,7 @@ export default function SettingsPage(){
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
-      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border px-4 py-3">
+      <header className="sticky top-0 z-10 px-4 py-3">
         <div className="max-w-4xl mx-auto flex flex-wrap items-center justify-between gap-y-3">
           <div className="flex items-center gap-4">
             <button onClick={goBack} className="p-2 rounded-lg border bg-card/80 hover:bg-card transition-colors" title="뒤로가기">

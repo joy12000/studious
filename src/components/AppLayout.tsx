@@ -32,7 +32,7 @@ const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolea
   };
 
   // 🚀 최신 노트 7개만 선택
-  const recentNotes = useMemo(() => notes.slice(0, 7), [notes]);
+  const recentNotes = useMemo(() => notes, [notes]);
 
   const NavLink = ({ to, icon, children }: { to: string, icon: React.ReactNode, children: React.ReactNode }) => {
     const isActive = location.pathname === to;

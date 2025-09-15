@@ -13,6 +13,20 @@
     
     <link rel="stylesheet" href="/src/styles/design-tokens.css">
     <link rel="stylesheet" href="/src/styles/global.css">
+      <script>
+      (function() {
+        try {
+          const theme = localStorage.getItem('pref-theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          if (theme === 'dark') {
+            document.documentElement.classList.add('dark');
+          } else {
+            document.documentElement.classList.remove('dark');
+          }
+        } catch (e) {
+          console.error('Failed to apply theme from localStorage', e);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

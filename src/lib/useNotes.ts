@@ -41,7 +41,7 @@ export function useNotes() {
         query = db.notes.toCollection();
       }
 
-      let notesFromDb = await query.reverse().sortBy('createdAt');
+      let notesFromDb = await query.reverse().sortBy('updatedAt');
 
       if (filters.search) {
         const searchQuery = filters.search.toLowerCase();

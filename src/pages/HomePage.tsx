@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useNotes } from "../lib/useNotes";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Youtube } from "lucide-react";
@@ -16,13 +16,25 @@ function LoadingOverlay({ message }: { message: string }) {
   );
 }
 
+const HEADLINES = [
+  "요약할 영상 링크를 붙여넣어 주세요.",
+  "어떤 영상을 요약해 드릴까요?",
+  "분석하고 싶은 영상이 있으신가요?",
+  "여기에 유튜브 링크를 입력하세요.",
+  "오늘 탐색할 지식은 무엇인가요? 영상 링크로 알려주세요."
+];
+
 export default function HomePage() {
   const { addNote } = useNotes();
   const navigate = useNavigate();
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [progressMessage, setProgressMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
+  const [headline, setHeadline] = useState(HEADLINES[0]);
+
+  useEffect(() => {
+    setHeadline(HEADLINES[Math.floor(Math.random() * HEADLINES.length)]);
+  }, []);
 
   const handleSave = async () => {
     if (!youtubeUrl.trim()) {
@@ -61,8 +73,8 @@ export default function HomePage() {
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4">
         <div className="w-full max-w-3xl text-center">
           
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-12">
-            AI가 영상의 핵심만 요약해 드립니다.
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-foreground mb-12">
+            {headline}
           </h1>
 
           <div className="relative">
