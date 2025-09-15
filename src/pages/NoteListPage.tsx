@@ -56,10 +56,10 @@ export default function NoteListPage() { // 이름 변경: HomePage -> NoteListP
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="md:hidden h-12 w-12" // 데스크탑에서는 숨김, 버튼 크기 증가
+                  className="md:hidden h-14 w-14" // 데스크탑에서는 숨김, 버튼 크기 증가
                   onClick={() => setIsSidebarOpen(true)}
                 >
-                  <Menu className="h-8 w-8" /> {/* 아이콘 크기 증가 */}
+                  <Menu className="h-10 w-10" /> {/* 아이콘 크기 증가 */}
                 </Button>
                 <h1 className="text-xl font-bold">내 노트</h1>
               </div>
