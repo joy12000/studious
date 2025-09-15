@@ -68,7 +68,7 @@ export default function SettingsPage(){
   function goHome(){ location.assign('/'); }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 space-y-6">
+    <div className="max-w-4xl mx-auto pl-12 pr-4 py-8 space-y-6">
       <header className="sticky top-0 z-10 px-4 py-3">
         <div className="max-w-4xl mx-auto flex flex-wrap items-baseline justify-between gap-y-3">
           <div className="flex items-center gap-4">

@@ -135,7 +135,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
               onClick={() => setIsSidebarOpen(true)}
               variant="ghost"
               size="icon"
-              className="absolute top-4 left-4 z-20 md:hidden" // 모바일에서만 보이도록
+              className="absolute top-3 left-4 z-20 md:hidden" // 모바일에서만 보이도록
             >
               <Menu className="h-7 w-7" />
             </Button>
