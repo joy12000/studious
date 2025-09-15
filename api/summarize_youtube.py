@@ -52,7 +52,7 @@ def extract_first_json(text: str):
     if not text:
         raise ValueError("Empty response from model.")
     
-    match = re.search(r"\{{.*\}}", text, re.DOTALL)
+    match = re.search(r"\{\{.*\}}", text, re.DOTALL)
     if not match:
         raise ValueError("No JSON object found in the model's response.")
     
@@ -75,7 +75,7 @@ def get_transcript_from_apify(youtube_url: str) -> str:
     headers = {"Content-Type": "application/json"}
 
     r = requests.post(api_url, json=payload, headers=headers, timeout=HTTP_TIMEOUT)
-    r.raise_for_status()
+    r.raise_for_status() # Raise an exception for bad status codes (4xx or 5xx)
 
     results = r.json()
     # Correctly parse the nested data structure
@@ -103,8 +103,12 @@ def get_transcript_from_apify(youtube_url: str) -> str:
 def summarize_text(model, text: str):
     """Summarizes text content using the Gemini API."""
     resp = model.generate_content([SUMMARY_PROMPT, f"[Transcript]\n{text}"])
-    # --- DIAGNOSTIC CHANGE: Return raw Gemini response ---
-    return resp.text
+    summary_data = extract_first_json(resp.text)
+    
+    tag_resp = model.generate_content(TAGGING_PROMPT_TEMPLATE.format(summary_text=summary_data["summary"]))
+    tag_data = extract_first_json(tag_resp.text)
+    
+    return {**summary_data, **tag_data}
 
 # ==============================================================================
 # VERCEL HANDLER CLASS
@@ -131,13 +135,9 @@ class Handler(BaseHTTPRequestHandler):
             model = genai.GenerativeModel(GENAI_MODEL)
 
             transcript = get_transcript_from_apify(url)
-            # --- DIAGNOSTIC CHANGE: Call summarize_text and return its raw output ---
-            raw_gemini_response = summarize_text(model, transcript)
-            # We'll return this as a simple text response, not JSON, to see the raw output
-            self.send_response(200)
-            self.send_header("Content-type", "text/plain; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(raw_gemini_response.encode("utf-8"))
+            result = summarize_text(model, transcript)
+            
+            return self._send_json(200, {**result, "mode": "transcript", "sourceUrl": url})
 
         except (ValueError, TypeError) as e:
             return self._send_json(400, {"error": str(e)})
