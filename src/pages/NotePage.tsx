@@ -302,7 +302,7 @@ export default function NotePage() {
               {editing ? (
                 <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full text-3xl font-bold text-foreground bg-transparent border rounded-lg px-3 py-2 focus:ring-2 focus:ring-ring focus:border-transparent transition-colors" />
               ) : (
-                <h1 className="mb-2 text-3xl font-bold leading-tight tracking-tight text-foreground md:text-4xl break-words">{note.title}</h1>
+                <h1 className="mb-2 text-3xl font-bold leading-normal tracking-tight text-foreground md:text-4xl break-words">{note.title}</h1>
               )}
             </div>
 
@@ -346,14 +346,13 @@ export default function NotePage() {
                   {note.key_insights && note.key_insights.length > 0 && (
                     <div className="mt-8">
                       <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                        <Star className="h-5 w-5 text-yellow-500" />
-                        핵심 인사이트
+                        💡 핵심 인사이트
                       </h3>
                       <div className="space-y-3">
                         {note.key_insights.map((insight, index) => (
                           <div key={index} className="flex items-start gap-3 p-4 bg-primary/5 border-l-4 border-primary/40 rounded-r-lg">
                             <div className="text-primary font-bold mt-1">{index + 1}.</div>
-                            <p className="text-card-foreground m-0">{insight}</p>
+                            <p className="text-card-foreground m-0" dangerouslySetInnerHTML={{ __html: marked(insight) as string }} />
                           </div>
                         ))}
                       </div>
@@ -371,7 +370,7 @@ export default function NotePage() {
             {/* ... (하이라이트, 할 일, 라벨 섹션은 변경 없음) ... */}
             {note.highlights.length > 0 && (
               <div className="mb-8">
-                <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2"><Star className="h-5 w-5 text-yellow-500" />하이라이트</h3>
+                <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">✨ 하이라이트</h3>
                 <div className="space-y-2">
                   {note.highlights.map((highlight, index) => (
                     <div key={index} className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">

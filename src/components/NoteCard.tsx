@@ -1,11 +1,11 @@
-// src/components/NoteCard.tsx
-import React, { useMemo } from 'react'; // GEMINI: useMemo 임포트
+import React from 'react';
 import { Star, ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { marked } from 'marked';
 import type { Note } from '../lib/types';
+import { generatePastelColorFromText } from '../lib/utils'; // 🚀 GEMINI: 색상 생성 함수 임포트
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 
 interface NoteCardProps {
   note: Note;
@@ -13,24 +13,12 @@ interface NoteCardProps {
   view?: 'grid' | 'list';
 }
 
-// GEMINI: HTML에서 순수 텍스트를 추출하는 헬퍼 함수
-function extractTextFromHTML(html: string): string {
-  if (typeof DOMParser === 'undefined') {
-    return html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-  }
-  const doc = new DOMParser().parseFromString(html, 'text/html');
-  return doc.body.textContent || "";
-}
-
 /**
  * AIBOOK-UI: shadcn/ui의 Card 컴포넌트를 기반으로 새롭게 디자인된 노트 카드입니다.
- * GEMINI: 'list' 뷰 모드를 지원하고, 미리보기 시 HTML 태그를 제거하도록 수정되었습니다.
+ * GEMINI: 'list' 뷰 모드를 지원하고, 태그에 동적 색상을 적용하도록 수정되었습니다.
  */
 export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: NoteCardProps) {
   
-  // GEMINI: note.content에서 HTML 태그를 제거한 미리보기용 텍스트를 생성합니다.
-  const previewText = useMemo(() => extractTextFromHTML(note.content), [note.content]);
-
   // 원본 URL을 여는 함수 (기존 로직 유지)
   const openSource = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -60,13 +48,20 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
             <h2 className="mb-2 line-clamp-1 text-lg font-semibold">{note.title || '제목 없음'}</h2>
           </Link>
           <Link to={`/note/${note.id}`} className="block">
-            <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
-              {previewText}
-            </p>
+            <div 
+              className="prose prose-sm dark:prose-invert line-clamp-2 text-sm text-muted-foreground"
+              dangerouslySetInnerHTML={{ __html: marked(note.content) as string }}
+            />
           </Link>
           {note.tag && (
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="secondary">{note.tag}</Badge>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {/* 🚀 GEMINI: 동적 색상 태그 적용 */}
+              <div
+                className="px-2.5 py-0.5 text-xs font-semibold rounded-full"
+                style={generatePastelColorFromText(note.tag)}
+              >
+                {note.tag}
+              </div>
             </div>
           )}
         </div>
@@ -121,16 +116,23 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
 
       <CardContent className="flex-1 pb-4">
         <Link to={`/note/${note.id}`} className="block">
-          <p className="line-clamp-3 text-sm text-muted-foreground">
-            {previewText}
-          </p>
+          <div 
+            className="prose prose-sm dark:prose-invert line-clamp-3 text-sm text-muted-foreground"
+            dangerouslySetInnerHTML={{ __html: marked(note.content) as string }}
+          />
         </Link>
       </CardContent>
 
       <CardFooter className="flex flex-col items-start gap-4">
         {note.tag && (
           <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary">{note.tag}</Badge>
+            {/* 🚀 GEMINI: 동적 색상 태그 적용 */}
+            <div
+              className="px-2.5 py-0.5 text-xs font-semibold rounded-full"
+              style={generatePastelColorFromText(note.tag)}
+            >
+              {note.tag}
+            </div>
           </div>
         )}
         {note.sourceUrl && (
