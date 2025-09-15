@@ -29,8 +29,13 @@ export async function exportPlain(): Promise<Blob> {
  * @param passphrase The password to encrypt the backup.
  * @returns A Blob containing the encrypted JSON data.
  */
-export async function exportEncrypted(passphrase: string): Promise<Blob> {
-  const notes = await db.notes.toArray();
+export async function exportEncrypted(passphrase: string, noteIds?: string[]): Promise<Blob> {
+  let notes: Note[];
+  if (noteIds && noteIds.length > 0) {
+    notes = await db.notes.where('id').anyOf(noteIds).toArray();
+  } else {
+    notes = await db.notes.toArray();
+  }
   const settings = await db.settings.toArray();
   const payload: ExportedData = { version: 1, exportedAt: Date.now(), notes, settings };
   const encryptedPayload = await encryptJSON(payload, passphrase);
