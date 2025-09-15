@@ -22,9 +22,7 @@ export default function NoteListPage() { // 이름 변경: HomePage -> NoteListP
   const { setIsSidebarOpen } = useSidebar();
   const navigate = useNavigate();
   const [availableTags, setAvailableTags] = useState<string[]>([]); // 이름 변경: availableTopics -> availableTags
-  const [pinFav, setPinFav] = useState<boolean>(() => {
-    try { return localStorage.getItem('pinFavorites') !== 'false'; } catch { return true; }
-  });
+  
   const [view, setView] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
@@ -36,21 +34,16 @@ export default function NoteListPage() { // 이름 변경: HomePage -> NoteListP
     setAvailableTags(Array.from(tags).sort());
   }, [notes]);
 
-  useEffect(()=>{
-    try { localStorage.setItem('pinFavorites', String(pinFav)); } catch (e) {
-      console.error("Failed to save pinFavorites to localStorage:", e);
-    }
-  }, [pinFav]);
+  
 
   const sortedNotes = useMemo(() => {
     const arr = [...notes];
     arr.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    if (!pinFav) return arr;
     
     const favs = arr.filter(n => n.favorite);
     const rest = arr.filter(n => !n.favorite);
     return [...favs, ...rest];
-  }, [notes, pinFav]);
+  }, [notes]);
 
   const handlePaste = async () => {
     try {
@@ -106,10 +99,7 @@ export default function NoteListPage() { // 이름 변경: HomePage -> NoteListP
                     </TooltipTrigger>
                     <TooltipContent><p>새 영상 요약</p></TooltipContent>
                   </Tooltip>
-                  <Tooltip>
-                    <TooltipTrigger asChild><button onClick={()=>setPinFav(v=>!v)} className={`p-2 rounded-lg transition-colors ${pinFav ? 'text-primary bg-primary/10' : 'text-foreground hover:bg-muted'}`}><Pin className={`h-5 w-5 ${pinFav ? 'fill-current' : ''}`} /></button></TooltipTrigger>
-                    <TooltipContent><p>즐겨찾기 고정</p></TooltipContent>
-                  </Tooltip>
+                  
                 </TooltipProvider>
               </div>
             </div>

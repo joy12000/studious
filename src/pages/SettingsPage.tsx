@@ -76,9 +76,7 @@ export default function SettingsPage(){
               <p className="text-sm text-muted-foreground">테마, 데이터 관리, 백업 등을 설정합니다.</p>
             </div>
           </div>
-          <button onClick={goHome} className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-lg border bg-card hover:bg-muted text-card-foreground transition-colors" title="홈으로">
-            <Home className="h-4 w-4" /> 홈으로
-          </button>
+          
         </div>
       </header>
 
