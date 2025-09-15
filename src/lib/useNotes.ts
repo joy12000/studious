@@ -101,20 +101,12 @@ export function useNotes() {
       const contentType = response.headers.get("content-type");
       const isJson = contentType && contentType.includes("application/json");
 
-      if (!response.ok) {
-        let errorMessage;
-        if (isJson) {
-          const errorData = await response.json();
-          errorMessage = errorData.error || `서버 오류: ${response.status}`;
-        } else {
-          errorMessage = `서버에서 예기치 않은 응답이 왔습니다. (상태: ${response.status}). PWA 앱에서 이 오류가 발생하면 서버 타임아웃일 수 있습니다.`;
-        }
-        throw new Error(errorMessage);
-      }
-      
-      if (!isJson) {
-        // 200 OK 응답이지만 JSON이 아닌 경우 (HTML 에러 페이지 등)
-        throw new Error(`서버 응답 형식 오류입니다. (받은 형식: ${contentType || '없음'})`);
+      // 응답이 정상이 아니거나 JSON이 아니면, 디버깅을 위해 응답 내용을 그대로 에러로 표시
+      if (!response.ok || !isJson) {
+        const errorBody = await response.text();
+        throw new Error(`[Debug] 서버 비정상 응답 (상태: ${response.status}): 
+
+${errorBody.substring(0, 1000)}`);
       }
 
       // 이제 응답이 JSON임이 보장됨
