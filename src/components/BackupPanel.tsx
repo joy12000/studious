@@ -53,18 +53,18 @@ export default function BackupPanel(){
   }
 
   return (
-    <div className="p-6 bg-white/60 backdrop-blur-lg rounded-2xl shadow-lg border border-white/20 space-y-4">
+    <div className="p-6 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20 space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Lock className="h-5 w-5 text-gray-600" />
+          <Lock className="h-5 w-5 text-muted-foreground" />
           <div>
             <div className="font-medium">백업 &amp; 복원</div>
-            <div className="text-xs text-gray-600/80">
+            <div className="text-xs text-muted-foreground/80">
               암호 입력 시 <b>암호화</b>로 동작, 비우면 <b>일반</b>으로 동작합니다.
             </div>
           </div>
         </div>
-        <span className="text-xs px-2 py-1 rounded-full border border-gray-200/80 bg-gray-200/70 text-gray-800">
+        <span className="text-xs px-2 py-1 rounded-full border bg-muted/70 text-muted-foreground">
           현재 모드: <b>{modeLabel}</b>
         </span>
       </div>
@@ -74,7 +74,7 @@ export default function BackupPanel(){
           value={pass}
           onChange={e=>setPass(e.target.value)}
           placeholder="암호(선택) — 입력하면 암호화"
-          className="flex-1 text-sm border border-gray-300/50 bg-white/50 rounded-lg px-3 py-2 focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors"
+          className="flex-1 text-sm border bg-card/50 rounded-lg px-3 py-2 focus:ring-2 focus:ring-ring focus:border-transparent transition-colors"
           autoComplete="new-password"
         />
       </div>
@@ -83,7 +83,7 @@ export default function BackupPanel(){
         <button
           onClick={doExport}
           disabled={busy}
-          className={`inline-flex items-center justify-center gap-2 px-3 py-3 rounded-lg font-semibold transition-colors ${busy ? 'bg-gray-200 text-gray-500 cursor-not-allowed' : 'bg-teal-600 text-white hover:bg-teal-700'}`}
+          className={`inline-flex items-center justify-center gap-2 px-3 py-3 rounded-lg font-semibold transition-colors ${busy ? 'bg-muted text-muted-foreground cursor-not-allowed' : 'bg-primary text-primary-foreground hover:bg-primary/90'}`}
         >
           <Download className="h-4 w-4" />
           백업 다운로드
@@ -91,7 +91,7 @@ export default function BackupPanel(){
         <button
           onClick={askFile}
           disabled={busy}
-          className={`inline-flex items-center justify-center gap-2 px-3 py-3 rounded-lg border transition-colors ${busy ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'border-gray-300/50 bg-white/50 hover:bg-white/80'}`}
+          className={`inline-flex items-center justify-center gap-2 px-3 py-3 rounded-lg border transition-colors ${busy ? 'bg-muted text-muted-foreground cursor-not-allowed' : 'border bg-card/50 hover:bg-card/80'}`}
         >
           <Upload className="h-4 w-4" />
           파일에서 복원
@@ -100,7 +100,7 @@ export default function BackupPanel(){
 
       <input type="file" accept="application/json" className="hidden" ref={fileRef} onChange={onImportFile} />
 
-      <div className="flex items-start gap-3 text-xs text-gray-700/80">
+      <div className="flex items-start gap-3 text-xs text-muted-foreground/80">
         <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
         <div className="space-y-1">
           <div>암호화 백업은 AES‑GCM + PBKDF2로 보호됩니다. 암호를 잊으면 복원할 수 없습니다.</div>
