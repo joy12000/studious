@@ -69,7 +69,7 @@ export default function NotePage() {
     // GEMINI: attachments도 업데이트에 포함
     await updateNote(id, {
       title: editTitle.trim(),
-      content: editContent.trim(),
+      content: editContent,
       attachments: editAttachments,
       updatedAt: Date.now(), // updatedAt 갱신
     });
