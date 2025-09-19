@@ -140,5 +140,29 @@ ${errorBody.substring(0, 1000)}`);
     return await db.notes.get(id);
   }, []);
 
-  return { notes: notes || [], loading, filters, setFilters, toggleFavorite, addNote, updateNote, deleteNote, getNote };
+  // GEMINI: 가져온 노트를 DB에 추가하는 함수
+  const importNote = async (note: Partial<Note>) => {
+    const newNote: Note = {
+      id: crypto.randomUUID(),
+      title: note.title || '제목 없음',
+      content: note.content || '',
+      key_insights: note.key_insights || [],
+      tag: note.tag || '일반',
+      sourceUrl: note.sourceUrl,
+      thumbnailUrl: note.thumbnailUrl,
+      sourceType: note.sourceType || 'other',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().getTime(),
+      topics: note.topics || [],
+      labels: note.labels || [],
+      highlights: note.highlights || [],
+      todo: note.todo || [],
+      favorite: note.favorite || false,
+      attachments: note.attachments || [],
+    };
+    await db.notes.add(newNote);
+    return newNote;
+  };
+
+  return { notes: notes || [], loading, filters, setFilters, toggleFavorite, addNote, updateNote, deleteNote, getNote, importNote };
 }

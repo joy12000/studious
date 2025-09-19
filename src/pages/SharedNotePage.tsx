@@ -60,7 +60,7 @@ function LoadingView({ text }: { text: string }) {
 export default function SharedNotePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { addNote } = useNotes();
+  const { importNote } = useNotes(); // GEMINI: addNote 대신 importNote 사용
   
   const [noteToImport, setNoteToImport] = useState<Partial<Note> | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -97,10 +97,10 @@ export default function SharedNotePage() {
   const handleSaveNote = async () => {
     if (!noteToImport) return;
     try {
-      // useNotes 훅의 addNote 함수를 사용해 저장
-      await addNote(noteToImport);
+      // GEMINI: useNotes 훅의 importNote 함수를 사용해 저장
+      const newNote = await importNote(noteToImport);
       alert('노트가 성공적으로 저장되었습니다.');
-      navigate('/'); // 저장 후 홈으로 이동
+      navigate(`/note/${newNote.id}`); // 저장 후 생성된 노트 페이지로 이동
     } catch (err) {
       console.error('Failed to save note:', err);
       alert('노트를 저장하는 데 실패했습니다.');
