@@ -33,12 +33,20 @@ export default defineConfig({
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
         ],
+        // 💡 [수정] Web Share Target API 설정
         share_target: {
-          action: '/share',
-          method: 'GET',
-          
-          enctype: 'application/x-www-form-urlencoded',params: { title: 'title', text: 'text', url: 'url' }
-        }
+          action: '/handle-shared-note', // 데이터를 처리할 고유 경로
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: {
+            files: [
+              {
+                name: 'shared_file', // 서비스 워커에서 사용할 파일의 키 이름
+                accept: ['application/json', '.json'], // JSON 파일만 허용
+              },
+            ],
+          },
+        },
       },
       workbox: {
         runtimeCaching: [
