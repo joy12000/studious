@@ -60,6 +60,7 @@ export default defineConfig({
             accept: {
               'application/json': ['.json'],
             },
+            launch_type: 'single-client',
           },
         ],
       },
