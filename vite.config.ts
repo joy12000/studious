@@ -20,7 +20,13 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      strategies: 'injectManifest',
+      srcDir: '.',
+      filename: 'sw.js',
       registerType: 'autoUpdate',
+      devOptions: {
+        enabled: true
+      },
       includeAssets: ['icon-192.png','icon-512.png'],
       manifest: {
         name: 'Aibrary',
@@ -48,14 +54,6 @@ export default defineConfig({
           },
         },
       },
-      workbox: {
-        runtimeCaching: [
-          {
-            urlPattern: /^\/api\//, // API 요청은 네트워크만 사용
-            handler: 'NetworkOnly'
-          }
-        ]
-      }
     })
   ],
   build: {
