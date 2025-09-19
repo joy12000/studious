@@ -53,6 +53,15 @@ export default defineConfig({
             }],
           },
         },
+        // 💡 [추가] File Handling API 설정
+        file_handlers: [
+          {
+            action: '/handle-opened-file',
+            accept: {
+              'application/json': ['.json'],
+            },
+          },
+        ],
       },
     })
   ],
