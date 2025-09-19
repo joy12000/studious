@@ -106,6 +106,7 @@ ${errorBody.substring(0, 1000)}`);
         key_insights: result.key_insights,
         tag: result.tag,
         sourceUrl: result.sourceUrl,
+        thumbnailUrl: result.thumbnailUrl, // GEMINI: 썸네일 URL 추가
         sourceType: 'youtube',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().getTime(),
