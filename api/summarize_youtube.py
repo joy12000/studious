@@ -133,14 +133,6 @@ def summarize_text(model, text: str):
     result_data = extract_first_json(resp.text)
     return result_data
 
-def get_youtube_video_id(url: str):
-    """Extracts the YouTube video ID from a URL."""
-    if not url:
-        return None
-    # Handles youtu.be/, youtube.com/watch?v=, youtube.com/embed/, etc.
-    match = re.search(r"(?:v=|\/|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})", url)
-    return match.group(1) if match else None
-
 # ==============================================================================
 # VERCEL HANDLER CLASS
 # ==============================================================================
@@ -167,20 +159,8 @@ class Handler(BaseHTTPRequestHandler):
 
             transcript = get_transcript_from_apify(url)
             result = summarize_text(model, transcript)
-
-            # --- GEMINI: 썸네일 URL 생성 로직 추가 ---
-            thumbnail_url = None
-            video_id = get_youtube_video_id(url)
-            if video_id:
-                thumbnail_url = f"https://img.youtube.com/vi/{video_id}/hqdefault.jpg"
-            # --- END ---
             
-            return self._send_json(200, {
-                **result, 
-                "mode": "transcript", 
-                "sourceUrl": url,
-                "thumbnailUrl": thumbnail_url
-            })
+            return self._send_json(200, {**result, "mode": "transcript", "sourceUrl": url})
 
         except (ValueError, TypeError) as e:
             return self._send_json(400, {"error": str(e)})

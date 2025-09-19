@@ -19,6 +19,18 @@ interface NoteCardProps {
  */
 export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: NoteCardProps) {
   
+  // GEMINI: sourceUrl에서 YouTube 썸네일 URL을 동적으로 생성합니다.
+  const getYoutubeThumbnailUrl = (youtubeUrl: string): string | null => {
+    if (!youtubeUrl) return null;
+    const match = youtubeUrl.match(/(?:v=|\/|youtu\.be\/|embed\/)([a-zA-Z0-9_-]{11})/);
+    const videoId = match ? match[1] : null;
+    return videoId ? `https://img.youtube.com/vi/${videoId}/hqdefault.jpg` : null;
+  };
+
+  const thumbnailUrl = note.sourceType === 'youtube' && note.sourceUrl 
+    ? getYoutubeThumbnailUrl(note.sourceUrl)
+    : null;
+
   // 원본 URL을 여는 함수 (기존 로직 유지)
   const openSource = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -95,10 +107,10 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
   // 기본 'grid' 뷰 레이아웃
   return (
     <Card className="flex h-full flex-col transition-all hover:shadow-md">
-      {/* GEMINI: 썸네일 이미지 표시 로직 추가 */}
-      {note.thumbnailUrl && view === 'grid' && (
+      {/* GEMINI: 동적으로 생성된 썸네일 URL을 사용하도록 수정 */}
+      {thumbnailUrl && view === 'grid' && (
         <Link to={`/note/${note.id}`} className="block aspect-video w-full overflow-hidden rounded-t-lg">
-          <img src={note.thumbnailUrl} alt={note.title} className="h-full w-full object-cover transition-transform hover:scale-105" />
+          <img src={thumbnailUrl} alt={note.title} className="h-full w-full object-cover transition-transform hover:scale-105" />
         </Link>
       )}
 

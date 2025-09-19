@@ -106,7 +106,6 @@ ${errorBody.substring(0, 1000)}`);
         key_insights: result.key_insights,
         tag: result.tag,
         sourceUrl: result.sourceUrl,
-        thumbnailUrl: result.thumbnailUrl, // GEMINI: 썸네일 URL 추가
         sourceType: 'youtube',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().getTime(),
@@ -149,7 +148,6 @@ ${errorBody.substring(0, 1000)}`);
       key_insights: note.key_insights || [],
       tag: note.tag || '일반',
       sourceUrl: note.sourceUrl,
-      thumbnailUrl: note.thumbnailUrl,
       sourceType: note.sourceType || 'other',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().getTime(),
