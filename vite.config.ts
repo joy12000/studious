@@ -20,15 +20,12 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      // 💡 [수정] 서비스 워커 생성 전략을 변경합니다.
-      // 'generateSW' 대신 'injectManifest'를 사용하여 우리가 만든 SW 파일을 사용합니다.
-      strategies: 'injectManifest',
-      srcDir: 'public', // 서비스 워커 파일이 있는 디렉토리
-      filename: 'sw.js',  // 우리가 만든 서비스 워커 파일 이름
-
       registerType: 'autoUpdate',
+      // 서비스 워커는 public/sw.js 파일을 직접 사용하도록 하고,
+      // VitePWA 플러그인은 아래 manifest 생성만 담당하도록 합니다.
+      strategies: 'copy', // 단순 복사 모드
+      srcDir: 'public',
       
-      // 💡 [수정] Manifest 설정을 여기서 명확하게 정의합니다.
       manifest: {
         name: 'Aibrary',
         short_name: 'Aibrary',
@@ -41,20 +38,17 @@ export default defineConfig({
           { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
         ],
-        // 💡 [수정] 파일 공유를 위한 share_target 설정
         share_target: {
-          action: '/share-target', // SW에서 처리할 경로
+          action: '/share-target',
           method: 'POST',
           enctype: 'multipart/form-data',
           params: {
             files: [{
-              name: 'shared_file', // SW에서 formData.get()으로 사용할 키
+              name: 'shared_file',
               accept: ['application/json', '.json'],
             }],
           },
         },
-        // 💡 [추가] File Handling API 설정 (삼성 인터넷 호환성을 위해 임시 주석 처리)
-        /*
         file_handlers: [
           {
             action: '/handle-opened-file',
@@ -64,7 +58,6 @@ export default defineConfig({
             launch_type: 'single-client',
           },
         ],
-        */
       },
     })
   ],
