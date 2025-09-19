@@ -61,6 +61,16 @@ export function useNotes() {
 
   const loading = notes === undefined;
 
+  // GEMINI: DB에 있는 모든 노트의 태그 목록을 생성합니다.
+  const allTags = useLiveQuery(async () => {
+    const allNotes = await db.notes.toArray();
+    const tags = new Set<string>();
+    allNotes.forEach(note => {
+      if (note.tag) tags.add(note.tag);
+    });
+    return Array.from(tags).sort();
+  }, []); // 의존성 배열이 비어있으므로, 이 쿼리는 한 번만 또는 DB 변경 시에만 실행됩니다.
+
   const toggleFavorite = async (id: string) => {
     const note = await db.notes.get(id);
     if (!note) return;
@@ -162,5 +172,17 @@ ${errorBody.substring(0, 1000)}`);
     return newNote;
   };
 
-  return { notes: notes || [], loading, filters, setFilters, toggleFavorite, addNote, updateNote, deleteNote, getNote, importNote };
+  return { 
+    notes: notes || [], 
+    loading, 
+    allTags: allTags || [], // GEMINI: 반환 객체에 전체 태그 목록 추가
+    filters, 
+    setFilters, 
+    toggleFavorite, 
+    addNote, 
+    updateNote, 
+    deleteNote, 
+    getNote, 
+    importNote 
+  };
 }

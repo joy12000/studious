@@ -17,21 +17,13 @@ import { Button } from '@/components/ui/button'; // GEMINI: Button 임포트
  * GEMINI: AppLayout에서 분리된 헤더를 자체적으로 구현하고 모바일 레이아웃을 최적화했습니다.
  */
 export default function NoteListPage() { // 이름 변경: HomePage -> NoteListPage
-  const { notes, loading, filters, setFilters, toggleFavorite, addNote } = useNotes();
+  const { notes, loading, allTags, filters, setFilters, toggleFavorite } = useNotes();
   const { setIsSidebarOpen } = useSidebar();
   const navigate = useNavigate();
-  const [availableTags, setAvailableTags] = useState<string[]>([]); // 이름 변경: availableTopics -> availableTags
   
   const [view, setView] = useState<'grid' | 'list'>('grid');
 
-  useEffect(() => {
-    // Set으로 중복 제거 후 정렬
-    const tags = new Set<string>();
-    notes.forEach(note => {
-      if (note.tag) tags.add(note.tag);
-    });
-    setAvailableTags(Array.from(tags).sort());
-  }, [notes]);
+  
 
   
 
@@ -90,7 +82,7 @@ export default function NoteListPage() { // 이름 변경: HomePage -> NoteListP
             </div>
             {/* 하단 행: 필터 바 */}
             <div className="w-full mt-2">
-              <FilterBar filters={filters} onFiltersChange={setFilters} availableTags={availableTags} />
+              <FilterBar filters={filters} onFiltersChange={setFilters} availableTags={allTags} />
             </div>
           </div>
         </div>
