@@ -20,12 +20,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
-      // 서비스 워커는 public/sw.js 파일을 직접 사용하도록 하고,
-      // VitePWA 플러그인은 아래 manifest 생성만 담당하도록 합니다.
-      strategies: 'copy', // 단순 복사 모드
+      strategies: 'injectManifest',
       srcDir: 'public',
-      
+      filename: 'sw.js',
+      registerType: 'autoUpdate',
       manifest: {
         name: 'Aibrary',
         short_name: 'Aibrary',
@@ -39,7 +37,7 @@ export default defineConfig({
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
         ],
         share_target: {
-          action: '/share-target',
+          action: '/index.html', // 안정성을 위해 실제 파일 경로로 변경
           method: 'POST',
           enctype: 'multipart/form-data',
           params: {

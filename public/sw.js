@@ -1,81 +1,68 @@
-const CACHE_NAME = 'aibrary-cache-v1';
-const ASSETS_TO_CACHE = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
-  // 빌드 후 실제 생성되는 JS/CSS 파일 경로를 포함해야 할 수 있습니다.
-  // 하지만 우선 가장 기본적인 파일들만 캐싱하여 설치 문제를 해결합니다.
-];
+import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
+import { registerRoute } from 'workbox-routing';
+import { NetworkFirst, CacheFirst } from 'workbox-strategies';
+import { ExpirationPlugin } from 'workbox-expiration';
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(ASSETS_TO_CACHE))
-      .then(() => self.skipWaiting())
-  );
+// 서비스 워커의 생명주기 이벤트를 제어합니다.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
-
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.map((key) => {
-        if (key !== CACHE_NAME) {
-          return caches.delete(key);
-        }
-      }))
-    ).then(() => self.clients.claim())
-  );
+  event.waitUntil(self.clients.claim());
 });
 
+// VitePWA가 주입할 매니페스트를 사용하여 앱의 핵심 자산을 미리 캐싱합니다.
+// 이것이 PWA 설치와 오프라인 실행의 핵심입니다.
+cleanupOutdatedCaches();
+precacheAndRoute(self.__WB_MANIFEST || []);
+
+// 구글 폰트와 같은 외부 리소스에 대한 캐싱 규칙 (CacheFirst 전략)
+registerRoute(
+  ({url}) => url.origin === 'https://fonts.googleapis.com' || url.origin === 'https://fonts.gstatic.com',
+  new CacheFirst({
+    cacheName: 'google-fonts',
+    plugins: [
+      new ExpirationPlugin({ maxEntries: 20 }),
+    ],
+  })
+);
+
+// API 요청에 대한 캐싱 규칙 (NetworkFirst 전략)
+registerRoute(
+  ({url}) => url.pathname.startsWith('/api/'),
+  new NetworkFirst({ cacheName: 'api-cache' })
+);
+
+// 파일 공유를 위한 특별 Fetch 이벤트 리스너
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
-  // 1. 파일 공유 POST 요청을 가장 먼저 처리합니다.
-  if (event.request.method === 'POST' && url.pathname === '/share-target') {
+  // Web Share Target API를 통해 들어온 POST 요청을 처리합니다.
+  if (event.request.method === 'POST' && url.pathname === '/index.html') {
     event.respondWith((async () => {
       try {
         const formData = await event.request.formData();
         const file = formData.get('shared_file');
+
         if (file instanceof File) {
           const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
           if (clients.length > 0) {
-            clients[0].postMessage({ file, type: 'shared-file' });
             await clients[0].focus();
+            clients[0].postMessage({ file, type: 'shared-file' });
           } else {
             self.clients.openWindow('/');
           }
         }
         return Response.redirect('/', 303);
       } catch (error) {
-        console.error('Share target fetch failed:', error);
+        console.error('Share target fetch handler failed:', error);
         return Response.redirect('/', 303);
       }
     })());
-    return; // 여기서 처리를 종료합니다.
+    return; // 이 요청은 여기서 처리를 종료합니다.
   }
 
-  // 2. API 요청은 캐시하지 않고 항상 네트워크로 보냅니다.
-  if (url.pathname.startsWith('/api/')) {
-    event.respondWith(fetch(event.request));
-    return;
-  }
-
-  // 3. 그 외의 모든 요청은 네트워크 우선, 실패 시 캐시 전략을 사용합니다.
-  event.respondWith(
-    fetch(event.request)
-      .then((networkResponse) => {
-        // 네트워크 요청이 성공하면 캐시에 저장하고 결과를 반환합니다.
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, responseToCache);
-        });
-        return networkResponse;
-      })
-      .catch(() => {
-        // 네트워크 요청이 실패하면 캐시에서 찾습니다.
-        return caches.match(event.request).then((cachedResponse) => {
-          return cachedResponse || caches.match('/'); // 캐시에도 없으면 기본 페이지로
-        });
-      })
-  );
+  // 그 외의 모든 GET 요청은 위에서 선언된 라우팅 규칙들이 처리합니다.
 });
