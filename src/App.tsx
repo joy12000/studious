@@ -6,87 +6,106 @@ import NotePage from './pages/NotePage';
 import SettingsPage from './pages/SettingsPage';
 import SharedNotePage from './pages/SharedNotePage';
 import ShareHandler from './components/ShareHandler';
-import { db } from './lib/db'; // DB import 추가
-import AppLayout from './components/AppLayout'; // AIBOOK-UI: AppLayout 컴포넌트를 가져옵니다.
-
-// A component to handle navigation from outside the Router context
-function ServiceWorkerMessageHandler() {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const handleServiceWorkerMessage = async (event: MessageEvent) => {
-      if (event.data && event.data.type === 'shared-file') {
-        const file = event.data.file as File;
-        try {
-          const content = await file.text();
-          navigate('/shared-note', { state: { sharedContent: content } });
-        } catch (error) {
-          console.error('Error reading shared file:', error);
-          alert('공유된 파일을 읽는 데 실패했습니다.');
-        }
-      }
-    };
-
-    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
-
-    return () => {
-      navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
-    };
-  }, [navigate]);
-
-  return null;
-}
+import AppLayout from './components/AppLayout';
+import { useNotes } from './lib/useNotes';
 
 function App() {
   const navigate = useNavigate();
+  const { importNote } = useNotes();
 
   useEffect(() => {
-    // File Handling API 로직
+    // --- 데이터 처리 중앙 핸들러 ---
+    const useImport = (json: any) => {
+      if (json && (json.content || json.title)) {
+        console.log('Imported JSON', json);
+        importNote(json).then(newNote => {
+          navigate(`/note/${newNote.id}`);
+        });
+        alert('노트를 성공적으로 가져왔습니다.');
+      } else {
+        alert('가져온 파일에 노트 내용이 없습니다.');
+      }
+    };
+
+    const handleIncomingPayload = (raw: any) => {
+      if (!raw || typeof raw !== 'string') {
+        alert('공유된 데이터가 비어있거나 형식이 잘못되었습니다.');
+        return;
+      }
+      let data = null;
+      // 1) JSON 시도
+      try { data = JSON.parse(raw); }
+      catch {
+        // 2) data: URL/Base64 시도
+        if (/^data:application\/json;base64,/.test(raw)) {
+          try { data = JSON.parse(atob(raw.split(',')[1])); } catch {}
+        }
+        // 3) URL이면 fetch 후 JSON 시도 (CORS 주의)
+        if (!data && /^https?:\/\//.test(raw)) {
+          alert('URL을 가져오는 중... 이 작업은 몇 초 정도 걸릴 수 있습니다.');
+          fetch(raw).then(r => r.text()).then(t => {
+            try {
+              const j = JSON.parse(t);
+              useImport(j);
+            } catch {
+              alert('JSON이 아닌 링크/텍스트입니다.');
+            }
+          }).catch(err => {
+            console.error('Fetch failed', err);
+            alert('링크에서 데이터를 가져오는 데 실패했습니다.');
+          });
+          return;
+        }
+      }
+
+      if (data) {
+        // ExportedData 형식인지 확인 (version, notes 키 존재)
+        if (data.version === 1 && Array.isArray(data.notes) && data.notes.length > 0) {
+          useImport(data.notes[0]); // 첫 번째 노트만 가져옴
+        } else {
+          useImport(data);
+        }
+      } else {
+        alert('유효한 JSON 데이터가 아닙니다.');
+      }
+    };
+
+    // --- 이벤트 리스너 설정 ---
+
+    // (A) 서비스 워커로부터 오는 메시지 수신 (Web Share Target)
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'shared-payload') {
+        handleIncomingPayload(event.data.payloadText);
+      }
+    };
+    navigator.serviceWorker?.addEventListener?.('message', handleServiceWorkerMessage);
+
+    // (B) launchQueue로부터 오는 파일 처리 (File Handling)
     if ('launchQueue' in window) {
+      // @ts-ignore
       window.launchQueue.setConsumer(async (launchParams) => {
-        if (!launchParams.files || launchParams.files.length === 0) return;
-        const fileHandle = launchParams.files[0];
-        const file = await fileHandle.getFile();
-        try {
-          const content = await file.text();
-          navigate('/shared-note', { state: { sharedContent: content } });
-        } catch (error) {
-          console.error('Error reading launched file:', error);
-          alert('파일을 여는 데 실패했습니다.');
+        if (!launchParams?.files?.length) return;
+        for (const handle of launchParams.files) {
+          try {
+            const file = await handle.getFile();
+            const text = await file.text();
+            handleIncomingPayload(text);
+          } catch (e) {
+            console.warn('launchQueue read failed', e);
+          }
         }
       });
     }
 
-    // 데이터 마이그레이션 로직 (단 한 번만 실행)
-    const runMigration = async () => {
-      const MIGRATION_KEY = 'topicRulesKeywordsCleared_v1';
-      const isMigrated = localStorage.getItem(MIGRATION_KEY);
-
-      if (!isMigrated) {
-        console.log('Running topic rules migration: Clearing keywords...');
-        try {
-          const rules = await db.topicRules.toArray();
-          if (rules.length > 0) {
-            const updates = rules.map(rule => ({ ...rule, keywords: [] }));
-            await db.topicRules.bulkPut(updates);
-            console.log('Migration successful: All user-defined keywords have been cleared.');
-          }
-          localStorage.setItem(MIGRATION_KEY, 'true');
-        } catch (error) {
-          console.error('Topic rules migration failed:', error);
-        }
-      }
+    return () => {
+      navigator.serviceWorker?.removeEventListener?.('message', handleServiceWorkerMessage);
     };
 
-    runMigration();
-
-  }, [navigate]);
+  }, [navigate, importNote]);
 
   return (
-    // AIBOOK-UI: 기존 div 대신 AppLayout으로 전체 페이지를 감싸도록 구조를 변경합니다.
     <AppLayout>
       <ShareHandler />
-      <ServiceWorkerMessageHandler />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/notes" element={<NoteListPage />} />

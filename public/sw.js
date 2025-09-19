@@ -40,24 +40,40 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   // Web Share Target API를 통해 들어온 POST 요청을 처리합니다.
-  if (event.request.method === 'POST' && url.pathname === '/index.html') {
+  if (event.request.method === 'POST' && url.pathname === '/share-target') {
     event.respondWith((async () => {
       try {
         const formData = await event.request.formData();
-        const file = formData.get('shared_file');
 
-        if (file instanceof File) {
-          const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-          if (clients.length > 0) {
-            await clients[0].focus();
-            clients[0].postMessage({ file, type: 'shared-file' });
-          } else {
-            self.clients.openWindow('/');
-          }
+        // 1) 파일 경로
+        const file = formData.get('shared_file');
+        let payloadText = null;
+
+        if (file && typeof file.text === 'function') {
+          try { payloadText = await file.text(); } catch {}
         }
+
+        // 2) 텍스트/URL 백업 경로
+        if (!payloadText) {
+          const text = formData.get('text') || formData.get('title') || '';
+          const urlStr = formData.get('url') || '';
+          payloadText = text || urlStr || '';
+        }
+
+        // 클라이언트로 전달
+        const clientsList = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        if (clientsList.length) {
+          clientsList[0].postMessage({ type: 'shared-payload', payloadText });
+          await clientsList[0].focus();
+        } else {
+          // 앱이 닫혀있을 경우, 쿼리 파라미터로 데이터를 전달하는 것은 복잡하므로,
+          // 우선 앱을 여는 것까지만 처리합니다. 사용자가 다시 공유를 시도할 수 있습니다.
+          await self.clients.openWindow('/');
+        }
+
         return Response.redirect('/', 303);
-      } catch (error) {
-        console.error('Share target fetch handler failed:', error);
+      } catch (e) {
+        console.error('Share target fetch failed:', e);
         return Response.redirect('/', 303);
       }
     })());

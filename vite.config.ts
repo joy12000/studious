@@ -37,21 +37,26 @@ export default defineConfig({
           { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
         ],
         share_target: {
-          action: '/index.html', // 안정성을 위해 실제 파일 경로로 변경
+          action: '/share-target',
           method: 'POST',
           enctype: 'multipart/form-data',
           params: {
             files: [{
               name: 'shared_file',
-              accept: ['application/json', '.json'],
+              accept: ['application/json', 'text/plain', 'application/octet-stream', '.json'],
             }],
+            title: 'title',
+            text: 'text',
+            url: 'url',
           },
         },
         file_handlers: [
           {
-            action: '/handle-opened-file',
+            action: '/',
             accept: {
               'application/json': ['.json'],
+              'text/plain': ['.json', '.txt'],
+              'application/octet-stream': ['.json'],
             },
             launch_type: 'single-client',
           },
