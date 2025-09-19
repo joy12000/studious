@@ -4,7 +4,7 @@ import { Note, Attachment } from '../lib/types';
 import { useNotes } from '../lib/useNotes';
 import ShareModal from '../components/ShareModal';
 import AttachmentPanel from '../components/AttachmentPanel';
-import { exportEncrypted, exportPlain } from '../lib/backup';
+import { exportEncrypted, exportPlain, exportPlainSingleNote } from '../lib/backup';
 import { v4 as uuidv4 } from 'uuid';
 import { marked } from 'marked';
 import { 
@@ -111,22 +111,22 @@ export default function NotePage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleShare = async (pin: string) => {
+  const handleShare = async () => {
     if (!note) return;
     try {
-      const encryptedNote = await exportEncrypted(pin, [note.id]);
+      const noteBlob = await exportPlainSingleNote(note.id);
       const shareData = {
         title: `노트 공유: ${note.title}`,
         text: `Aibrary에서 공유된 노트입니다. 파일을 열어 확인하세요.`,
         files: [
-          new File([encryptedNote], `${note.title}.enc.json`, { type: 'application/json' })
+          new File([noteBlob], `${note.title}.json`, { type: 'application/json' })
         ]
       };
       if (navigator.canShare && navigator.canShare(shareData)) {
         await navigator.share(shareData);
       } else {
         alert('이 브라우저에서는 파일 공유를 지원하지 않습니다. 대신 다운로드합니다.');
-        triggerDownload(encryptedNote, `${note.title}.enc.json`);
+        triggerDownload(noteBlob, `${note.title}.json`);
       }
     } catch (error) {
       console.error("Share failed", error);
@@ -135,11 +135,11 @@ export default function NotePage() {
     setIsShareModalOpen(false);
   };
 
-  const handleDownload = async (pin: string) => {
+  const handleDownload = async () => {
     if (!note) return;
     try {
-      const blob = await (pin ? exportEncrypted(pin, [note.id]) : exportPlain([note.id]));
-      const fileName = `${note.title.replace(/[^a-z0-9]/gi, '_')}.${pin ? 'enc' : ''}.json`;
+      const blob = await exportPlainSingleNote(note.id);
+      const fileName = `${note.title.replace(/[^a-z0-9]/gi, '_')}.json`;
       triggerDownload(blob, fileName);
     } catch (error) {
       console.error("Download failed", error);

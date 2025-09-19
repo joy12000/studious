@@ -26,6 +26,21 @@ export async function exportPlain(): Promise<Blob> {
 }
 
 /**
+ * GEMINI: Exports a single note to a plain JSON file without encryption.
+ * @param noteId The ID of the note to export.
+ * @returns A Blob containing the JSON data.
+ */
+export async function exportPlainSingleNote(noteId: string): Promise<Blob> {
+  const note = await db.notes.get(noteId);
+  if (!note) {
+    throw new Error('Note not found for export');
+  }
+  // ExportedData a-lways expects a `notes` array
+  const payload: ExportedData = { version: 1, exportedAt: Date.now(), notes: [note], settings: [] };
+  return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+}
+
+/**
  * Encrypts and exports all notes and settings to a JSON file.
  * @param passphrase The password to encrypt the backup.
  * @returns A Blob containing the encrypted JSON data.

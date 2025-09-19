@@ -1,74 +1,40 @@
-
-import React, { useState, useEffect, useRef } from 'react';
-import { X, Download } from 'lucide-react';
-
-// COMMENT: 공유 시 4자리 PIN을 입력받기 위한 모달 컴포넌트
+import React, { useEffect } from 'react';
+import { X, Download, Share2 } from 'lucide-react';
 
 interface ShareModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (pin: string) => void;
-  onDownload: (pin: string) => void; // 다운로드 핸들러 추가
+  onConfirm: () => void; // PIN is no longer needed
+  onDownload: () => void; // PIN is no longer needed
   noteTitle: string;
 }
 
 export default function ShareModal({ isOpen, onClose, onConfirm, onDownload, noteTitle }: ShareModalProps) {
-  const [pin, setPin] = useState('');
-  const [error, setError] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
 
-  // COMMENT: 모달이 열릴 때마다 input에 포커스를 주고, 상태를 초기화합니다.
   useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
     if (isOpen) {
-      setPin('');
-      setError('');
-      // setTimeout을 사용하여 모달이 렌더링된 후 포커스를 줍니다.
-      setTimeout(() => inputRef.current?.focus(), 100);
+      window.addEventListener('keydown', handleKeyDown);
     }
-  }, [isOpen]);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
-  // COMMENT: PIN 유효성을 검사하는 공통 함수
-  const validateAndProceed = (action: (pin: string) => void) => {
-    if (/^\d{4}$/.test(pin)) {
-      action(pin);
-    } else {
-      setError('반드시 4자리 숫자를 입력해야 합니다.');
-      inputRef.current?.focus();
-    }
-  };
-
-  // COMMENT: 사용자가 '공유 시작' 버튼을 눌렀을 때 실행됩니다.
-  const handleSubmit = () => {
-    validateAndProceed(onConfirm);
-  };
-
-  // COMMENT: 사용자가 '파일만 다운로드' 버튼을 눌렀을 때 실행됩니다.
-  const handleDownload = () => {
-    validateAndProceed(onDownload);
-  };
-
-  // COMMENT: Enter 키를 눌렀을 때 기본 동작인 '공유 시작'이 실행되도록 합니다.
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSubmit();
-    }
-  };
-
-  // COMMENT: 모달이 닫혀있으면 아무것도 렌더링하지 않습니다.
   if (!isOpen) {
     return null;
   }
 
   return (
-    // 배경 (Backdrop)
     <div 
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
-      {/* 모달 컨텐츠 */}
       <div
         className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-sm m-4"
-        onClick={(e) => e.stopPropagation()} // 모달 내부 클릭 시 닫히지 않도록 함
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold text-gray-800">노트 공유 및 내보내기</h2>
@@ -77,32 +43,20 @@ export default function ShareModal({ isOpen, onClose, onConfirm, onDownload, not
           </button>
         </div>
         
-        <p className="text-gray-600 mb-2">
-          공유 또는 다운로드할 노트 "<strong className="truncate max-w-xs inline-block align-bottom">{noteTitle}</strong>"를 암호화할 4자리 숫자 PIN을 입력하세요.
+        <p className="text-gray-600 mb-6 text-center">
+          "<strong className="truncate max-w-xs inline-block align-bottom">{noteTitle}</strong>" 노트를 공유하거나 파일로 다운로드하시겠습니까?
         </p>
-        
-        <input
-          ref={inputRef}
-          type="tel" // 모바일에서 숫자 키패드가 뜨도록 tel 타입 사용
-          maxLength={4}
-          value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))} // 숫자만 입력되도록 필터링
-          onKeyDown={handleKeyDown}
-          className={`w-full text-center text-3xl tracking-[1em] font-mono border-2 ${error ? 'border-red-500' : 'border-gray-300'} rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition`}
-          placeholder="••••"
-        />
-        
-        {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
 
         <div className="mt-6 space-y-3">
           <button
-            onClick={handleSubmit}
+            onClick={onConfirm}
             className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition-transform active:scale-[0.98] flex items-center justify-center gap-2"
           >
+            <Share2 size={18} />
             공유 시작
           </button>
           <button
-            onClick={handleDownload}
+            onClick={onDownload}
             className="w-full bg-gray-600 text-white font-bold py-3 rounded-lg hover:bg-gray-700 transition-transform active:scale-[0.98] flex items-center justify-center gap-2"
           >
             <Download size={18} />
