@@ -32,6 +32,7 @@ export interface Note {
   content: string;     // (수정) Gemini가 생성한 요약문 (summary)
   sourceType: SourceType;
   sourceUrl?: string | null;
+  thumbnailUrl?: string | null; // GEMINI: 유튜브 썸네일 URL 필드 추가
   createdAt: string;
   updatedAt: number; // updatedAt은 number 타입 유지
   tag: string;         // (대체) Gemini가 생성한 단일 태그

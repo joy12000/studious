@@ -95,9 +95,17 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
   // 기본 'grid' 뷰 레이아웃
   return (
     <Card className="flex h-full flex-col transition-all hover:shadow-md">
-      <CardHeader className="flex-row items-start justify-between gap-4 pb-4">
+      {/* GEMINI: 썸네일 이미지 표시 로직 추가 */}
+      {note.thumbnailUrl && view === 'grid' && (
+        <Link to={`/note/${note.id}`} className="block aspect-video w-full overflow-hidden rounded-t-lg">
+          <img src={note.thumbnailUrl} alt={note.title} className="h-full w-full object-cover transition-transform hover:scale-105" />
+        </Link>
+      )}
+
+      <CardHeader className="flex-grow flex-row items-start justify-between gap-4">
         <Link to={`/note/${note.id}`} className="flex-1">
-          <CardTitle className="line-clamp-2 text-lg">
+          {/* GEMINI: line-clamp-2 제거하여 제목 전체 보이게 수정 */}
+          <CardTitle className="text-lg">
             {note.title || '제목 없음'}
           </CardTitle>
         </Link>
@@ -114,16 +122,9 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
         )}
       </CardHeader>
 
-      <CardContent className="flex-1 pb-4">
-        <Link to={`/note/${note.id}`} className="block">
-          <div 
-            className="prose prose-sm dark:prose-invert line-clamp-3 text-sm text-muted-foreground"
-            dangerouslySetInnerHTML={{ __html: marked(note.content) as string }}
-          />
-        </Link>
-      </CardContent>
+      {/* GEMINI: 본문 내용(CardContent) 제거 */}
 
-      <CardFooter className="flex flex-col items-start gap-4">
+      <CardFooter className="flex items-end pt-0">
         {note.tag && (
           <div className="flex flex-wrap gap-2">
             {/* 🚀 GEMINI: 동적 색상 태그 적용 */}
@@ -135,17 +136,7 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
             </div>
           </div>
         )}
-        {note.sourceUrl && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={openSource}
-            className="mt-auto"
-          >
-            <ExternalLink className="mr-2 h-4 w-4" />
-            원본 열기
-          </Button>
-        )}
+        {/* GEMINI: 원본 열기 버튼 제거 */}
       </CardFooter>
     </Card>
   );
