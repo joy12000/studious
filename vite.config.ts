@@ -20,37 +20,37 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      // 💡 [수정] 서비스 워커 생성 전략을 변경합니다.
+      // 'generateSW' 대신 'injectManifest'를 사용하여 우리가 만든 SW 파일을 사용합니다.
       strategies: 'injectManifest',
-      srcDir: '.',
-      filename: 'sw.js',
+      srcDir: 'public', // 서비스 워커 파일이 있는 디렉토리
+      filename: 'sw.js',  // 우리가 만든 서비스 워커 파일 이름
+
       registerType: 'autoUpdate',
-      devOptions: {
-        enabled: true
-      },
-      includeAssets: ['icon-192.png','icon-512.png'],
+      
+      // 💡 [수정] Manifest 설정을 여기서 명확하게 정의합니다.
       manifest: {
         name: 'Aibrary',
         short_name: 'Aibrary',
+        description: 'Your personal AI-powered note-taking app.',
         start_url: '/',
         display: 'standalone',
         theme_color: '#3B82F6',
         background_color: '#ffffff',
         icons: [
-          { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
+          { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any maskable' },
+          { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
         ],
-        // 💡 [수정] Web Share Target API 설정
+        // 💡 [수정] 파일 공유를 위한 share_target 설정
         share_target: {
-          action: '/handle-shared-note', // 데이터를 처리할 고유 경로
+          action: '/share-target', // SW에서 처리할 경로
           method: 'POST',
           enctype: 'multipart/form-data',
           params: {
-            files: [
-              {
-                name: 'shared_file', // 서비스 워커에서 사용할 파일의 키 이름
-                accept: ['application/json', '.json'], // JSON 파일만 허용
-              },
-            ],
+            files: [{
+              name: 'shared_file', // SW에서 formData.get()으로 사용할 키
+              accept: ['application/json', '.json'],
+            }],
           },
         },
       },
