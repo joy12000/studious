@@ -111,41 +111,49 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
 
   // 기본 'grid' 뷰 레이아웃
   return (
-    <Link to={`/note/${note.id}`} className="group relative block w-full aspect-video overflow-hidden rounded-lg shadow-md transition-all hover:shadow-xl hover:-translate-y-1">
-      {/* 썸네일 이미지 */}
-      <img 
-        src={thumbnailUrl || 'https://via.placeholder.com/480x270.png?text=No+Image'} 
-        alt={note.title} 
-        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-      />
-      
-      {/* 썸네일 위에 올라가는 컨텐츠 */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent p-2 flex flex-col justify-between">
-        {/* 상단: 태그와 즐겨찾기 버튼 */}
-        <div className="flex items-start justify-between">
-          {note.tag ? (
-            <div
-              className="px-2 py-0.5 text-xs font-semibold rounded-full shadow-lg"
-              style={generatePastelColorFromText(note.tag)}
-            >
-              {note.tag}
-            </div>
-          ) : <div />} {/* 빈 공간 유지 */}
+    <div>
+      <Link to={`/note/${note.id}`} className="group relative block w-full aspect-video overflow-hidden rounded-lg shadow-md transition-all hover:shadow-xl hover:-translate-y-1">
+        {/* 썸네일 이미지 */}
+        <img 
+          src={thumbnailUrl || 'https://via.placeholder.com/480x270.png?text=No+Image'} 
+          alt={note.title} 
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+        
+        {/* 썸네일 위에 올라가는 컨텐츠 */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent p-2 flex flex-col justify-between">
+          {/* 상단: 태그와 즐겨찾기 버튼 */}
+          <div className="flex items-start justify-between">
+            {note.tag ? (
+              <div
+                className="px-2 py-0.5 text-xs font-semibold rounded-full shadow-lg"
+                style={generatePastelColorFromText(note.tag)}
+              >
+                {note.tag}
+              </div>
+            ) : <div />} {/* 빈 공간 유지 */}
 
-          {onToggleFavorite && (
-            <button
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }}
-              className="h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
-              title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
-            >
-              <Star className={`h-5 w-5 transition-all ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-white/80'}`} />
-            </button>
-          )}
+            {onToggleFavorite && (
+              <button
+                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }}
+                className="h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+                title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
+              >
+                <Star className={`h-5 w-5 transition-all ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-white/80'}`} />
+              </button>
+            )}
+          </div>
+
+          {/* 하단: 빈 공간 (미래에 제목 등을 추가할 수 있음) */}
+          <div></div>
         </div>
-
-        {/* 하단: 빈 공간 (미래에 제목 등을 추가할 수 있음) */}
-        <div></div>
+      </Link>
+      {/* GEMINI: 썸네일 하단에 제목 추가 */}
+      <div className="mt-2">
+        <p className="text-sm font-medium text-foreground truncate" title={note.title}>
+          {note.title || '제목 없음'}
+        </p>
       </div>
-    </Link>
+    </div>
   );
 }
