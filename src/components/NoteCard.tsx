@@ -54,51 +54,56 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
   // 'list' 뷰일 때의 카드 레이아웃
   if (view === 'list') {
     return (
-      <Card className="flex w-full flex-row items-start gap-4 p-4 transition-all hover:shadow-md">
-        <div className="flex-1">
-          <Link to={`/note/${note.id}`}>
-            <h2 className="mb-2 line-clamp-1 text-lg font-semibold">{note.title || '제목 없음'}</h2>
-          </Link>
-          <Link to={`/note/${note.id}`} className="block">
-            <div 
-              className="prose prose-sm dark:prose-invert line-clamp-2 text-sm text-muted-foreground"
-              dangerouslySetInnerHTML={{ __html: marked(note.content) as string }}
-            />
-          </Link>
-          {note.tag && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {/* 🚀 GEMINI: 동적 색상 태그 적용 */}
-              <div
-                className="px-2.5 py-0.5 text-xs font-semibold rounded-full"
-                style={generatePastelColorFromText(note.tag)}
-              >
-                {note.tag}
-              </div>
-            </div>
+      <Card className="w-full transition-all hover:shadow-md">
+        <div className="flex flex-row items-start gap-4 p-4">
+          {/* 왼쪽 컨텐츠 영역 */}
+          <div className="flex-1">
+            <Link to={`/note/${note.id}`} className="block">
+              <h2 className="mb-2 line-clamp-2 text-lg font-semibold leading-snug">{note.title || '제목 없음'}</h2>
+            </Link>
+            <Link to={`/note/${note.id}`} className="block">
+              <div 
+                className="prose prose-sm dark:prose-invert line-clamp-2 text-sm text-muted-foreground"
+                dangerouslySetInnerHTML={{ __html: marked(note.content) as string }}
+              />
+            </Link>
+          </div>
+
+          {/* 오른쪽 썸네일 영역 */}
+          {thumbnailUrl && (
+            <Link to={`/note/${note.id}`} className="block flex-shrink-0">
+              <img 
+                src={thumbnailUrl} 
+                alt={note.title} 
+                className="aspect-video w-32 rounded-md object-cover sm:w-40"
+              />
+            </Link>
           )}
         </div>
-        <div className="flex flex-col items-end gap-2">
-          {onToggleFavorite && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }}
-              className="h-8 w-8 flex-shrink-0"
-              title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
+
+        {/* 하단 태그 및 버튼 영역 */}
+        <div className="flex items-center justify-between px-4 pb-3 pt-2">
+          {note.tag ? (
+            <div
+              className="px-2.5 py-0.5 text-xs font-semibold rounded-full"
+              style={generatePastelColorFromText(note.tag)}
             >
-              <Star className={`h-5 w-5 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
-            </Button>
-          )}
-          {note.sourceUrl && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={openSource}
-            >
-              <ExternalLink className="mr-2 h-4 w-4" />
-              원본
-            </Button>
-          )}
+              {note.tag}
+            </div>
+          ) : <div />} {/* 태그가 없을 때 공간을 차지하기 위한 빈 div */}
+          
+          <div className="flex items-center gap-1">
+            {note.sourceUrl && (
+              <Button variant="ghost" size="icon" onClick={openSource} className="h-8 w-8">
+                <ExternalLink className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            )}
+            {onToggleFavorite && (
+              <Button variant="ghost" size="icon" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }} className="h-8 w-8">
+                <Star className={`h-5 w-5 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
     );
