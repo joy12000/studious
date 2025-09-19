@@ -111,50 +111,41 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
 
   // 기본 'grid' 뷰 레이아웃
   return (
-    <Card className="flex h-full flex-col transition-all hover:shadow-md">
-      {/* GEMINI: 동적으로 생성된 썸네일 URL을 사용하도록 수정 */}
-      {thumbnailUrl && view === 'grid' && (
-        <Link to={`/note/${note.id}`} className="block aspect-video w-full overflow-hidden rounded-t-lg">
-          <img src={thumbnailUrl} alt={note.title} className="h-full w-full object-cover transition-transform hover:scale-105" />
-        </Link>
-      )}
-
-      <CardHeader className="flex-grow flex-row items-start justify-between gap-4">
-        <Link to={`/note/${note.id}`} className="flex-1">
-          {/* GEMINI: line-clamp-2 제거하여 제목 전체 보이게 수정 */}
-          <CardTitle className="text-lg">
-            {note.title || '제목 없음'}
-          </CardTitle>
-        </Link>
-        {onToggleFavorite && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }}
-            className="h-8 w-8 flex-shrink-0"
-            title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
-          >
-            <Star className={`h-5 w-5 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
-          </Button>
-        )}
-      </CardHeader>
-
-      {/* GEMINI: 본문 내용(CardContent) 제거 */}
-
-      <CardFooter className="flex items-end pt-0">
-        {note.tag && (
-          <div className="flex flex-wrap gap-2">
-            {/* 🚀 GEMINI: 동적 색상 태그 적용 */}
+    <Link to={`/note/${note.id}`} className="group relative block w-full aspect-video overflow-hidden rounded-lg shadow-md transition-all hover:shadow-xl hover:-translate-y-1">
+      {/* 썸네일 이미지 */}
+      <img 
+        src={thumbnailUrl || 'https://via.placeholder.com/480x270.png?text=No+Image'} 
+        alt={note.title} 
+        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+      />
+      
+      {/* 썸네일 위에 올라가는 컨텐츠 */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent p-2 flex flex-col justify-between">
+        {/* 상단: 태그와 즐겨찾기 버튼 */}
+        <div className="flex items-start justify-between">
+          {note.tag ? (
             <div
-              className="px-2.5 py-0.5 text-xs font-semibold rounded-full"
+              className="px-2 py-0.5 text-xs font-semibold rounded-full shadow-lg"
               style={generatePastelColorFromText(note.tag)}
             >
               {note.tag}
             </div>
-          </div>
-        )}
-        {/* GEMINI: 원본 열기 버튼 제거 */}
-      </CardFooter>
-    </Card>
+          ) : <div />} {/* 빈 공간 유지 */}
+
+          {onToggleFavorite && (
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }}
+              className="h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+              title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
+            >
+              <Star className={`h-5 w-5 transition-all ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-white/80'}`} />
+            </button>
+          )}
+        </div>
+
+        {/* 하단: 빈 공간 (미래에 제목 등을 추가할 수 있음) */}
+        <div></div>
+      </div>
+    </Link>
   );
 }
