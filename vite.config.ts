@@ -53,7 +53,8 @@ export default defineConfig({
             }],
           },
         },
-        // 💡 [추가] File Handling API 설정
+        // 💡 [추가] File Handling API 설정 (삼성 인터넷 호환성을 위해 임시 주석 처리)
+        /*
         file_handlers: [
           {
             action: '/handle-opened-file',
@@ -63,6 +64,7 @@ export default defineConfig({
             launch_type: 'single-client',
           },
         ],
+        */
       },
     })
   ],
