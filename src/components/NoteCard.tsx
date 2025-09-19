@@ -111,8 +111,8 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
 
   // 기본 'grid' 뷰 레이아웃
   return (
-    <div>
-      <Link to={`/note/${note.id}`} className="group relative block w-full aspect-video overflow-hidden rounded-lg shadow-md transition-all hover:shadow-xl hover:-translate-y-1">
+    <Link to={`/note/${note.id}`} className="group block">
+      <div className="relative w-full aspect-video overflow-hidden rounded-lg shadow-md transition-all duration-300 group-hover:shadow-xl group-hover:-translate-y-1">
         {/* 썸네일 이미지 */}
         <img 
           src={thumbnailUrl || 'https://via.placeholder.com/480x270.png?text=No+Image'} 
@@ -143,17 +143,14 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
               </button>
             )}
           </div>
-
-          {/* 하단: 빈 공간 (미래에 제목 등을 추가할 수 있음) */}
-          <div></div>
         </div>
-      </Link>
-      {/* GEMINI: 썸네일 하단에 제목 추가 */}
-      <div className="mt-2">
-        <p className="text-sm font-medium text-foreground truncate" title={note.title}>
-          {note.title || '제목 없음'}
-        </p>
       </div>
-    </div>
+      {/* GEMINI: 썸네일 하단에 제목 추가 (최대 2줄) */}
+      <div className="mt-2 px-0.5">
+        <h3 className="text-sm font-medium text-foreground leading-snug line-clamp-2 h-[2.8em] group-hover:text-primary transition-colors" title={note.title}>
+          {note.title || '제목 없음'}
+        </h3>
+      </div>
+    </Link>
   );
 }
