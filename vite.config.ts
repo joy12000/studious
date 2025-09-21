@@ -25,8 +25,8 @@ export default defineConfig({
       filename: 'sw.js',
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Aibrary',
-        short_name: 'Aibrary',
+name: 'studious',
+        short_name: 'studious',
         description: 'Your personal AI-powered note-taking app.',
         start_url: '/',
         display: 'standalone',

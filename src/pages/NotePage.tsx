@@ -117,7 +117,7 @@ export default function NotePage() {
       const noteBlob = await exportPlainSingleNote(note.id);
       const shareData = {
         title: `노트 공유: ${note.title}`,
-        text: `Aibrary에서 공유된 노트입니다. 파일을 열어 확인하세요.`,
+        text: `studious에서 공유된 노트입니다. 파일을 열어 확인하세요.`,
         files: [
           new File([noteBlob], `${note.title}.json`, { type: 'application/json' })
         ]

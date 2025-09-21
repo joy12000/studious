@@ -48,7 +48,7 @@ const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolea
     <div className="flex h-full flex-col">
       <div className="mb-8 flex items-center justify-between">
         <div className={`font-bold text-primary transition-all duration-300 ${isCollapsed ? 'w-full flex justify-center text-2xl' : 'text-2xl'}`}>
-          <Link to="/" onClick={handleLinkClick}>{isCollapsed ? 'A' : 'Aibrary'}</Link>
+          <Link to="/" onClick={handleLinkClick}>{isCollapsed ? 'S' : 'studious'}</Link>
         </div>
         
         {/* 펼친 상태의 데스크탑 접기 버튼 (상단) */}
