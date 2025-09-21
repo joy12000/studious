@@ -44,7 +44,7 @@ class handler(BaseHTTPRequestHandler):
                 raise ValueError("GEMINI_API_KEY environment variable not set.")
             
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-pro-vision')
+            model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
             prompt = "이 시간표 이미지를 분석하여 각 과목의 이름(subjectName), 시작 시간(startTime), 종료 시간(endTime), 요일(dayOfWeek)을 JSON 배열로 추출해줘. 요일은 월,화,수,목,금,토,일 중 하나로 표기해줘."
 
@@ -58,6 +58,8 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps(json_response).encode('utf-8'))
 
         except Exception as e:
+            print(f"Error processing request: {e}")
+            traceback.print_exc()
             self.send_response(500)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
