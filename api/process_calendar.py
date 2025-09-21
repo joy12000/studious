@@ -7,6 +7,8 @@ import io
 from pdf2image import convert_from_bytes
 import cgi
 
+import traceback
+
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
@@ -22,18 +24,27 @@ class handler(BaseHTTPRequestHandler):
 
             img = None
             if file_type == 'application/pdf':
-                # For Vercel deployment, poppler is often in /usr/bin
-                images = convert_from_bytes(file_data, poppler_path='/usr/bin/')
-                if images:
-                    img = images[0]
+                try:
+                    images = convert_from_bytes(file_data)
+                    if images:
+                        img = images[0]
+                except Exception as e:
+                    if "Poppler" in str(e):
+                        raise ValueError("Poppler not found. Please install Poppler and add it to your system's PATH to process PDF files.")
+                    else:
+                        raise e
             elif 'image' in file_type:
                 img = Image.open(io.BytesIO(file_data))
             
             if img is None:
-                raise ValueError("Unsupported file type. Please upload a PDF or an image.")
+                raise ValueError("Unsupported file type or file processing failed. Please upload a valid PDF or an image.")
 
-            genai.configure(api_key=os.environ.get('GEMINI_API_KEY'))
-            model = genai.GenerativeModel('2.5-flash')
+            api_key = os.environ.get('GEMINI_API_KEY')
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY environment variable not set.")
+            
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-pro-vision')
 
             prompt = "이 시간표 이미지를 분석하여 각 과목의 이름(subjectName), 시작 시간(startTime), 종료 시간(endTime), 요일(dayOfWeek)을 JSON 배열로 추출해줘. 요일은 월,화,수,목,금,토,일 중 하나로 표기해줘."
 
@@ -50,4 +61,8 @@ class handler(BaseHTTPRequestHandler):
             self.send_response(500)
             self.send_header('Content-type', 'application/json')
             self.end_headers()
-            self.wfile.write(json.dumps({"error": str(e)}).encode('utf-8'))
+            error_details = {
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            }
+            self.wfile.write(json.dumps(error_details).encode('utf-8'))

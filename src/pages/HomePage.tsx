@@ -155,18 +155,30 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="w-full">
-                <div 
-                  className="w-full h-48 border-2 border-dashed rounded-lg flex items-center justify-center text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => document.getElementById('file-upload')?.click()}
-                >
-                  {file ? (
-                    <p>{file.name}</p>
-                  ) : (
-                    <p>여기에 파일을 드래그 앤 드롭하거나 클릭하여 업로드하세요.</p>
-                  )}
-                  <input id="file-upload" type="file" className="hidden" onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)} />
-                </div>
-                {file && (
+                              <div className="w-full">
+                                <div 
+                                  className="w-full h-48 border-2 border-dashed rounded-lg flex items-center justify-center text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors"
+                                  onClick={() => document.getElementById('file-upload')?.click()}
+                                >
+                                  {file ? (
+                                    <p>{file.name}</p>
+                                  ) : (
+                                    <p>여기에 파일을 드래그 앤 드롭하거나 클릭하여 업로드하세요.</p>
+                                  )}
+                                  <input id="file-upload" type="file" className="hidden" onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)} />
+                                </div>
+                                {file && (
+                                  <div className="mt-4 text-center">
+                                    <button 
+                                      onClick={handleSave} 
+                                      disabled={isLoading}
+                                      className={`inline-flex items-center justify-center bg-primary text-primary-foreground h-12 px-6 rounded-full font-semibold hover:bg-primary/90 disabled:opacity-50 transition-all duration-300`}
+                                    >
+                                      {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><ArrowRight className="h-5 w-5 mr-2" />생성하기</>}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>                {file && (
                   <div className="mt-4 text-center">
                     <button 
                       onClick={handleSave} 
