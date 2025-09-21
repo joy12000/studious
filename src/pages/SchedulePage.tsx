@@ -3,6 +3,7 @@ import { useNotes } from '../lib/useNotes';
 import { ScheduleEvent, Subject } from '../lib/types';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
+import ScheduleImportButton from '../components/ScheduleImportButton';
 
 const DAYS = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -178,9 +179,12 @@ export default function SchedulePage() {
     <div className="p-4 h-full flex flex-col">
         <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold">시간표</h1>
-            <div className="flex items-center gap-2 p-1 rounded-full bg-muted">
-                <Button onClick={() => setView('weekly')} variant={view === 'weekly' ? 'primary' : 'ghost'} size="sm" className="rounded-full">주간</Button>
-                <Button onClick={() => setView('monthly')} variant={view === 'monthly' ? 'primary' : 'ghost'} size="sm" className="rounded-full">월간</Button>
+            <div className="flex items-center gap-4">
+              <ScheduleImportButton />
+              <div className="flex items-center gap-2 p-1 rounded-full bg-muted">
+                  <Button onClick={() => setView('weekly')} variant={view === 'weekly' ? 'primary' : 'ghost'} size="sm" className="rounded-full">주간</Button>
+                  <Button onClick={() => setView('monthly')} variant={view === 'monthly' ? 'primary' : 'ghost'} size="sm" className="rounded-full">월간</Button>
+              </div>
             </div>
         </div>
         {view === 'weekly' ? <WeeklyCalendarView onEventClick={handleEventClick} /> : <MonthlyCalendarView onDayClick={handleDayClick} onEventClick={handleEventClick} />}

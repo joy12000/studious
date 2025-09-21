@@ -219,6 +219,19 @@ import { useState, useCallback } from 'react';
         const eventsFromApi: { subjectName: string, startTime: string, endTime: string, dayOfWeek: string }[] = await response.json();
 
         const newEvents: ScheduleEvent[] = [];
+        
+        // --- Date Calculation Logic ---
+        const today = new Date();
+        const currentDay = today.getDay(); // Sunday: 0, Monday: 1, ..., Saturday: 6
+        const monday = new Date(today);
+        // Adjust to Monday of the current week (assuming Sunday is the first day of the week, day 0)
+        const dayOffset = (currentDay === 0) ? -6 : 1 - currentDay;
+        monday.setDate(today.getDate() + dayOffset);
+
+        const dayNameToIndex: { [key: string]: number } = {
+          '월': 0, '화': 1, '수': 2, '목': 3, '금': 4, '토': 5, '일': 6
+        };
+
         for (const event of eventsFromApi) {
           let subject = await db.subjects.where('name').equalsIgnoreCase(event.subjectName).first();
           if (!subject) {
@@ -226,12 +239,21 @@ import { useState, useCallback } from 'react';
             subject = { id: newSubjectId, name: event.subjectName };
             await db.subjects.add(subject);
           }
+
+          const eventDate = new Date(monday);
+          if (event.dayOfWeek in dayNameToIndex) {
+            eventDate.setDate(monday.getDate() + dayNameToIndex[event.dayOfWeek]);
+          }
+          
+          const dateString = eventDate.toISOString().split('T')[0]; // YYYY-MM-DD
+
           newEvents.push({
             id: crypto.randomUUID(),
             subjectId: subject.id,
             startTime: event.startTime,
             endTime: event.endTime,
             dayOfWeek: event.dayOfWeek,
+            date: dateString, // Add the calculated date
           });
         }
 
