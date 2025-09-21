@@ -1,18 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Home, Smartphone, RefreshCcw, Sun, Moon, Trash2, Menu } from 'lucide-react'; // GEMINI: Menu 아이콘 추가
+import { ArrowLeft, Home, Smartphone, RefreshCcw, Sun, Moon, Trash2, Menu, Plus, Edit, Trash } from 'lucide-react';
 import { canInstall, onCanInstallChange, promptInstall } from '../lib/install';
 import { useNotes } from '../lib/useNotes';
 import BackupPanel from '../components/BackupPanel';
 import DataUsagePanel from '../components/DataUsagePanel';
-import { useSidebar } from '../components/AppLayout'; // GEMINI: useSidebar 훅 임포트
+import { useSidebar } from '../components/AppLayout';
 
 import { db } from '../lib/db';
-import type { AppSettings } from '../lib/types';
+import type { AppSettings, Subject } from '../lib/types';
 import { autoBackupIfNeeded } from '../lib/backup';
 import VersionBadge from '../components/VersionBadge';
-import { Button } from '@/components/ui/button'; // GEMINI: Button 임포트
+import { Button } from '@/components/ui/button';
 
-type TabKey = 'general'|'backup'|'data'|'app';
+type TabKey = 'general'|'subjects'|'backup'|'data'|'app';
 
 function TabButton({active, onClick, children}:{active:boolean; onClick:()=>void; children:React.ReactNode}){
   return (
@@ -25,25 +25,63 @@ function TabButton({active, onClick, children}:{active:boolean; onClick:()=>void
   );
 }
 
+const SubjectsPanel = () => {
+  const { allSubjects, addSubject, updateSubject, deleteSubject } = useNotes();
+
+  const handleAddSubject = async () => {
+    const name = prompt('새 과목 이름을 입력하세요.');
+    if (name) {
+      await addSubject(name);
+    }
+  };
+
+  const handleEditSubject = async (subject: Subject) => {
+    const newName = prompt('새 과목 이름을 입력하세요.', subject.name);
+    if (newName && newName !== subject.name) {
+      await updateSubject(subject.id, newName, subject.color);
+    }
+  };
+
+  const handleDeleteSubject = async (id: string) => {
+    if (confirm('정말로 이 과목을 삭제하시겠습니까?')) {
+      await deleteSubject(id);
+    }
+  };
+
+  return (
+    <section className="p-6 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold">과목 관리</h2>
+        <Button onClick={handleAddSubject} size="sm"><Plus className="mr-2 h-4 w-4"/>과목 추가</Button>
+      </div>
+      <div className="space-y-2">
+        {allSubjects?.map(subject => (
+          <div key={subject.id} className="flex items-center justify-between p-2 rounded-lg bg-card">
+            <span>{subject.name}</span>
+            <div className="space-x-2">
+              <Button onClick={() => handleEditSubject(subject)} variant="ghost" size="icon"><Edit className="h-4 w-4"/></Button>
+              <Button onClick={() => handleDeleteSubject(subject.id)} variant="ghost" size="icon" className="text-destructive hover:text-destructive"><Trash className="h-4 w-4"/></Button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function SettingsPage(){
-  const { notes } = useNotes();
+  const { notes, allSubjects, addSubject, updateSubject, deleteSubject } = useNotes();
   const [tab, setTab] = useState<TabKey>('general');
   const [installable, setInstallable] = useState(canInstall());
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const { setIsSidebarOpen } = useSidebar(); // GEMINI: useSidebar 훅 사용
+  const { setIsSidebarOpen } = useSidebar();
 
   useEffect(()=>{ const off = onCanInstallChange(setInstallable); return off; }, []);
   useEffect(()=>{ (async ()=>{ const s = await db.settings.get('default'); setSettings(s || null); })(); }, []);
   useEffect(()=>{ autoBackupIfNeeded(); }, []);
 
   const noteCount = notes.length;
-  const tagCount = useMemo(()=>{
-    const all = new Set<string>();
-    notes.forEach(n => {
-      if (n.tag) all.add(n.tag);
-    });
-    return all.size;
-  }, [notes]);
+  const subjectCount = allSubjects?.length || 0;
 
   async function toggleTheme(){
     if (!settings) return;
@@ -74,11 +112,10 @@ export default function SettingsPage(){
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b p-4 pt-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center gap-4">
-            {/* 🚀 GEMINI: 메뉴 버튼 추가 */}
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden" // 데스크탑에서는 숨김
+              className="md:hidden"
               onClick={() => setIsSidebarOpen(true)}
             >
               <Menu className="h-6 w-6" />
@@ -95,6 +132,7 @@ export default function SettingsPage(){
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="flex items-center gap-2 flex-wrap">
             <TabButton active={tab==='general'} onClick={()=>setTab('general')}>일반</TabButton>
+            <TabButton active={tab==='subjects'} onClick={()=>setTab('subjects')}>과목 관리</TabButton>
             <TabButton active={tab==='backup'} onClick={()=>setTab('backup')}>백업/복원</TabButton>
             <TabButton active={tab==='data'} onClick={()=>setTab('data')}>데이터 관리</TabButton>
             <TabButton active={tab==='app'} onClick={()=>setTab('app')}>앱 정보</TabButton>
@@ -121,12 +159,14 @@ export default function SettingsPage(){
                   <div className="text-xl font-semibold">{noteCount.toLocaleString()}</div>
                 </div>
                 <div className="p-3 rounded-lg bg-card/60">
-                  <div className="text-xs text-muted-foreground">전체 태그 수</div>
-                  <div className="text-xl font-semibold">{tagCount.toLocaleString()}</div>
+                  <div className="text-xs text-muted-foreground">전체 과목 수</div>
+                  <div className="text-xl font-semibold">{subjectCount.toLocaleString()}</div>
                 </div>
               </section>
             </div>
           )}
+
+          {tab==='subjects' && <SubjectsPanel />}
 
           {tab==='backup' && (
             <div className="space-y-4">

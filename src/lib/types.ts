@@ -23,25 +23,39 @@ export type LinkAttachment = {
 export type Attachment = FileAttachment | LinkAttachment;
 
 
-/**
- * Represents a single note entry in the database.
- */
-export interface Note {
+// 신규 타입 추가export interface Subject {
   id: string;
-  title: string;       // (수정) Gemini가 생성
-  content: string;     // (수정) Gemini가 생성한 요약문 (summary)
+  name: string;
+  color?: string; // 과목별 색상 지정을 위한 선택적 필드
+}export interface ScheduleEvent {
+  id: string;
+  subjectId: string; // Subject의 id와 연결
+  date: string;      // "YYYY-MM-DD" 형식
+  startTime: string; // ISO 8601 형식
+  endTime: string;   // ISO 8601 형식
+  dayOfWeek: string; // 요일
+}export interface QuizQuestion {
+  question: string;
+  options: string[];
+  answer: string;
+}export interface Quiz {
+  id: string;
+  noteId: string; // Note의 id와 연결
+  questions: QuizQuestion[];
+}// 기존 Note 타입 확장export interface Note {
+  id: string;
+  title: string;
+  content: string;
+  noteType: 'general' | 'review'; // 노트 타입 추가
+  subjectId?: string; // subject의 id와 연결 (기존 tag 대체)
   sourceType: SourceType;
   sourceUrl?: string | null;
   createdAt: string;
-  updatedAt: number; // updatedAt은 number 타입 유지
-  tag: string;         // (대체) Gemini가 생성한 단일 태그
-  key_insights: string[]; // (신규) Gemini가 생성한 핵심 인사이트
-  topics: string[];    // (삭제 예정 또는 레거시 데이터용으로 유지)
-  labels: string[];
-  highlights: { text: string; index: number }[];
-  todo: { text: string; done: boolean }[];
+  updatedAt: number;
+  key_insights: string[];
   favorite: boolean;
   attachments?: Attachment[];
+  // 기존의 tag, topics, labels 등은 레거시 데이터 호환을 위해 유지하거나 마이그레이션 과정에서 제거
 }
 
 /**
@@ -74,4 +88,3 @@ export interface TaggingData {
   title: string;
   tag: string; // API는 tag 하나만 반환하지만, 우리 시스템은 topics 배열을 사용합니다.
 }
-

@@ -1,2 +1,5 @@
-google-generativeai>=0.7.0
-requests>=2.31.0
+requests
+google-generativeai
+certifi
+pdf2image
+Pillow

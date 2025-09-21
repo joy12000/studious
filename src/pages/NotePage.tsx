@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Note, Attachment } from '../lib/types';
+import { Note, Attachment, Quiz, QuizQuestion } from '../lib/types';
 import { useNotes } from '../lib/useNotes';
 import ShareModal from '../components/ShareModal';
 import AttachmentPanel from '../components/AttachmentPanel';
@@ -8,7 +8,7 @@ import { exportEncrypted, exportPlain, exportPlainSingleNote } from '../lib/back
 import { v4 as uuidv4 } from 'uuid';
 import { marked } from 'marked';
 import { 
-  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube
+  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,53 +25,81 @@ const formatDate = (dateValue: string | number) => {
   } catch { return '날짜 오류'; }
 };
 
+const QuizComponent = ({ quiz }: { quiz: Quiz }) => {
+  // Quiz component logic here
+  return (
+    <div className="mt-8">
+      <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+        📝 퀴즈
+      </h3>
+      {quiz.questions.map((q, i) => (
+        <div key={i} className="mb-4 p-4 border rounded-lg">
+          <p className="font-semibold">{i + 1}. {q.question}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+            {q.options.map((opt, j) => (
+              <Button key={j} variant="outline" className="w-full justify-start text-left h-auto whitespace-normal">{opt}</Button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 export default function NotePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { getNote, updateNote, deleteNote } = useNotes(); // getNote 추가
+  const { getNote, updateNote, deleteNote, getQuiz } = useNotes();
   
   const [note, setNote] = useState<Note | null>(null);
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [editTitle, setEditTitle] = useState('');
-  const [editAttachments, setEditAttachments] = useState<Attachment[]>([]); // GEMINI: 수정용 첨부파일 상태
+  const [editAttachments, setEditAttachments] = useState<Attachment[]>([]);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   useEffect(() => {
     if (!id) return;
 
-    const loadNote = async () => {
+    const loadNoteAndQuiz = async () => {
       try {
-        const foundNote = await getNote(id); // db.notes.get(id) -> getNote(id)
+        const foundNote = await getNote(id);
         if (foundNote) {
           setNote(foundNote);
           setEditContent(foundNote.content);
           setEditTitle(foundNote.title);
-          setEditAttachments(foundNote.attachments || []); // GEMINI: 첨부파일 상태 초기화
+          setEditAttachments(foundNote.attachments || []);
+
+          if (foundNote.noteType === 'review') {
+            const foundQuiz = await getQuiz(foundNote.id);
+            if (foundQuiz) {
+              setQuiz(foundQuiz);
+            }
+          }
         } else {
           navigate('/');
         }
       } catch (error) {
-        console.error('Error loading note:', error);
+        console.error('Error loading note and quiz:', error);
         navigate('/');
       } finally {
         setLoading(false);
       }
     };
 
-    loadNote();
-  }, [id, navigate, getNote]);
+    loadNoteAndQuiz();
+  }, [id, navigate, getNote, getQuiz]);
 
   const handleSaveEdit = async () => {
     if (!note || !id) return;
     
-    // GEMINI: attachments도 업데이트에 포함
     await updateNote(id, {
       title: editTitle.trim(),
       content: editContent.replace(/\r\n/g, '\n'),
       attachments: editAttachments,
-      updatedAt: Date.now(), // updatedAt 갱신
+      updatedAt: Date.now(),
     });
     
     setNote(prev => prev ? { ...prev, title: editTitle.trim(), content: editContent.trim(), attachments: editAttachments, updatedAt: Date.now() } : null);
@@ -81,7 +109,7 @@ export default function NotePage() {
   const handleCancelEdit = () => {
     setEditContent(note?.content || '');
     setEditTitle(note?.title || '');
-    setEditAttachments(note?.attachments || []); // GEMINI: 첨부파일 상태도 원복
+    setEditAttachments(note?.attachments || []);
     setEditing(false);
   };
 
@@ -98,6 +126,13 @@ export default function NotePage() {
       await deleteNote(id);
       navigate('/notes');
     }
+  };
+
+  const handleTestUnderstanding = () => {
+    if (!note) return;
+    const prompt = `다음은 나의 학습 노트 내용이야. 이 내용을 바탕으로 나의 이해도를 테스트할 수 있는 질문 5개를 만들어줘. 질문은 내가 얼마나 깊이 이해했는지 확인할 수 있도록 개념의 연결, 적용, 비판적 사고를 유도하는 질문으로 구성해줘.\n\n--- 학습 노트 ---\n${note.content}`;
+    const encodedPrompt = encodeURIComponent(prompt);
+    window.open(`https://gemini.google.com/app?q=${encodedPrompt}`, '_blank');
   };
 
   const triggerDownload = (blob: Blob, name: string) => {
@@ -182,52 +217,7 @@ export default function NotePage() {
     window.location.href = deepLink;
   };
 
-  const toggleTodo = async (todoIndex: number) => {
-    if (!note || !id) return;
-    
-    const updatedTodos = [...note.todo];
-    updatedTodos[todoIndex] = {
-      ...updatedTodos[todoIndex],
-      done: !updatedTodos[todoIndex].done
-    };
-    
-    await updateNote(id, { todo: updatedTodos });
-    setNote({ ...note, todo: updatedTodos });
-  };
-
-
-  // GEMINI: 첨부파일 핸들러 (CapturePage와 동일)
-  const handleAddLink = () => {
-    const url = prompt("추가할 URL을 입력하세요:", "https://");
-    if (url) {
-      try {
-        new URL(url);
-        setEditAttachments(prev => [...prev, { id: uuidv4(), type: 'link', url }]);
-      } catch {
-        alert("유효하지 않은 URL 형식입니다.");
-      }
-    }
-  };
-
-  const handleAddFile = (files: FileList | null) => {
-    if (!files) return;
-    const newFiles = Array.from(files).map(file => ({
-      id: uuidv4(),
-      type: 'file' as const,
-      name: file.name,
-      mimeType: file.type,
-      data: file,
-    }));
-    setEditAttachments(prev => [...prev, ...newFiles]);
-  };
-
-  const handleRemoveAttachment = (id: string) => {
-    setEditAttachments(prev => prev.filter(att => att.id !== id));
-  };
-
-
   if (loading) {
-    // ... (로딩 UI는 변경 없음) ...
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -239,7 +229,6 @@ export default function NotePage() {
   }
 
   if (!note) {
-    // ... (노트 없음 UI는 변경 없음) ...
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -307,7 +296,7 @@ export default function NotePage() {
             </div>
 
             <div className="flex flex-wrap gap-2 mb-8">
-              {note.tag && <Badge variant="secondary">{note.tag}</Badge>}
+              {note.subjectId && <Badge variant="secondary">{note.subjectId}</Badge>}
             </div>
 
             <div className="mb-8">
@@ -315,7 +304,7 @@ export default function NotePage() {
                 <div>
                   <textarea
                     value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)} // dangerouslySetInnerHTML is not for editing
+                    onChange={(e) => setEditContent(e.target.value)}
                     className="w-full h-64 bg-transparent border rounded-lg p-2 focus:ring-0 resize-y"
                   />
                   
@@ -342,7 +331,6 @@ export default function NotePage() {
                   <div className="note-content-line-height prose prose-slate max-w-none dark:prose-invert prose-headings:font-semibold leading-relaxed" 
                        dangerouslySetInnerHTML={{ __html: marked(note.content, { breaks: true }) as string }} />
 
-                  {/* 🚀 핵심 인사이트 섹션 추가 */}
                   {note.key_insights && note.key_insights.length > 0 && (
                     <div className="mt-8">
                       <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
@@ -363,48 +351,19 @@ export default function NotePage() {
                     attachments={note.attachments || []}
                     readOnly
                   />
+
+                  {note.noteType === 'review' && quiz && <QuizComponent quiz={quiz} />}
+
+                  <div className="mt-8">
+                    <Button onClick={handleTestUnderstanding} variant="outline" className="w-full">
+                      <BrainCircuit className="mr-2 h-4 w-4" />
+                      나의 이해도 테스트하기
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
 
-            {/* ... (하이라이트, 할 일, 라벨 섹션은 변경 없음) ... */}
-            {note.highlights.length > 0 && (
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">✨ 하이라이트</h3>
-                <div className="space-y-2">
-                  {note.highlights.map((highlight, index) => (
-                    <div key={index} className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-3">
-                      <div className="text-yellow-700 dark:text-yellow-300">{highlight.text}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {note.todo.length > 0 && (
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">✅ 할 일<span className="text-sm text-muted-foreground font-normal">({note.todo.filter(t => t.done).length}/{note.todo.length} 완료)</span></h3>
-                <div className="space-y-2">
-                  {note.todo.map((todo, index) => (
-                    <div key={index} className="flex items-start gap-3 p-3 bg-muted/50 rounded-lg">
-                      <button onClick={() => toggleTodo(index)} className={`mt-1 w-4 h-4 rounded-sm border-2 flex-shrink-0 flex items-center justify-center transition-colors ${todo.done ? 'bg-primary border-primary text-primary-foreground' : 'border hover:border-primary'}`}>
-                        {todo.done && <Check className="h-3 w-3" />}
-                      </button>
-                      <span className={`flex-1 ${todo.done ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{todo.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {note.labels && note.labels.length > 0 && (
-              <div>
-                <h3 className="text-lg font-semibold text-foreground mb-4">라벨</h3>
-                <div className="flex flex-wrap gap-2">
-                  {note.labels.map((label) => (<span key={label} className="px-3 py-1 bg-muted text-muted-foreground rounded-full text-sm">#{label}</span>))}
-                </div>
-              </div>
-            )}
           </article>
         </main>
       </div>
