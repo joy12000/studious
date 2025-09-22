@@ -21,6 +21,15 @@ class handler(BaseHTTPRequestHandler):
             """
         }
         
+        payload = {
+            "model": model_identifier,
+            "messages": [system_prompt] + messages,
+        }
+
+        # Google 모델에 대해서만 JSON 모드를 활성화합니다.
+        if model_identifier.startswith('google/'):
+            payload["response_format"] = {"type": "json_object"}
+
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
@@ -29,11 +38,7 @@ class handler(BaseHTTPRequestHandler):
                 "HTTP-Referer": "https://studious.app",
                 "X-Title": "Studious"
             },
-            json={
-                "model": model_identifier,
-                "messages": [system_prompt] + messages,
-                "response_format": {"type": "json_object"}
-            },
+            json=payload,
             timeout=180
         )
         response.raise_for_status()
