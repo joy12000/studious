@@ -18,64 +18,68 @@ class handler(BaseHTTPRequestHandler):
             )
 
             ai_conversation_text = form.getvalue('aiConversationText', '')
-            learning_material_files = form.getlist('files') # Use getlist to handle multiple files
-            subjects_list = json.loads(form.getvalue('subjects', '[]'))
+            learning_material_files = form.getlist('files')
+            subjects_list_str = form.getvalue('subjects', '[]')
+            subjects_list = json.loads(subjects_list_str)
 
             api_key = os.environ.get('GEMINI_API_KEY')
             if not api_key:
                 raise ValueError("GEMINI_API_KEY environment variable not set.")
 
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.0-flash')
+            model = genai.GenerativeModel('gemini-1.5-flash-latest') # 모델명을 최신으로 업데이트
 
-            prompt_text = f"""너는 학습 전문가다. 
+            prompt_text = f"""
+            너는 학습 전문가다.
             주어진 대화 내용과 여러 학습 자료를 종합하고, 아래 '과목 목록'을 참고하여 가장 관련 있는 과목의 'id'를 'subjectId' 필드에 담아라.
-            그리고 해당 과목의 복습 노트(요약, 핵심 개념)와 객관식 퀴즈 3개를 포함하여 {{"title", "summary", "key_insights", "quiz", "subjectId"}} 형식의 JSON으로 출력해줘.
+            그리고 해당 과목의 복습 노트(요약, 핵심 개념)와 객관식 퀴즈 3개를 포함하여 {{"title": "...", "summary": "...", "key_insights": ["...", "..."], "quiz": {{"questions": [{{"question": "...", "options": ["...", "..."], "answer": "..."}}]}}, "subjectId": "..."}} 형식의 JSON으로 출력해줘.
 
             AI 대화 내용: {ai_conversation_text}
             과목 목록 (JSON 형식): {subjects_list}
             """
             
             request_contents = [prompt_text]
-            text_materials = []
-
+            
             for learning_material_file in learning_material_files:
-                file_content = material_file.value
-                file_type = learning_material_file.type
+                # ✨ [오류 수정] getattr를 사용하여 안정적으로 파일 내용물 가져오기
+                file_content = getattr(learning_material_file, 'value', learning_material_file)
+                file_type = getattr(learning_material_file, 'type', 'application/octet-stream')
+                filename = getattr(learning_material_file, 'filename', 'unknown')
+
+                if not isinstance(file_content, bytes):
+                    continue
 
                 if file_type == 'application/pdf':
                     try:
                         images = convert_from_bytes(file_content)
                         if images:
-                            request_contents.extend(images) # 모든 페이지 추가
+                            # PDF의 모든 페이지를 이미지로 추가
+                            request_contents.extend(images)
                     except Exception as e:
                         if "Poppler" in str(e):
-                            raise ValueError("Poppler not found. Please install Poppler and add it to your system's PATH to process PDF files.")
+                            raise ValueError("PDF 처리를 위해 Poppler를 설치해야 합니다.")
                         else:
                             raise e
                 elif 'image' in file_type:
-                    img = Image.open(io.BytesIO(file_content))
-                    request_contents.append(img)
+                    try:
+                        img = Image.open(io.BytesIO(file_content))
+                        request_contents.append(img)
+                    except Exception as img_err:
+                         print(f"이미지 파일 '{filename}' 처리 중 오류: {img_err}")
                 else:
-                    # For text files, collect them to append at the end
-                    text_materials.append(file_content.decode('utf-8', errors='ignore'))
-
-            if text_materials:
-                request_contents.append("\n--- 학습 자료 (텍스트) ---\n" + "\n\n".join(text_materials))
+                    try:
+                        text_content = file_content.decode('utf-8', errors='ignore')
+                        request_contents.append(f"\n--- 텍스트 파일 '{filename}' 내용 ---\n{text_content}")
+                    except Exception as txt_err:
+                        print(f"텍스트 파일 '{filename}' 처리 중 오류: {txt_err}")
 
             response = model.generate_content(request_contents)
 
-            # Clean the response text before parsing
-            cleaned_text = response.text.strip()
-            if cleaned_text.startswith('```json'):
-                cleaned_text = cleaned_text[7:]
-            if cleaned_text.endswith('```'):
-                cleaned_text = cleaned_text[:-3]
-            
+            cleaned_text = response.text.strip().replace('```json', '').replace('```', '')
             json_response = json.loads(cleaned_text)
 
             self.send_response(200)
-            self.send_header('Content-type', 'application/json')
+            self.send_header('Content-type', 'application/json; charset=utf-8')
             self.end_headers()
             self.wfile.write(json.dumps(json_response).encode('utf-8'))
 

@@ -25,6 +25,18 @@ interface GeminiHistory {
   parts: { text: string }[];
 }
 
+// ✨ [추가] 초기 메시지를 생성하는 헬퍼 함수
+const createInitialMessage = (): Message => ({
+  id: Date.now(),
+  text: '현재 노트 내용을 바탕으로 무엇이든 물어보세요!',
+  sender: 'bot',
+  followUp: [
+    '이 노트의 핵심 내용을 세 문장으로 요약해줘.',
+    '여기서 더 깊이 탐구할 만한 주제는 뭐가 있을까?',
+    '이 개념을 실제 사례에 적용해서 설명해줘.'
+  ]
+});
+
 // ✨ [개선] Props에 noteContext와 onClose 추가
 interface ChatUIProps {
   noteContext: string;
@@ -50,25 +62,18 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose }) => {
   
   // ✨ [추가] 컴포넌트 마운트 시 첫 AI 메시지 설정
   useEffect(() => {
-    setMessages([
-      {
-        id: Date.now(),
-        text: '현재 노트 내용을 바탕으로 무엇이든 물어보세요!',
-        sender: 'bot',
-        followUp: [
-          '이 노트의 핵심 내용을 세 문장으로 요약해줘.',
-          '여기서 더 깊이 탐구할 만한 주제는 뭐가 있을까?',
-          '이 개념을 실제 사례에 적용해서 설명해줘.'
-        ]
-      }
-    ])
+    setMessages([createInitialMessage()]);
   }, []);
 
-  const handleNewChat = () => setMessages([]);
+  const handleNewChat = () => {
+    setMessages([createInitialMessage()]);
+  };
+
   const handleCopy = (text: string) => navigator.clipboard.writeText(text);
 
   const handleSaveToNote = async () => {
-    if (messages.length === 0) return;
+    // 사용자가 메시지를 입력하지 않은 초기 상태에서는 저장하지 않음
+    if (messages.length <= 1) return;
     const title = prompt("노트의 제목을 입력하세요:", "AI 채팅 기록");
     if (title) {
       try {
@@ -167,10 +172,18 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose }) => {
           </PopoverContent>
         </Popover>
 
-        {/* ✨ [개선] 닫기 버튼 추가 */}
-        <Button variant="ghost" size="icon" onClick={onClose}>
-          <X className="h-5 w-5" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" onClick={handleSaveToNote} disabled={messages.length <= 1} title="채팅 저장">
+            <Save className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={handleNewChat} title="새 대화">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          {/* ✨ [개선] 닫기 버튼 추가 */}
+          <Button variant="ghost" size="icon" onClick={onClose} title="닫기">
+            <X className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
       <div className="flex-1 p-4 overflow-y-auto">
         {messages.length === 0 ? (

@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { Loader2, Youtube, ArrowRight, File, Calendar, Bot, ExternalLink, AppWindow, Trash2, Pencil, Plus, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { generateFallbackIconDataUrl } from '../lib/utils';
 
 const LoadingOverlay = () => (
   <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
@@ -29,6 +30,7 @@ interface ExternalLinkItem {
   name: string;
   url: string;
   iconUrl: string;
+  fallbackIconDataUrl: string; // Data URL for SVG fallback
 }
 
 // ✨ [추가] 기본 링크 목록
@@ -88,7 +90,8 @@ export default function HomePage() {
         id: crypto.randomUUID(),
         name,
         url,
-        iconUrl: `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+        iconUrl: `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
+        fallbackIconDataUrl: generateFallbackIconDataUrl(name) // Generate fallback here
       };
       saveLinks([...externalLinks, newLink]);
     } catch (error) {
@@ -224,7 +227,14 @@ export default function HomePage() {
                 <div className="grid grid-cols-1">
                   {externalLinks.map(link => (
                     <div key={link.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted group">
-                      <img src={link.iconUrl} alt={`${link.name} icon`} className="h-4 w-4" />
+                      <img 
+                        src={link.iconUrl} 
+                        alt={`${link.name} icon`} 
+                        className="h-4 w-4" 
+                        onError={(e) => { 
+                          (e.target as HTMLImageElement).src = link.fallbackIconDataUrl; 
+                        }}
+                      />
                       <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex-1 text-sm truncate">{link.name}</a>
                       {isEditLinks && (
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteLink(link.id)}>

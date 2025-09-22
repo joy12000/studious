@@ -2,6 +2,13 @@ import React from 'react';
 import { marked } from 'marked';
 import { InlineMath, BlockMath } from 'react-katex';
 
+// ✨ 이 설정이 포함되어 있는지 확인해주세요.
+marked.use({
+  // ... (다른 설정들)
+  breaks: true, // 한 줄 띄어쓰기(single newline)를 <br>로 변환
+  gfm: true,    // GitHub Flavored Markdown 활성화 (일반적인 마크다운 호환성)
+});
+
 interface Props {
   content: string;
 }

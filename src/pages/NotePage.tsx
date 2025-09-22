@@ -406,6 +406,18 @@ export default function NotePage() {
                         </div>
                       )}
                       
+                      {note.subjectId === 'AI 채팅' && (
+                        <div className="mt-8 p-4 bg-blue-50/50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
+                          <details>
+                            <summary className="cursor-pointer font-semibold text-blue-700 dark:text-blue-300">
+                              AI 챗봇 대화 기록 보기
+                            </summary>
+                            <div className="mt-4 prose prose-sm dark:prose-invert">
+                              <MarkdownRenderer content={note.content} />
+                            </div>
+                          </details>
+                        </div>
+                      )}
                       <AttachmentPanel
                         attachments={note.attachments || []}
                         readOnly

@@ -100,3 +100,9 @@
     @apply opacity-50 cursor-not-allowed;
   }
 }
+
+/* ✨ [핵심 수정] Prose 내부의 문단 여백을 강제로 복원하여 줄바꿈 문제 해결 */
+.prose p {
+  margin-top: 1.25em;
+  margin-bottom: 1.25em;
+}
