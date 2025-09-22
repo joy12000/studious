@@ -7,6 +7,7 @@ import SettingsPage from './pages/SettingsPage';
 import SharedNotePage from './pages/SharedNotePage';
 import SchedulePage from './pages/SchedulePage';
 import ReviewPage from './pages/ReviewPage';
+import ChatPage from './pages/ChatPage';
 import ShareHandler from './components/ShareHandler';
 import AppLayout from './components/AppLayout';
 import { useNotes } from './lib/useNotes';
@@ -117,6 +118,7 @@ function App() {
         <Route path="/review" element={<ReviewPage />} />
         <Route path="/share" element={<ShareHandler />} />
         <Route path="/shared-note" element={<SharedNotePage />} />
+        <Route path="/chat" element={<ChatPage />} />
       </Routes>
     </AppLayout>
   );
