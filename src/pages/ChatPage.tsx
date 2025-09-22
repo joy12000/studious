@@ -120,7 +120,7 @@ export default function ChatPage() {
   const currentModelName = models.find(m => m.id === selectedModel)?.name || '모델 선택';
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-card">
+    <div className="flex flex-col h-full w-full bg-card">
       <div className="p-2 sm:p-4 border-b flex justify-between items-center">
         <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
           <PopoverTrigger asChild>
