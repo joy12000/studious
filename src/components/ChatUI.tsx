@@ -1,20 +1,19 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
-import { ArrowUp, Loader2, RefreshCw, Copy, Save, ChevronsUpDown, Check } from 'lucide-react';
+import { ArrowUp, Loader2, RefreshCw, Copy, Save, ChevronsUpDown, Check, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import MarkdownRenderer from './MarkdownRenderer';
 import { useNotes } from '../lib/useNotes';
 
-// ✨ 사용자 피드백을 반영한 최종 무료 모델 5가지
 const models = [
-      { id: 'x-ai/grok-4-fast:free', name: '🚀 Grok 4 Fast (최신/대용량)' },
-      { id: 'deepseek/deepseek-r1-0528:free', name: '🧠 DeepSeek R1 (강력한 추론)' },
-      { id: 'deepseek/deepseek-chat-v3.1', name: '✨ DeepSeek V3.1 (신규)' },
-      { id: 'meta-llama/llama-4-maverick:free', name: '🦙 Llama 4 (최신)' },
-      { id: 'mistralai/mistral-7b-instruct', name: '💨 Mistral 7B (가볍고 빠름)' },
-    ];
-// 메시지 및 API 관련 타입 정의
+    { id: 'x-ai/grok-4-fast:free', name: '🚀 Grok 4 Fast (최신/대용량)' },
+    { id: 'deepseek/deepseek-r1-0528:free', name: '🧠 DeepSeek R1 (강력한 추론)' },
+    { id: 'deepseek/deepseek-chat-v3.1', name: '✨ DeepSeek V3.1 (신규)' },
+    { id: 'meta-llama/llama-4-maverick:free', name: '🦙 Llama 4 (최신)' },
+    { id: 'mistralai/mistral-7b-instruct', name: '💨 Mistral 7B (가볍고 빠름)' },
+];
+
 interface Message {
   id: number;
   text: string;
@@ -26,8 +25,13 @@ interface GeminiHistory {
   parts: { text: string }[];
 }
 
+// ✨ [개선] Props에 noteContext와 onClose 추가
+interface ChatUIProps {
+  noteContext: string;
+  onClose: () => void;
+}
 
-export const ChatUI: React.FC = () => {
+export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -43,6 +47,22 @@ export const ChatUI: React.FC = () => {
   };
 
   useEffect(scrollToBottom, [messages]);
+  
+  // ✨ [추가] 컴포넌트 마운트 시 첫 AI 메시지 설정
+  useEffect(() => {
+    setMessages([
+      {
+        id: Date.now(),
+        text: '현재 노트 내용을 바탕으로 무엇이든 물어보세요!',
+        sender: 'bot',
+        followUp: [
+          '이 노트의 핵심 내용을 세 문장으로 요약해줘.',
+          '여기서 더 깊이 탐구할 만한 주제는 뭐가 있을까?',
+          '이 개념을 실제 사례에 적용해서 설명해줘.'
+        ]
+      }
+    ])
+  }, []);
 
   const handleNewChat = () => setMessages([]);
   const handleCopy = (text: string) => navigator.clipboard.writeText(text);
@@ -90,10 +110,14 @@ export const ChatUI: React.FC = () => {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ history, model: selectedModel }),
+        // ✨ [개선] API 요청 시 noteContext 포함
+        body: JSON.stringify({ history, model: selectedModel, noteContext }),
       });
       
-      if (!response.ok) throw new Error('API 요청 실패');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.details || 'API 요청 실패');
+      }
 
       const data = await response.json();
       
@@ -109,7 +133,7 @@ export const ChatUI: React.FC = () => {
       console.error('API 통신 오류:', error);
       const errorMessage: Message = {
         id: Date.now() + 1,
-        text: '죄송합니다, 답변을 생성하는 중 오류가 발생했습니다.',
+        text: `죄송합니다, 답변을 생성하는 중 오류가 발생했습니다.\n\n오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`,
         sender: 'bot',
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -121,11 +145,11 @@ export const ChatUI: React.FC = () => {
   const currentModelName = models.find(m => m.id === selectedModel)?.name || '모델 선택';
 
   return (
-    <div className="flex flex-col h-full max-w-3xl mx-auto bg-card border rounded-lg shadow-lg">
+    <div className="flex flex-col h-full bg-card border-r rounded-r-lg shadow-lg">
       <div className="p-2 sm:p-4 border-b flex justify-between items-center">
         <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" role="combobox" aria-expanded={isPopoverOpen} className="w-[200px] sm:w-[280px] justify-between">
+            <Button variant="outline" role="combobox" aria-expanded={isPopoverOpen} className="w-[180px] sm:w-[250px] justify-between">
               <span className="truncate">{currentModelName}</span>
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
@@ -133,13 +157,8 @@ export const ChatUI: React.FC = () => {
           <PopoverContent className="w-[200px] sm:w-[280px] p-0">
             {models.map((model) => (
               <Button
-                key={model.id}
-                variant="ghost"
-                className="w-full justify-start h-auto py-2"
-                onClick={() => {
-                  setSelectedModel(model.id);
-                  setIsPopoverOpen(false);
-                }}
+                key={model.id} variant="ghost" className="w-full justify-start h-auto py-2"
+                onClick={() => { setSelectedModel(model.id); setIsPopoverOpen(false); }}
               >
                 <Check className={`mr-2 h-4 w-4 ${selectedModel === model.id ? 'opacity-100' : 'opacity-0'}`} />
                 <span className="whitespace-normal text-left">{model.name}</span>
@@ -148,14 +167,10 @@ export const ChatUI: React.FC = () => {
           </PopoverContent>
         </Popover>
 
-        <div className="flex items-center gap-1 sm:gap-2">
-          <Button variant="ghost" size="sm" onClick={handleSaveToNote} disabled={messages.length === 0}>
-            <Save className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">노트 저장</span>
-          </Button>
-          <Button variant="ghost" size="sm" onClick={handleNewChat}>
-            <RefreshCw className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">새 대화</span>
-          </Button>
-        </div>
+        {/* ✨ [개선] 닫기 버튼 추가 */}
+        <Button variant="ghost" size="icon" onClick={onClose}>
+          <X className="h-5 w-5" />
+        </Button>
       </div>
       <div className="flex-1 p-4 overflow-y-auto">
         {messages.length === 0 ? (

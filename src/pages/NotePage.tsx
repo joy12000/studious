@@ -4,14 +4,14 @@ import { Note, Attachment, Quiz, QuizQuestion } from '../lib/types';
 import { useNotes } from '../lib/useNotes';
 import ShareModal from '../components/ShareModal';
 import AttachmentPanel from '../components/AttachmentPanel';
-import { exportEncrypted, exportPlain, exportPlainSingleNote } from '../lib/backup';
-import { v4 as uuidv4 } from 'uuid';
+import { exportPlainSingleNote } from '../lib/backup';
 import MarkdownRenderer from '../components/MarkdownRenderer';
-import { 
-  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit
+import {
+  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit, Bot
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ChatUI } from '../components/ChatUI'; // ✨ [추가] ChatUI 컴포넌트 임포트
 
 // Helper to format dates robustly
 const formatDate = (dateValue: string | number) => {
@@ -60,10 +60,14 @@ export default function NotePage() {
   const [editAttachments, setEditAttachments] = useState<Attachment[]>([]);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
+  // ✨ [추가] AI 채팅 패널 상태 관리
+  const [isChatOpen, setIsChatOpen] = useState(false);
+
   useEffect(() => {
     if (!id) return;
 
     const loadNoteAndQuiz = async () => {
+      setLoading(true);
       try {
         const foundNote = await getNote(id);
         if (foundNote) {
@@ -241,133 +245,149 @@ export default function NotePage() {
 
   return (
     <>
-      <div className="flex h-full flex-col bg-background">
-        {/* Header */}
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 p-2 backdrop-blur-lg md:p-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate(-1)} aria-label="뒤로 가기">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div className="flex items-center gap-1">
-            <Button variant="ghost" size="sm" onClick={handleToggleFavorite} title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}>
-              <Star className={`h-5 w-5 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setEditing(v => !v)} title="편집">
-              <Edit className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setIsShareModalOpen(true)} title="공유/내보내기">
-              <Share2 className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="sm" onClick={handleDelete} className="text-destructive hover:text-destructive" title="삭제">
-              <Trash2 className="h-5 w-5" />
-            </Button>
-          </div>
-        </header>
-
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-8">
-          <article className="mx-auto max-w-3xl">
-            <div className="mt-8 mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span>{formatDate(note.createdAt)}</span>
+      <div className="flex h-screen w-full overflow-hidden">
+        {/* Chat Panel */}
+        <div className={`transition-all duration-300 ease-in-out ${isChatOpen ? 'w-full md:w-2/5' : 'w-0'}`}>
+          {isChatOpen && <ChatUI noteContext={note.content} onClose={() => setIsChatOpen(false)} />}
+        </div>
+        
+        {/* Note Panel */}
+        <div className={`flex h-full flex-col bg-background transition-all duration-300 ease-in-out ${isChatOpen ? 'w-full md:w-3/5' : 'w-full'}`}>
+            <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 p-2 backdrop-blur-lg md:p-4">
+              <Button variant="ghost" size="sm" onClick={() => navigate(-1)} aria-label="뒤로 가기">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" onClick={handleToggleFavorite} title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}>
+                  <Star className={`h-5 w-5 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setEditing(v => !v)} title="편집">
+                  <Edit className="h-5 w-5" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setIsShareModalOpen(true)} title="공유/내보내기">
+                  <Share2 className="h-5 w-5" />
+                </Button>
+                <Button variant="ghost" size="sm" onClick={handleDelete} className="text-destructive hover:text-destructive" title="삭제">
+                  <Trash2 className="h-5 w-5" />
+                </Button>
               </div>
-              
-              {note.sourceType === 'youtube' && note.sourceUrl && (
-                <button onClick={openSource} className="flex items-center gap-1.5 text-red-600 hover:text-red-700 transition-colors font-medium">
-                  <Youtube className="h-4 w-4" />
-                  YouTube에서 열기
-                </button>
-              )}
+            </header>
 
-              {note.sourceType !== 'youtube' && note.sourceUrl && (
-                <a href={note.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-primary transition-colors font-medium">
-                  <ExternalLink className="h-4 w-4" />
-                  원문 보기
-                </a>
-              )}
-            </div>
-
-            <div className="mb-6">
-              {editing ? (
-                <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full text-3xl font-bold text-foreground bg-transparent border rounded-lg px-3 py-2 focus:ring-2 focus:ring-ring focus:border-transparent transition-colors" />
-              ) : (
-                <h1 className="mb-2 text-3xl font-bold leading-normal tracking-tight text-foreground md:text-4xl break-words">{note.title}</h1>
-              )}
-            </div>
-
-            <div className="flex flex-wrap gap-2 mb-8">
-              {note.subjectId && <Badge variant="secondary">{note.subjectId}</Badge>}
-            </div>
-
-            <div className="mb-8">
-              {editing ? (
-                <div>
-                  <textarea
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    className="w-full h-64 bg-transparent border rounded-lg p-2 focus:ring-0 resize-y"
-                  />
+            <main className="flex-1 overflow-y-auto p-4 md:p-8">
+              <article className={`mx-auto transition-all duration-300 ease-in-out ${isChatOpen ? 'max-w-full' : 'max-w-3xl'}`}>
+                <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    <span>{formatDate(note.createdAt)}</span>
+                  </div>
                   
-                  <AttachmentPanel
-                    attachments={editAttachments}
-                    onAddLink={handleAddLink}
-                    onAddFile={handleAddFile}
-                    onRemoveAttachment={handleRemoveAttachment}
-                  />
+                  {note.sourceType === 'youtube' && note.sourceUrl && (
+                    <button onClick={openSource} className="flex items-center gap-1.5 text-red-600 hover:text-red-700 transition-colors font-medium">
+                      <Youtube className="h-4 w-4" />
+                      YouTube에서 열기
+                    </button>
+                  )}
 
-                  <div className="flex justify-end gap-3 mt-4">
-                    <Button variant="outline" onClick={handleCancelEdit}>
-                      <X className="h-4 w-4" />
-                      취소
-                    </Button>
-                    <Button onClick={handleSaveEdit}>
-                      <Check className="h-4 w-4" />
-                      저장
-                    </Button>
-                  </div>
+                  {note.sourceType !== 'youtube' && note.sourceUrl && (
+                    <a href={note.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-primary transition-colors font-medium">
+                      <ExternalLink className="h-4 w-4" />
+                      원문 보기
+                    </a>
+                  )}
                 </div>
-              ) : (
-                <div>
-                  <div className="note-content-line-height prose prose-slate max-w-none dark:prose-invert prose-headings:font-semibold leading-relaxed">
-                    <MarkdownRenderer content={note.content} />
-                  </div>
 
-                  {note.key_insights && note.key_insights.length > 0 && (
-                    <div className="mt-8">
-                      <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                        💡 핵심 인사이트
-                      </h3>
-                      <div className="space-y-3">
-                        {note.key_insights.map((insight, index) => (
-                          <div key={index} className="flex items-start gap-3 p-4 bg-primary/5 border-l-4 border-primary/40 rounded-r-lg">
-                            <div className="text-primary font-bold mt-1">{index + 1}.</div>
-                            <div className="text-card-foreground m-0"><MarkdownRenderer content={insight} /></div>
+                <div className="mb-6">
+                  {editing ? (
+                    <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full text-3xl font-bold text-foreground bg-transparent border rounded-lg px-3 py-2 focus:ring-2 focus:ring-ring focus:border-transparent transition-colors" />
+                  ) : (
+                    <h1 className="mb-2 text-3xl font-bold leading-normal tracking-tight text-foreground md:text-4xl break-words">{note.title}</h1>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap gap-2 mb-8">
+                  {note.subjectId && <Badge variant="secondary">{note.subjectId}</Badge>}
+                </div>
+
+                <div className="mb-8">
+                  {editing ? (
+                    <div>
+                      <textarea
+                        value={editContent}
+                        onChange={(e) => setEditContent(e.target.value)}
+                        className="w-full h-64 bg-transparent border rounded-lg p-2 focus:ring-0 resize-y"
+                      />
+                      
+                      <AttachmentPanel
+                        attachments={editAttachments}
+                        onAddLink={() => { /* handleAddLink 구현 필요 */ }}
+                        onAddFile={() => { /* handleAddFile 구현 필요 */ }}
+                        onRemoveAttachment={() => { /* handleRemoveAttachment 구현 필요 */ }}
+                      />
+
+                      <div className="flex justify-end gap-3 mt-4">
+                        <Button variant="outline" onClick={handleCancelEdit}>
+                          <X className="h-4 w-4" />
+                          취소
+                        </Button>
+                        <Button onClick={handleSaveEdit}>
+                          <Check className="h-4 w-4" />
+                          저장
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="note-content-line-height prose prose-slate max-w-none dark:prose-invert prose-headings:font-semibold leading-relaxed">
+                        <MarkdownRenderer content={note.content} />
+                      </div>
+
+                      {note.key_insights && note.key_insights.length > 0 && (
+                        <div className="mt-8">
+                          <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+                            💡 핵심 인사이트
+                          </h3>
+                          <div className="space-y-3">
+                            {note.key_insights.map((insight, index) => (
+                              <div key={index} className="flex items-start gap-3 p-4 bg-primary/5 border-l-4 border-primary/40 rounded-r-lg">
+                                <div className="text-primary font-bold mt-1">{index + 1}.</div>
+                                <div className="text-card-foreground m-0"><MarkdownRenderer content={insight} /></div>
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        </div>
+                      )}
+                      
+                      <AttachmentPanel
+                        attachments={note.attachments || []}
+                        readOnly
+                      />
+
+                      {note.noteType === 'review' && quiz && <QuizComponent quiz={quiz} />}
+
+                      <div className="mt-8">
+                        <Button onClick={handleTestUnderstanding} variant="outline" className="w-full">
+                          <BrainCircuit className="mr-2 h-4 w-4" />
+                          나의 이해도 테스트하기
+                        </Button>
                       </div>
                     </div>
                   )}
-                  
-                  <AttachmentPanel
-                    attachments={note.attachments || []}
-                    readOnly
-                  />
-
-                  {note.noteType === 'review' && quiz && <QuizComponent quiz={quiz} />}
-
-                  <div className="mt-8">
-                    <Button onClick={handleTestUnderstanding} variant="outline" className="w-full">
-                      <BrainCircuit className="mr-2 h-4 w-4" />
-                      나의 이해도 테스트하기
-                    </Button>
-                  </div>
                 </div>
-              )}
-            </div>
-
-          </article>
-        </main>
+              </article>
+            </main>
+        </div>
       </div>
+      
+      {!isChatOpen && (
+        <Button
+          onClick={() => setIsChatOpen(true)}
+          className="fixed bottom-6 right-6 z-20 h-14 w-14 rounded-full shadow-lg"
+          title="AI와 대화하기"
+        >
+          <Bot className="h-7 w-7" />
+        </Button>
+      )}
+
       <ShareModal
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
