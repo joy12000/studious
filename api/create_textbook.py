@@ -112,7 +112,7 @@ class handler(BaseHTTPRequestHandler):
             text_materials = []
 
             for material_file in learning_materials:
-                file_content = material_file.file.read()
+                file_content = material_file.value
                 file_type = material_file.type
 
                 if file_type == 'application/pdf':
