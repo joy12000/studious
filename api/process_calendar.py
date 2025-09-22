@@ -47,9 +47,14 @@ class handler(BaseHTTPRequestHandler):
             model = genai.GenerativeModel('gemini-2.5-pro')
 
             prompt = f"""이 시간표 이미지에서 과목 이름(subjectName), 시작 시간(startTime), 종료 시간(endTime), 요일(dayOfWeek)을 추출하여 JSON 배열 형식으로 만들어줘.
-            - subjectName: 한글 과목명을 그대로 추출해줘.
-            - startTime, endTime: 'HH:MM' 형식으로 추출해줘.
-            - dayOfWeek: '월','화','수','목','금','토','일' 중 하나로 표기해야 한다.
+
+            추출 규칙:
+            1. **시간 계산:** 시간표의 한 칸은 보통 1시간을 의미합니다. 과목이 차지하는 칸 수를 바탕으로 시작 시간(startTime)과 종료 시간(endTime)을 정확히 계산해야 합니다.
+            2. **중복 및 분리:** 한 요일의 같은 시간대에 여러 과목이 겹쳐 있거나 나란히 있는 경우, 각 과목을 반드시 별개의 JSON 객체로 분리하여 추출해야 합니다.
+            3. **출력 형식:**
+               - subjectName: 한글 과목명을 그대로 추출합니다.
+               - startTime, endTime: 'HH:MM' 형식으로 추출합니다.
+               - dayOfWeek: '월','화','수','목','금','토','일' 중 하나로 표기합니다.
             """
 
             response = model.generate_content([prompt, img])
