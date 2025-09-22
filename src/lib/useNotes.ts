@@ -160,13 +160,10 @@ import { useState, useCallback } from 'react';
         }
 
         const result = await response.json();
-        const { title, summary, key_insights, quiz, subjectName } = result;
+        const { title, summary, key_insights, quiz, subjectId } = result;
 
-        let subject = await db.subjects.where('name').equalsIgnoreCase(subjectName).first();
-        if (!subject) {
-          const newSubjectId = crypto.randomUUID();
-          subject = { id: newSubjectId, name: subjectName };
-          await db.subjects.add(subject);
+        if (!subjectId || !await db.subjects.get(subjectId)) {
+            throw new Error('API가 유효하지 않은 subjectId를 반환했습니다.');
         }
 
         const newNote: Note = {
@@ -174,7 +171,7 @@ import { useState, useCallback } from 'react';
           title,
           content: summary,
           key_insights,
-          subjectId: subject.id,
+          subjectId: subjectId, // Use subjectId directly from API
           noteType: 'review',
           sourceType: 'other',
           createdAt: new Date().toISOString(),

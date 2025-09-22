@@ -32,11 +32,11 @@ class handler(BaseHTTPRequestHandler):
             model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
             prompt_text = f"""너는 학습 전문가다. 
-            주어진 대화 내용과 학습 자료를 종합하고, 등록된 과목 목록을 참고하여 가장 관련 있는 과목을 자동으로 분류해라. 
-            그리고 해당 과목의 복습 노트(요약, 핵심 개념)와 객관식 퀴즈 3개를 포함하여 {{"title, "summary", "key_insights", "quiz", "subjectName"}} 형식의 JSON으로 출력해줘.
+            주어진 대화 내용과 학습 자료를 종합하고, 아래 '과목 목록'을 참고하여 가장 관련 있는 과목의 'id'를 'subjectId' 필드에 담아라.
+            그리고 해당 과목의 복습 노트(요약, 핵심 개념)와 객관식 퀴즈 3개를 포함하여 {{"title", "summary", "key_insights", "quiz", "subjectId"}} 형식의 JSON으로 출력해줘.
 
             AI 대화 내용: {ai_conversation_text}
-            과목 목록: {subjects_list}
+            과목 목록 (JSON 형식): {subjects_list}
             """
             
             request_contents = [prompt_text]
