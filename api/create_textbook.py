@@ -11,11 +11,11 @@ from pdf2image import convert_from_bytes
 class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
-        # ✨ [개선] 여러 개의 Gemini API 키를 환경 변수에서 가져와 폴백 기능 구현
+        # API 키 폴백 기능 구현
         api_keys = [
             os.environ.get('GEMINI_API_KEY_PRIMARY'),
             os.environ.get('GEMINI_API_KEY_SECONDARY'),
-            os.environ.get('GEMINI_API_KEY') # 기존 키도 호환을 위해 포함
+            os.environ.get('GEMINI_API_KEY') # 기존 키 호환
         ]
         valid_keys = [key for key in api_keys if key]
 
@@ -32,12 +32,11 @@ class handler(BaseHTTPRequestHandler):
             )
             learning_materials = form.getlist('files')
             
-            # ✨ [추가] 프론트엔드에서 과목, 주차 정보 수신 (향후 확장 가능)
             subject_name = form.getvalue('subject', '[과목명]')
             week_info = form.getvalue('week', '[N주차/18주차]')
             material_types = form.getvalue('materialTypes', '[PPT/PDF/텍스트 등]')
 
-            # ✨ [핵심] 제공해주신 전문가용 프롬프트 적용
+            # 전문가용 프롬프트 적용
             prompt = f"""
             당신은 인지과학과 교육심리학 전문가입니다. 첨부된 강의 자료를 분석해서, 교수 수업 없이도 스스로 이해하고 숙달할 수 있는 학습 자료를 제작해주세요.
 
@@ -112,14 +111,18 @@ class handler(BaseHTTPRequestHandler):
             text_materials = []
 
             for material_file in learning_materials:
-                file_content = material_file.value
-                file_type = material_file.type
+                # ✨ [핵심 오류 수정] getattr를 사용하여 어떤 형태의 파일 객체든 안전하게 처리
+                file_content = getattr(material_file, 'value', material_file)
+                file_type = getattr(material_file, 'type', 'application/octet-stream')
+                filename = getattr(material_file, 'filename', 'unknown')
+
+                if not isinstance(file_content, bytes):
+                    continue
 
                 if file_type == 'application/pdf':
                     try:
                         images = convert_from_bytes(file_content)
                         if images:
-                            # PDF의 모든 페이지를 이미지로 추가
                             request_contents.extend(images)
                     except Exception as e:
                         if "Poppler" in str(e):
@@ -127,16 +130,21 @@ class handler(BaseHTTPRequestHandler):
                         else:
                             raise e
                 elif 'image' in file_type:
-                    img = Image.open(io.BytesIO(file_content))
-                    request_contents.append(img)
+                    try:
+                        img = Image.open(io.BytesIO(file_content))
+                        request_contents.append(img)
+                    except Exception as img_err:
+                        print(f"이미지 파일 '{filename}' 처리 중 오류: {img_err}")
                 else:
-                    # 텍스트 파일은 내용을 모아서 마지막에 추가
-                    text_materials.append(file_content.decode('utf-8', errors='ignore'))
+                    try:
+                        text_content = file_content.decode('utf-8', errors='ignore')
+                        text_materials.append(text_content)
+                    except Exception as txt_err:
+                        print(f"텍스트 파일 '{filename}' 처리 중 오류: {txt_err}")
 
             if text_materials:
                 request_contents.append("\n--- 학습 자료 (텍스트) ---\n" + "\n\n".join(text_materials))
                 
-            # ✨ [개선] API 키 폴백 루프
             for i, api_key in enumerate(valid_keys):
                 try:
                     print(f"INFO: Generating textbook with gemini-1.5-pro-latest using API key #{i + 1}...")
@@ -158,7 +166,6 @@ class handler(BaseHTTPRequestHandler):
                     print(f"WARN: API key #{i + 1} failed. Fallback to next key. Error: {e}")
                     continue
 
-            # 모든 키가 실패한 경우
             raise ConnectionError("모든 Gemini API 키로 요청에 실패했습니다.") from last_error
 
         except Exception as e:
@@ -167,12 +174,16 @@ class handler(BaseHTTPRequestHandler):
     def handle_error(self, e, message="오류 발생", status_code=500):
         print(f"Error processing request: {message}")
         traceback.print_exc()
-        self.send_response(status_code)
-        self.send_header('Content-type', 'application/json; charset=utf-8')
-        self.end_headers()
-        error_details = {
-            "error": message,
-            "details": str(e),
-            "traceback": traceback.format_exc()
-        }
-        self.wfile.write(json.dumps(error_details).encode('utf-8'))
+        if not hasattr(self, '_headers_sent') or not self._headers_sent:
+            try:
+                self.send_response(status_code)
+                self.send_header('Content-type', 'application/json; charset=utf-8')
+                self.end_headers()
+                error_details = {
+                    "error": message,
+                    "details": str(e),
+                    "traceback": traceback.format_exc()
+                }
+                self.wfile.write(json.dumps(error_details).encode('utf-8'))
+            except Exception as write_error:
+                print(f"FATAL: 오류 응답을 보내는 중 추가 오류 발생: {write_error}")

@@ -1,5 +1,5 @@
 // src/pages/NoteListPage.tsx
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useNotes, Filters } from '../lib/useNotes'; // ✨ Filters 타입 임포트
 import NoteCard from '../components/NoteCard';
