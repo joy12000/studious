@@ -3,6 +3,7 @@ import { useNotes } from '../lib/useNotes';
 import { ScheduleEvent, Subject } from '../lib/types';
 import { Button } from '@/components/ui/button';
 import { ScheduleEditModal } from '../components/ScheduleEditModal';
+import ScheduleImportButton from '../components/ScheduleImportButton';
 
 // --- Weekly View Components ---
 
