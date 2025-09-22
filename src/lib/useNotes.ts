@@ -147,8 +147,16 @@ export type Filters = {
       }
     };
 
-    const addNoteFromReview = async (payload: AddNoteFromReviewPayload) => {
-      const { aiConversationText, files, subjects, onProgress, onComplete, onError } = payload;
+    const addNoteFromReview = async (args: {
+      aiConversationText: string;
+      files: File[];
+      subjects: Subject[];
+      onProgress?: (message: string) => void;
+      onComplete?: (newNote: Note, newQuiz: Quiz) => void;
+      onError?: (error: string) => void;
+      noteDate?: string; // ✨ [핵심 추가] noteDate 인자 추가
+    }) => {
+      const { aiConversationText, files, subjects, onProgress, onComplete, onError, noteDate } = args; // ✨ noteDate 추출
       try {
         onProgress("AI 복습 노트를 생성하고 있습니다...");
         const formData = new FormData();
@@ -182,6 +190,7 @@ export type Filters = {
           sourceType: 'other',
           createdAt: new Date().toISOString(),
           updatedAt: new Date().getTime(),
+          noteDate: noteDate, // ✨ [핵심 추가] 전달받은 noteDate 저장
           favorite: false,
           attachments: [],
         };
@@ -383,7 +392,8 @@ export type Filters = {
       title: string,
       content: string,
       subjectId: string,
-      files: File[]
+      files: File[],
+      noteDate?: string // ✨ [개선] noteDate 인자 추가
     ): Promise<Note> => {
       
       const attachments: Attachment[] = files.map(file => ({
@@ -405,6 +415,7 @@ export type Filters = {
         sourceType: 'other',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().getTime(),
+        noteDate: noteDate, // ✨ [개선] 전달받은 noteDate 저장
         favorite: false,
         attachments: attachments,
       };

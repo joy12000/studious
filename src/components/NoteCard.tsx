@@ -91,7 +91,7 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
   // Grid View
   return (
     <Link to={`/note/${note.id}`} className="group block">
-      <div className="relative w-full aspect-video overflow-hidden rounded-lg shadow-md transition-all duration-300 group-hover:shadow-xl group-hover:-translate-y-1 bg-muted">
+      <div className={`relative w-full ${note.sourceType === 'youtube' ? 'aspect-video' : 'aspect-[3/4]'} overflow-hidden rounded-lg shadow-md transition-all duration-300 group-hover:shadow-xl group-hover:-translate-y-1 bg-muted`}>
         {note.sourceType === 'youtube' && thumbnailUrl ? (
           <img 
             src={thumbnailUrl} 

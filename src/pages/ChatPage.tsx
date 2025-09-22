@@ -194,11 +194,15 @@ export default function ChatPage() {
       setLoadingMessage('생성된 참고서를 노트에 저장하는 중...');
       const noteTitle = `${selectedSubject.name} - ${weekInfo} 참고서`;
       
+      // ✨ [핵심 수정] 선택된 날짜를 "YYYY-MM-DD" 형식으로 변환하여 전달
+      const noteDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
+
       const newNote = await addNoteFromTextbook(
         noteTitle,
         data.textbook,
         selectedSubject.id,
-        uploadedFiles
+        uploadedFiles,
+        noteDateStr // ✨ 수정된 날짜 정보 전달
       );
 
       // 3. 생성된 노트 페이지로 즉시 이동

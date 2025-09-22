@@ -50,8 +50,9 @@ export type Attachment = FileAttachment | LinkAttachment;
   subjectId?: string; // subject의 id와 연결 (기존 tag 대체)
   sourceType: SourceType;
   sourceUrl?: string | null;
-  createdAt: string;
-  updatedAt: number;
+  createdAt: string; // 노트가 DB에 처음 생성된 시간 (수정X)
+  updatedAt: number; // 노트가 마지막으로 수정된 시간
+  noteDate?: string; // ✨ [핵심 추가] 사용자가 지정한 노트의 해당 날짜 (YYYY-MM-DD 형식)
   key_insights: string[];
   favorite: boolean;
   attachments?: Attachment[];
