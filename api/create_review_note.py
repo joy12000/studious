@@ -47,7 +47,7 @@ class handler(BaseHTTPRequestHandler):
                     try:
                         images = convert_from_bytes(file_content)
                         if images:
-                            request_contents.append(images[0])
+                            request_contents.extend(images) # 모든 페이지 추가
                     except Exception as e:
                         if "Poppler" in str(e):
                             raise ValueError("Poppler not found. Please install Poppler and add it to your system's PATH to process PDF files.")

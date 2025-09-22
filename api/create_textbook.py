@@ -119,8 +119,8 @@ class handler(BaseHTTPRequestHandler):
                     try:
                         images = convert_from_bytes(file_content)
                         if images:
-                            # PDF의 첫 페이지만 이미지로 추가 (필요시 여러 페이지 처리)
-                            request_contents.append(images[0])
+                            # PDF의 모든 페이지를 이미지로 추가
+                            request_contents.extend(images)
                     except Exception as e:
                         if "Poppler" in str(e):
                             raise ValueError("PDF 처리를 위해 Poppler를 설치해야 합니다.")
