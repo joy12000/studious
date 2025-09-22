@@ -1,17 +1,39 @@
-import React, { useState, useEffect } from 'react';
+// src/pages/NotePage.tsx
+
+import React, { useState, useEffect, useMemo } from 'react'; // ✨ [수정] useMemo를 react에서 import
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Note, Attachment, Quiz, QuizQuestion } from '../lib/types';
+import { Note, Attachment, Quiz } from '../lib/types';
 import { useNotes } from '../lib/useNotes';
 import ShareModal from '../components/ShareModal';
 import AttachmentPanel from '../components/AttachmentPanel';
 import { exportPlainSingleNote } from '../lib/backup';
 import MarkdownRenderer from '../components/MarkdownRenderer';
-import {
-  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit, Bot, ChevronRight
+import { 
+  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit, Bot, ChevronsUpDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChatUI } from '../components/ChatUI'; // ✨ [추가] ChatUI 컴포넌트 임포트
+import { ChatUI } from '../components/ChatUI';
+
+// ✨ AI 참고서 내용을 섹션별로 파싱하는 함수
+type TextbookSection = {
+  title: string;
+  content: string;
+};
+
+function parseTextbookContent(markdownText: string): TextbookSection[] {
+  if (!markdownText) return [];
+  
+  // Markdown 제목(## 또는 ###)을 기준으로 텍스트를 분리합니다.
+  const sections = markdownText.split(/\n(?=##\s|###\s)/).filter(part => part.trim() !== '');
+
+  return sections.map(sectionText => {
+    const lines = sectionText.split('\n');
+    const title = lines[0].replace(/^[#\s]+/, '').trim(); // 제목 추출
+    const content = lines.slice(1).join('\n').trim(); // 나머지 내용
+    return { title, content };
+  });
+}
 
 // Helper to format dates robustly
 const formatDate = (dateValue: string | number) => {
@@ -46,16 +68,6 @@ const QuizComponent = ({ quiz }: { quiz: Quiz }) => {
   );
 };
 
-// ✨ [추가] 참고서 콘텐츠를 파싱하는 함수
-const parseTextbookContent = (content: string) => {
-  const sections = content.split(/\n(?=#{1,3}\s)/).filter(s => s.trim() !== '');
-  return sections.map(section => {
-    const match = section.match(/(#{1,3})\s(.*)/);
-    const title = match ? match[2] : '제목 없음';
-    const contentWithoutTitle = match ? section.substring(match[0].length).trim() : section;
-    return { title, content: contentWithoutTitle };
-  });
-};
 
 export default function NotePage() {
   const { id } = useParams<{ id: string }>();
@@ -70,16 +82,7 @@ export default function NotePage() {
   const [editTitle, setEditTitle] = useState('');
   const [editAttachments, setEditAttachments] = useState<Attachment[]>([]);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-
-  // ✨ [추가] AI 채팅 패널 상태 관리
   const [isChatOpen, setIsChatOpen] = useState(false);
-
-  const textbookSections = useMemo(() => {
-    if (note && note.noteType === 'textbook') {
-      return parseTextbookContent(note.content);
-    }
-    return [];
-  }, [note]);
 
   useEffect(() => {
     if (!id) return;
@@ -113,6 +116,14 @@ export default function NotePage() {
 
     loadNoteAndQuiz();
   }, [id, navigate, getNote, getQuiz]);
+  
+  const textbookSections = useMemo(() => {
+    if (note && note.noteType === 'textbook') {
+      return parseTextbookContent(note.content);
+    }
+    return [];
+  }, [note]);
+
 
   const handleSaveEdit = async () => {
     if (!note || !id) return;
@@ -361,9 +372,9 @@ export default function NotePage() {
                             <details key={index} className="group rounded-lg border bg-card p-4 transition-all duration-300 open:bg-primary/5 open:shadow-inner" open={index < 2}>
                               <summary className="cursor-pointer text-lg font-semibold text-foreground list-none flex items-center justify-between">
                                 {section.title}
-                                <span className="text-primary transition-transform duration-300 group-open:rotate-90">
-                                  <ChevronRight className="h-5 w-5" />
-                                </span>
+                                <div className="transform transition-transform duration-300 group-open:rotate-180">
+                                  <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
+                                </div>
                               </summary>
                               <div className="mt-4 note-content-line-height prose prose-slate max-w-none dark:prose-invert prose-headings:font-semibold leading-relaxed">
                                 <MarkdownRenderer content={section.content} />
