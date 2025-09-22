@@ -8,13 +8,12 @@ import { useNotes } from '../lib/useNotes';
 
 // ✨ 사용자 피드백을 반영한 최종 무료 모델 5가지
 const models = [
-  { id: 'grok-4-fast', name: 'Grok 4 Fast (최신/대용량)' },
-  { id: 'deepseek/deepseek-r1-0528', name: 'DeepSeek R1 (강력한 추론)' },
-  { id: 'deepseek/deepseek-chat-v3.1', name: 'DeepSeek V3.1 (신규)' },
-  { id: 'meta-llama/llama-3.1-8b-instruct', name: 'Llama 3.1 8B (최신)' },
-  { id: 'mistralai/mistral-7b-instruct', name: 'Mistral 7B (가볍고 빠름)' },
-];
-
+      { id: 'x-ai/grok-4-fast:free', name: '🚀 Grok 4 Fast (최신/대용량)' },
+      { id: 'deepseek/deepseek-r1-0528:free', name: '🧠 DeepSeek R1 (강력한 추론)' },
+      { id: 'deepseek/deepseek-chat-v3.1', name: '✨ DeepSeek V3.1 (신규)' },
+      { id: 'meta-llama/llama-4-maverick:free', name: '🦙 Llama 4 (최신)' },
+      { id: 'mistralai/mistral-7b-instruct', name: '💨 Mistral 7B (가볍고 빠름)' },
+    ];
 // 메시지 및 API 관련 타입 정의
 interface Message {
   id: number;
