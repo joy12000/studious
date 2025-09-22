@@ -26,36 +26,6 @@ interface GeminiHistory {
   parts: { text: string }[];
 }
 
-
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '../components/ui/button';
-import { ArrowUp, Loader2, RefreshCw, Copy, Save, ChevronsUpDown, Check } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import MarkdownRenderer from '../components/MarkdownRenderer';
-import { useNotes } from '../lib/useNotes';
-
-// ✨ 사용자 피드백을 반영한 최종 무료 모델 5가지
-const models = [
-      { id: 'x-ai/grok-4-fast:free', name: '🚀 Grok 4 Fast (최신/대용량)' },
-      { id: 'deepseek/deepseek-r1-0528:free', name: '🧠 DeepSeek R1 (강력한 추론)' },
-      { id: 'deepseek/deepseek-chat-v3.1', name: '✨ DeepSeek V3.1 (신규)' },
-      { id: 'meta-llama/llama-4-maverick:free', name: '🦙 Llama 4 (최신)' },
-      { id: 'mistralai/mistral-7b-instruct', name: '💨 Mistral 7B (가볍고 빠름)' },
-    ];
-// 메시지 및 API 관련 타입 정의
-interface Message {
-  id: number;
-  text: string;
-  sender: 'user' | 'bot';
-  followUp?: string[];
-}
-interface GeminiHistory {
-  role: 'user' | 'model';
-  parts: { text: string }[];
-}
-
-
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
