@@ -89,6 +89,7 @@ const WeeklyCalendarView = ({ onEventClick }: { onEventClick: (event: ScheduleEv
 const MonthlyCalendarView = ({ onDayClick, onEventClick }: { onDayClick: (date: string) => void; onEventClick: (event: ScheduleEvent) => void }) => {
     const { schedule, allSubjects } = useNotes();
     const [currentDate, setCurrentDate] = useState(new Date());
+    const MAX_EVENTS_VISIBLE = 2; // 셀 당 최대 표시 이벤트 수 
 
     const subjectsById = useMemo(() => {
         const map = new Map<string, Subject>();
@@ -133,8 +134,8 @@ const MonthlyCalendarView = ({ onDayClick, onEventClick }: { onDayClick: (date: 
     };
 
   return (
-    <div>
-      <div className="flex items-center justify-center mb-4">
+    <div className="flex-1 flex flex-col">
+      <div className="flex items-center justify-center px-1 sm:px-4 mb-4">
         <Button variant="ghost" size="icon" onClick={() => changeMonth(-1)}>
           <ChevronLeft className="h-6 w-6" />
         </Button>
@@ -145,35 +146,50 @@ const MonthlyCalendarView = ({ onDayClick, onEventClick }: { onDayClick: (date: 
           <ChevronRight className="h-6 w-6" />
         </Button>
       </div>
-      <div className="grid grid-cols-7 gap-1">
+
+      {/* Calendar Grid */}
+      <div className="flex-1 flex flex-col border-t border-border">
+        {/* Day Headers */}
+        <div className="grid grid-cols-7">
           {['월', '화', '수', '목', '금', '토', '일'].map(day => (
-              <div key={day} className="text-center font-semibold text-sm py-2">{day}</div>
+              <div key={day} className="text-center font-semibold text-xs sm:text-sm py-2 border-b border-border">{day}</div>
           ))}
+        </div>
+
+        {/* Calendar Body */}
+        <div className="grid grid-cols-7 flex-1">
           {calendarDays.map((date, i) => {
               const dateString = formatDate(date.getFullYear(), date.getMonth(), date.getDate());
               const isCurrentMonth = date.getMonth() === currentDate.getMonth();
               const isToday = date.getTime() === today.getTime();
-              
               const dailyEvents = eventsByDate[dateString] || [];
 
-              const cellClasses = `h-24 border rounded-lg p-1 text-xs ${
-                isCurrentMonth ? 'bg-card/50' : 'bg-muted/20'
-              } ${isToday ? 'border-2 border-primary' : ''}`;
+              const cellClasses = `relative min-h-[6rem] sm:min-h-[8rem] border-b border-r border-border p-1 text-xs ${
+                isCurrentMonth ? 'bg-background' : 'bg-muted/30'
+              } ${isToday ? 'bg-primary/10' : ''}`;
+              
+              const finalCellClasses = `${cellClasses} ${(i + 1) % 7 === 0 ? 'border-r-0' : ''}`;
 
               return (
-                  <div key={i} className={cellClasses} onClick={() => onDayClick(dateString)}>
-                      <span className={`${isCurrentMonth ? '' : 'text-muted-foreground'} ${isToday ? 'font-bold text-primary' : ''}`}>{date.getDate()}</span>
-                      <div className="mt-1 space-y-0.5 overflow-y-auto h-[calc(100%-1.25rem)]">
-                          {dailyEvents.map(event => (
-                              <div key={event.id} className="flex items-center cursor-pointer" onClick={(e) => { e.stopPropagation(); onEventClick(event); }}>
+                  <div key={i} className={finalCellClasses} onClick={() => onDayClick(dateString)}>
+                      <span className={`absolute top-1 right-2 text-xs sm:text-sm ${isCurrentMonth ? '' : 'text-muted-foreground'} ${isToday ? 'font-bold text-primary' : ''}`}>{date.getDate()}</span>
+                      <div className="mt-5 space-y-1 overflow-hidden">
+                          {dailyEvents.slice(0, MAX_EVENTS_VISIBLE).map(event => (
+                              <div key={event.id} className="flex items-center cursor-pointer rounded-sm px-1 bg-primary/10 hover:bg-primary/20" onClick={(e) => { e.stopPropagation(); onEventClick(event); }}>
                                   <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${subjectsById.get(event.subjectId)?.color ? '' : 'bg-primary'}`} style={{ backgroundColor: subjectsById.get(event.subjectId)?.color }}></div>
-                                  <span className="ml-1 text-xs truncate">{subjectsById.get(event.subjectId)?.name} {event.startTime}</span>
+                                  <span className="ml-1 text-xs truncate font-semibold">{subjectsById.get(event.subjectId)?.name}</span>
                               </div>
                           ))}
+                          {dailyEvents.length > MAX_EVENTS_VISIBLE && (
+                            <div className="text-xs text-muted-foreground px-1 pt-0.5">
+                              + {dailyEvents.length - MAX_EVENTS_VISIBLE}개 더보기
+                            </div>
+                          )}
                       </div>
                   </div>
               )
           })}
+        </div>
       </div>
     </div>
   );
