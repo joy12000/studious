@@ -2,8 +2,9 @@ import React, { useState, useMemo } from 'react';
 import { useNotes } from '../lib/useNotes';
 import { ScheduleEvent, Subject } from '../lib/types';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
-import ScheduleImportButton from '../components/ScheduleImportButton';
+import { ScheduleEditModal } from '../components/ScheduleEditModal';
+
+// --- Weekly View Components ---
 
 const DAYS = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -93,9 +94,23 @@ const MonthlyCalendarView = ({ onDayClick, onEventClick }: { onDayClick: (date: 
         return map;
     }, [allSubjects]);
 
+    const eventsByDayOfWeek = useMemo(() => {
+        const grouped: { [key: string]: ScheduleEvent[] } = {};
+        DAYS.forEach(day => { grouped[day] = [] });
+        schedule?.forEach(event => {
+            if (grouped[event.dayOfWeek]) {
+                grouped[event.dayOfWeek].push(event);
+            }
+        });
+        for (const day in grouped) {
+          grouped[day].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+        }
+        return grouped;
+    }, [schedule]);
+
     const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-    const startDay = firstDayOfMonth.getDay();
+    const startDay = firstDayOfMonth.getDay(); // 0 for Sunday, 1 for Monday...
     const daysInMonth = lastDayOfMonth.getDate();
 
     const calendarDays = Array.from({ length: 42 }, (_, i) => {
@@ -105,18 +120,6 @@ const MonthlyCalendarView = ({ onDayClick, onEventClick }: { onDayClick: (date: 
         return date;
     });
 
-    const eventsByDate = useMemo(() => {
-        const grouped: { [key: string]: ScheduleEvent[] } = {};
-        schedule?.forEach(event => {
-            const date = event.date;
-            if (!grouped[date]) {
-                grouped[date] = [];
-            }
-            grouped[date].push(event);
-        });
-        return grouped;
-    }, [schedule]);
-
   return (
     <div className="grid grid-cols-7 gap-1">
         {['월', '화', '수', '목', '금', '토', '일'].map(day => (
@@ -125,14 +128,20 @@ const MonthlyCalendarView = ({ onDayClick, onEventClick }: { onDayClick: (date: 
         {calendarDays.map((date, i) => {
             const dateString = formatDate(date.getFullYear(), date.getMonth(), date.getDate());
             const isCurrentMonth = date.getMonth() === currentDate.getMonth();
+            
+            const dayOfWeekIndex = date.getDay();
+            const dayOfWeek = DAYS[(dayOfWeekIndex + 6) % 7];
+            
+            const dailyEvents = eventsByDayOfWeek[dayOfWeek] || [];
+
             return (
                 <div key={i} className={`h-24 border rounded-lg p-1 text-xs ${isCurrentMonth ? 'bg-card/50' : 'bg-muted/20'}`} onClick={() => onDayClick(dateString)}>
                     <span className={`${isCurrentMonth ? '' : 'text-muted-foreground'}`}>{date.getDate()}</span>
-                    <div className="mt-1 space-y-0.5">
-                        {eventsByDate[dateString]?.map(event => (
+                    <div className="mt-1 space-y-0.5 overflow-y-auto h-[calc(100%-1.25rem)]">
+                        {dailyEvents.map(event => (
                             <div key={event.id} className="flex items-center cursor-pointer" onClick={(e) => { e.stopPropagation(); onEventClick(event); }}>
-                                <div className={`w-1.5 h-1.5 rounded-full ${subjectsById.get(event.subjectId)?.color ? '' : 'bg-primary'}`} style={{ backgroundColor: subjectsById.get(event.subjectId)?.color }}></div>
-                                <span className="ml-1 text-xs truncate">{subjectsById.get(event.subjectId)?.name}</span>
+                                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${subjectsById.get(event.subjectId)?.color ? '' : 'bg-primary'}`} style={{ backgroundColor: subjectsById.get(event.subjectId)?.color }}></div>
+                                <span className="ml-1 text-xs truncate">{subjectsById.get(event.subjectId)?.name} {event.startTime}</span>
                             </div>
                         ))}
                     </div>
@@ -146,6 +155,7 @@ const MonthlyCalendarView = ({ onDayClick, onEventClick }: { onDayClick: (date: 
 export default function SchedulePage() {
   const [view, setView] = useState<'weekly' | 'monthly'>('weekly');
   const { allSubjects, addScheduleEvent, updateScheduleEvent, deleteScheduleEvent } = useNotes();
+  const [editingEvent, setEditingEvent] = useState<ScheduleEvent | null>(null);
 
   const handleDayClick = async (date: string) => {
     const subjectId = prompt('과목 ID를 입력하세요:\n' + allSubjects?.map(s => `${s.name}: ${s.id}`).join('\n'));
@@ -157,22 +167,22 @@ export default function SchedulePage() {
     const endTime = prompt('종료 시간을 입력하세요 (HH:MM):');
     if (!endTime) return;
 
-    const dayOfWeek = DAYS[new Date(date).getDay()];
+    const dayIndex = new Date(date).getDay();
+    const dayOfWeek = DAYS[(dayIndex + 6) % 7];
 
     await addScheduleEvent({ date, subjectId, startTime, endTime, dayOfWeek });
   };
 
-  const handleEventClick = async (event: ScheduleEvent) => {
-    const action = prompt('수정 또는 삭제? (수정/삭제)');
-    if (action?.toLowerCase() === '삭제') {
-      if (confirm('정말로 이 일정을 삭제하시겠습니까?')) {
-        await deleteScheduleEvent(event.id);
-      }
-    } else if (action?.toLowerCase() === '수정') {
-      const newStartTime = prompt('새 시작 시간을 입력하세요 (HH:MM):', event.startTime);
-      const newEndTime = prompt('새 종료 시간을 입력하세요 (HH:MM):', event.endTime);
-      await updateScheduleEvent(event.id, { startTime: newStartTime || event.startTime, endTime: newEndTime || event.endTime });
-    }
+  const handleEventClick = (event: ScheduleEvent) => {
+    setEditingEvent(event);
+  };
+
+  const handleUpdateSchedule = async (id: string, updates: Partial<ScheduleEvent>) => {
+    await updateScheduleEvent(id, updates);
+  };
+
+  const handleDeleteSchedule = async (id: string) => {
+    await deleteScheduleEvent(id);
   };
 
   return (
@@ -188,6 +198,14 @@ export default function SchedulePage() {
             </div>
         </div>
         {view === 'weekly' ? <WeeklyCalendarView onEventClick={handleEventClick} /> : <MonthlyCalendarView onDayClick={handleDayClick} onEventClick={handleEventClick} />}
+        {editingEvent && (
+          <ScheduleEditModal 
+            event={editingEvent}
+            onClose={() => setEditingEvent(null)}
+            onSave={handleUpdateSchedule}
+            onDelete={handleDeleteSchedule}
+          />
+        )}
     </div>
   );
 }

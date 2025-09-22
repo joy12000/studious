@@ -240,20 +240,13 @@ import { useState, useCallback } from 'react';
             await db.subjects.add(subject);
           }
 
-          const eventDate = new Date(monday);
-          if (event.dayOfWeek in dayNameToIndex) {
-            eventDate.setDate(monday.getDate() + dayNameToIndex[event.dayOfWeek]);
-          }
-          
-          const dateString = eventDate.toISOString().split('T')[0]; // YYYY-MM-DD
-
           newEvents.push({
             id: crypto.randomUUID(),
             subjectId: subject.id,
             startTime: event.startTime,
             endTime: event.endTime,
             dayOfWeek: event.dayOfWeek,
-            date: dateString, // Add the calculated date
+            // date: dateString, // Recurring events should not have a fixed date.
           });
         }
 
