@@ -46,7 +46,7 @@ export type Attachment = FileAttachment | LinkAttachment;
   id: string;
   title: string;
   content: string;
-  noteType: 'general' | 'review'; // 노트 타입 추가
+  noteType: 'general' | 'review' | 'textbook'; // 노트 타입 추가
   subjectId?: string; // subject의 id와 연결 (기존 tag 대체)
   sourceType: SourceType;
   sourceUrl?: string | null;

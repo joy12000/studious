@@ -7,7 +7,7 @@ import AttachmentPanel from '../components/AttachmentPanel';
 import { exportPlainSingleNote } from '../lib/backup';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import {
-  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit, Bot
+  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit, Bot, ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -46,6 +46,17 @@ const QuizComponent = ({ quiz }: { quiz: Quiz }) => {
   );
 };
 
+// ✨ [추가] 참고서 콘텐츠를 파싱하는 함수
+const parseTextbookContent = (content: string) => {
+  const sections = content.split(/\n(?=#{1,3}\s)/).filter(s => s.trim() !== '');
+  return sections.map(section => {
+    const match = section.match(/(#{1,3})\s(.*)/);
+    const title = match ? match[2] : '제목 없음';
+    const contentWithoutTitle = match ? section.substring(match[0].length).trim() : section;
+    return { title, content: contentWithoutTitle };
+  });
+};
+
 export default function NotePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -62,6 +73,13 @@ export default function NotePage() {
 
   // ✨ [추가] AI 채팅 패널 상태 관리
   const [isChatOpen, setIsChatOpen] = useState(false);
+
+  const textbookSections = useMemo(() => {
+    if (note && note.noteType === 'textbook') {
+      return parseTextbookContent(note.content);
+    }
+    return [];
+  }, [note]);
 
   useEffect(() => {
     if (!id) return;
@@ -337,9 +355,27 @@ export default function NotePage() {
                     </div>
                   ) : (
                     <div>
-                      <div className="note-content-line-height prose prose-slate max-w-none dark:prose-invert prose-headings:font-semibold leading-relaxed">
-                        <MarkdownRenderer content={note.content} />
-                      </div>
+                      {textbookSections.length > 0 ? (
+                        <div className="space-y-3">
+                          {textbookSections.map((section, index) => (
+                            <details key={index} className="group rounded-lg border bg-card p-4 transition-all duration-300 open:bg-primary/5 open:shadow-inner" open={index < 2}>
+                              <summary className="cursor-pointer text-lg font-semibold text-foreground list-none flex items-center justify-between">
+                                {section.title}
+                                <span className="text-primary transition-transform duration-300 group-open:rotate-90">
+                                  <ChevronRight className="h-5 w-5" />
+                                </span>
+                              </summary>
+                              <div className="mt-4 note-content-line-height prose prose-slate max-w-none dark:prose-invert prose-headings:font-semibold leading-relaxed">
+                                <MarkdownRenderer content={section.content} />
+                              </div>
+                            </details>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="note-content-line-height prose prose-slate max-w-none dark:prose-invert prose-headings:font-semibold leading-relaxed">
+                          <MarkdownRenderer content={note.content} />
+                        </div>
+                      )}
 
                       {note.key_insights && note.key_insights.length > 0 && (
                         <div className="mt-8">

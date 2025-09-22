@@ -394,7 +394,8 @@ import { useState, useCallback } from 'react';
         content: content,
         key_insights: [], // 참고서 생성 시에는 key_insights를 AI 프롬프트에서 직접 생성하도록 유도할 수 있습니다.
         subjectId: subjectId,
-        noteType: 'review', // '복습/학습' 타입으로 저장
+        // ✨ [핵심 수정] 노트 타입을 'textbook'으로 명확하게 지정
+        noteType: 'textbook', 
         sourceType: 'other',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().getTime(),
