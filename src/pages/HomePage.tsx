@@ -32,7 +32,7 @@ export default function HomePage() {
 
   const [mode, setMode] = useState<InputMode>('youtube');
   const [youtubeUrl, setYoutubeUrl] = useState("");
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [progressMessage, setProgressMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [headline, setHeadline] = useState(HEADLINES[0]);
@@ -71,12 +71,12 @@ export default function HomePage() {
           setProgressMessage(null);
         },
       });
-    } else if (file) {
+    } else if (files.length > 0) {
       if (mode === 'review') {
         setProgressMessage("복습 노트를 생성하는 중...");
         await addNoteFromReview({
           aiConversationText: '', // This needs to be implemented
-          file,
+          files,
           subjects: allSubjects || [],
           onProgress: setProgressMessage,
           onComplete: (newNote, newQuiz) => {
@@ -91,7 +91,7 @@ export default function HomePage() {
       } else if (mode === 'schedule') {
         setProgressMessage("시간표를 분석하는 중...");
         await addScheduleFromImage({
-          file,
+          file: files[0], // Schedule still uses a single file
           onProgress: setProgressMessage,
           onComplete: (events) => {
             setProgressMessage(null);
@@ -108,9 +108,7 @@ export default function HomePage() {
   };
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      setFile(acceptedFiles[0]);
-    }
+    setFiles(prevFiles => [...prevFiles, ...acceptedFiles]);
   }, []);
 
   const isLoading = progressMessage !== null;
@@ -155,30 +153,20 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="w-full">
-                              <div className="w-full">
-                                <div 
-                                  className="w-full h-48 border-2 border-dashed rounded-lg flex items-center justify-center text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors"
-                                  onClick={() => document.getElementById('file-upload')?.click()}
-                                >
-                                  {file ? (
-                                    <p>{file.name}</p>
-                                  ) : (
-                                    <p>여기에 파일을 드래그 앤 드롭하거나 클릭하여 업로드하세요.</p>
-                                  )}
-                                  <input id="file-upload" type="file" className="hidden" onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)} />
-                                </div>
-                                {file && (
-                                  <div className="mt-4 text-center">
-                                    <button 
-                                      onClick={handleSave} 
-                                      disabled={isLoading}
-                                      className={`inline-flex items-center justify-center bg-primary text-primary-foreground h-12 px-6 rounded-full font-semibold hover:bg-primary/90 disabled:opacity-50 transition-all duration-300`}
-                                    >
-                                      {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><ArrowRight className="h-5 w-5 mr-2" />생성하기</>}
-                                    </button>
-                                  </div>
-                                )}
-                              </div>                {file && (
+                <div 
+                  className="w-full min-h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors p-4"
+                  onClick={() => document.getElementById('file-upload')?.click()}
+                >
+                  {files.length > 0 ? (
+                    <ul className="list-disc pl-5">
+                      {files.map((f, i) => <li key={i} className="text-sm">{f.name}</li>)}
+                    </ul>
+                  ) : (
+                    <p>여기에 파일을 드래그 앤 드롭하거나 클릭하여 업로드하세요.</p>
+                  )}
+                  <input id="file-upload" type="file" multiple className="hidden" onChange={(e) => setFiles(e.target.files ? Array.from(e.target.files) : [])} />
+                </div>
+                {files.length > 0 && (
                   <div className="mt-4 text-center">
                     <button 
                       onClick={handleSave} 

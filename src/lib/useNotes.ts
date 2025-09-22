@@ -20,7 +20,7 @@ import { useState, useCallback } from 'react';
 
   export interface AddNoteFromReviewPayload {
     aiConversationText: string;
-    file: File;
+    files: File[];
     subjects: Subject[];
     onProgress: (status: string) => void;
     onComplete: (note: Note, quiz: Quiz) => void;
@@ -142,12 +142,12 @@ import { useState, useCallback } from 'react';
     };
 
     const addNoteFromReview = async (payload: AddNoteFromReviewPayload) => {
-      const { aiConversationText, file, subjects, onProgress, onComplete, onError } = payload;
+      const { aiConversationText, files, subjects, onProgress, onComplete, onError } = payload;
       try {
         onProgress("AI 복습 노트를 생성하고 있습니다...");
         const formData = new FormData();
         formData.append('aiConversationText', aiConversationText);
-        formData.append('file', file);
+        files.forEach(file => formData.append('files', file));
         formData.append('subjects', JSON.stringify(subjects));
 
         const response = await fetch('/api/create_review_note', {
