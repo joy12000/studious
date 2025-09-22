@@ -1,16 +1,18 @@
-import React, { useEffect, useMemo, useState } from 'react';
+// src/pages/SettingsPage.tsx
+
+import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Home, Smartphone, RefreshCcw, Sun, Moon, Trash2, Menu, Plus, Edit, Trash } from 'lucide-react';
 import { canInstall, onCanInstallChange, promptInstall } from '../lib/install';
 import { useNotes } from '../lib/useNotes';
 import BackupPanel from '../components/BackupPanel';
 import DataUsagePanel from '../components/DataUsagePanel';
 import { useSidebar } from '../components/AppLayout';
-
 import { db } from '../lib/db';
 import type { AppSettings, Subject } from '../lib/types';
 import { autoBackupIfNeeded } from '../lib/backup';
 import VersionBadge from '../components/VersionBadge';
 import { Button } from '@/components/ui/button';
+import { format } from 'date-fns'; // ✨ date-fns 임포트
 
 type TabKey = 'general'|'subjects'|'backup'|'data'|'app';
 
@@ -69,8 +71,9 @@ const SubjectsPanel = () => {
   );
 }
 
+
 export default function SettingsPage(){
-  const { notes, allSubjects, addSubject, updateSubject, deleteSubject } = useNotes();
+  const { notes, allSubjects } = useNotes();
   const [tab, setTab] = useState<TabKey>('general');
   const [installable, setInstallable] = useState(canInstall());
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -83,12 +86,17 @@ export default function SettingsPage(){
   const noteCount = notes.length;
   const subjectCount = allSubjects?.length || 0;
 
+  async function updateSettings(newSettings: Partial<AppSettings>) {
+    const currentSettings = await db.settings.get('default') || { id: 'default' };
+    const updated = { ...currentSettings, ...newSettings };
+    await db.settings.put(updated as AppSettings & { id: string });
+    setSettings(updated);
+  }
+
   async function toggleTheme(){
     if (!settings) return;
     const next = settings.theme === 'dark' ? 'light' : 'dark';
-    const updated = { ...settings, theme: next };
-    await db.settings.put({ id: 'default', ...updated });
-    setSettings(updated);
+    updateSettings({ theme: next });
     try {
       const root = document.documentElement;
       if (next === 'dark') root.classList.add('dark'); else root.classList.remove('dark');
@@ -140,7 +148,7 @@ export default function SettingsPage(){
 
           {tab==='general' && (
             <div className="space-y-4">
-              <section className="p-6 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20">
+              <section className="p-6 bg-card/60 rounded-2xl shadow-lg border">
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="font-medium">화면 테마</div>
@@ -153,7 +161,23 @@ export default function SettingsPage(){
                 </div>
               </section>
 
-              <section className="p-4 bg-card/60 backdrop-blur-lg rounded-2xl shadow-lg border border-card/20 grid grid-cols-2 gap-4">
+              {/* ✨ [추가] 학기 시작일 설정 UI */}
+              <section className="p-6 bg-card/60 rounded-2xl shadow-lg border">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="font-medium">학기 시작일 설정</div>
+                    <div className="text-xs text-muted-foreground">AI 참고서 생성 시 주차 계산의 기준이 됩니다.</div>
+                  </div>
+                  <input
+                    type="date"
+                    value={settings?.semesterStartDate || ''}
+                    onChange={(e) => updateSettings({ semesterStartDate: e.target.value })}
+                    className="px-3 py-2 rounded-lg border bg-card/80"
+                  />
+                </div>
+              </section>
+
+              <section className="p-4 bg-card/60 rounded-2xl shadow-lg border grid grid-cols-2 gap-4">
                 <div className="p-3 rounded-lg bg-card/60">
                   <div className="text-xs text-muted-foreground">전체 노트 수</div>
                   <div className="text-xl font-semibold">{noteCount.toLocaleString()}</div>

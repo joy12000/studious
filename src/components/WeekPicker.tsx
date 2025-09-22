@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import { ko } from 'date-fns/locale';
-import { getWeek } from 'date-fns';
+import { differenceInWeeks, startOfWeek } from 'date-fns';
 import { useNotes } from '../lib/useNotes';
 import { Badge } from './ui/badge';
 
@@ -67,6 +67,19 @@ export function WeekPicker({ onDateSelect }: WeekPickerProps) {
 }
 
 // 선택된 날짜가 해당 연도의 몇 번째 주차인지 계산하는 헬퍼 함수
-export function getWeekNumber(date: Date): number {
-  return getWeek(date, { weekStartsOn: 1, firstWeekContainsDate: 4 });
+export function getWeekNumber(date: Date, semesterStartDateStr?: string): number {
+  if (!semesterStartDateStr) {
+    // 학기 시작일이 설정되지 않았으면 기본값으로 1을 반환
+    return 1;
+  }
+  
+  const startDate = new Date(semesterStartDateStr);
+  // 주의 시작을 월요일로 통일하여 계산
+  const startOfWeekForStartDate = startOfWeek(startDate, { weekStartsOn: 1 });
+  const startOfWeekForSelectedDate = startOfWeek(date, { weekStartsOn: 1 });
+
+  // 두 날짜 사이의 주 차이를 계산하고, 1주차부터 시작하도록 +1
+  const week = differenceInWeeks(startOfWeekForSelectedDate, startOfWeekForStartDate) + 1;
+  
+  return week > 0 ? week : 1; // 음수가 나올 경우 1로 보정
 }

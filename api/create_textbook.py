@@ -149,7 +149,7 @@ class handler(BaseHTTPRequestHandler):
                 try:
                     print(f"INFO: Generating textbook with gemini-1.5-pro-latest using API key #{i + 1}...")
                     genai.configure(api_key=api_key)
-                    model = genai.GenerativeModel('gemini-1.5-pro-latest')
+                    model = genai.GenerativeModel('gemini-2.5-pro')
                     
                     response = model.generate_content(request_contents)
                     

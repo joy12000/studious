@@ -1,187 +1,295 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNotes } from "../lib/useNotes";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Loader2, Youtube, ArrowRight, File, Calendar, Bot } from "lucide-react";
+import { Loader2, Youtube, ArrowRight, File, Calendar, Bot, ExternalLink, AppWindow, Trash2, Pencil, Plus, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
-// 진행 메시지를 표시하는 오버레이 컴포넌트
-function LoadingOverlay({ message }: { message: string }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="flex flex-col items-center gap-4 rounded-lg bg-card p-8 text-card-foreground shadow-xl">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-lg font-medium">{message}</p>
-        <p className="text-sm text-muted-foreground">잠시만 기다려주세요...</p>
-      </div>
+const LoadingOverlay = () => (
+  <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
+    <div className="text-center">
+      <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+      <p className="mt-4 text-lg font-semibold">노트를 생성하고 있습니다...</p>
+      <p className="text-muted-foreground">잠시만 기다려주세요.</p>
     </div>
-  );
-}
+  </div>
+);
 
 const HEADLINES = [
-  "어떤 것을 학습할까요?",
-  "오늘 탐색할 지식은 무엇인가요?",
-  "학습 자료를 업로드하거나 AI와 대화해보세요.",
+  "새로운 지식을 내 것으로",
+  "복잡한 정보를 명확하게",
+  "학습의 모든 과정을 한 곳에서",
+  "AI와 함께 더 깊이있는 학습을",
+  "당신의 두 번째 뇌가 되어줄게요"
 ];
+
+// ✨ [추가] 링크 객체 타입 정의
+interface ExternalLinkItem {
+  id: string;
+  name: string;
+  url: string;
+  iconUrl: string;
+}
+
+// ✨ [추가] 기본 링크 목록
+const defaultLinks: ExternalLinkItem[] = [
+  { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/', iconUrl: 'https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64' },
+  { id: 'perplexity', name: 'Perplexity', url: 'https://www.perplexity.ai/', iconUrl: 'https://www.google.com/s2/favicons?domain=perplexity.ai&sz=64' },
+  { id: 'chatgpt', name: 'ChatGPT', url: 'https://chat.openai.com/', iconUrl: 'https://www.google.com/s2/favicons?domain=openai.com&sz=64' },
+  { id: 'mathpix', name: 'Mathpix Snip', url: 'https://snip.mathpix.com/', iconUrl: 'https://www.google.com/s2/favicons?domain=mathpix.com&sz=64' }
+];
+
+const LINKS_STORAGE_KEY = 'studious-external-links';
 
 type InputMode = 'youtube' | 'review' | 'schedule';
 
 export default function HomePage() {
-  const { addNote, addNoteFromReview, addScheduleFromImage, allSubjects } = useNotes();
+  const { addNote, addNoteFromReview, addScheduleFromImage } = useNotes();
   const navigate = useNavigate();
   const location = useLocation();
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  const [mode, setMode] = useState<InputMode>('youtube'); // 기본 모드를 'youtube'로 변경
-  const [youtubeUrl, setYoutubeUrl] = useState("");
-  const [files, setFiles] = useState<File[]>([]);
-  const [progressMessage, setProgressMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
+  const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [mode, setMode] = useState<InputMode>('youtube');
   const [headline, setHeadline] = useState(HEADLINES[0]);
 
+  // ✨ [개선] 외부 링크 목록을 상태로 관리하고 localStorage와 연동
+  const [externalLinks, setExternalLinks] = useState<ExternalLinkItem[]>([]);
+  const [isEditLinks, setIsEditLinks] = useState(false);
+
   useEffect(() => {
-    setHeadline(HEADLINES[Math.floor(Math.random() * HEADLINES.length)]);
+    try {
+      const storedLinks = localStorage.getItem(LINKS_STORAGE_KEY);
+      if (storedLinks) {
+        setExternalLinks(JSON.parse(storedLinks));
+      } else {
+        setExternalLinks(defaultLinks);
+      }
+    } catch (error) {
+      console.error("Failed to load links from localStorage", error);
+      setExternalLinks(defaultLinks);
+    }
   }, []);
 
-  useEffect(() => {
-    if (location.state?.focusInput && mode === 'youtube') {
-      inputRef.current?.focus();
-    }
-  }, [location.state, mode]);
+  const saveLinks = (links: ExternalLinkItem[]) => {
+    setExternalLinks(links);
+    localStorage.setItem(LINKS_STORAGE_KEY, JSON.stringify(links));
+  };
 
-  const handleSave = async () => {
-    setError(null);
-    if (mode === 'youtube') {
-      if (!youtubeUrl.trim()) {
-        setError("유튜브 URL을 입력해주세요.");
-        return;
-      }
-      if (!youtubeUrl.includes("youtube.com") && !youtubeUrl.includes("youtu.be")) {
-        setError("유효한 유튜브 URL이 아닙니다.");
-        return;
-      }
-      setProgressMessage("요약을 준비하는 중...");
-      await addNote({
-        youtubeUrl,
-        onProgress: setProgressMessage,
-        onComplete: (newNote) => {
-          setProgressMessage(null);
-          navigate(`/note/${newNote.id}`);
-        },
-        onError: (err) => {
-          setError(err);
-          setProgressMessage(null);
-        },
-      });
-    } else if (files.length > 0) {
-      if (mode === 'review') {
-        setProgressMessage("복습 노트를 생성하는 중...");
-        await addNoteFromReview({
-          aiConversationText: '', // This needs to be implemented
-          files,
-          subjects: allSubjects || [],
-          onProgress: setProgressMessage,
-          onComplete: (newNote, newQuiz) => {
-            setProgressMessage(null);
-            navigate(`/note/${newNote.id}`);
-          },
-          onError: (err) => {
-            setError(err);
-            setProgressMessage(null);
-          },
-        });
-      } else if (mode === 'schedule') {
-        setProgressMessage("시간표를 분석하는 중...");
-        await addScheduleFromImage({
-          file: files[0], // Schedule still uses a single file
-          onProgress: setProgressMessage,
-          onComplete: (events) => {
-            setProgressMessage(null);
-            navigate(`/schedule`);
-          },
-          onError: (err) => {
-            setError(err);
-            setProgressMessage(null);
-          },
-        });
-      }
+  const handleAddLink = () => {
+    const name = prompt("추가할 사이트의 이름을 입력하세요:");
+    if (!name) return;
+    const url = prompt(`'${name}'의 전체 주소(URL)를 입력하세요 (https:// 포함):`);
+    if (!url) return;
+
+    try {
+      const domain = new URL(url).hostname;
+      const newLink: ExternalLinkItem = {
+        id: crypto.randomUUID(),
+        name,
+        url,
+        iconUrl: `https://www.google.com/s2/favicons?domain=${domain}&sz=64`
+      };
+      saveLinks([...externalLinks, newLink]);
+    } catch (error) {
+      alert("유효하지 않은 URL 형식입니다. 'https://'를 포함하여 다시 시도해주세요.");
     }
   };
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    setFiles(prevFiles => [...prevFiles, ...acceptedFiles]);
+  const handleDeleteLink = (id: string) => {
+    if (confirm("이 바로가기를 삭제하시겠습니까?")) {
+      saveLinks(externalLinks.filter(link => link.id !== id));
+    }
+  };
+
+  const handleProgress = (status: string) => {
+    setLoadingMessage(status);
+  };
+
+  const handleComplete = (note: any) => {
+    setIsLoading(false);
+    navigate(`/note/${note.id}`);
+  };
+
+  const handleError = (error: string) => {
+    setIsLoading(false);
+    alert(`오류가 발생했습니다: ${error}`);
+  };
+
+  const handleYoutubeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!youtubeUrl) return;
+    setIsLoading(true);
+    setLoadingMessage('YouTube 영상 요약을 시작합니다...');
+    await addNote({ youtubeUrl, onProgress: handleProgress, onComplete: handleComplete, onError: handleError });
+  };
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsLoading(true);
+    if (mode === 'review') {
+      setLoadingMessage('AI 복습 노트를 생성합니다...');
+      // This is a simplified version. In a real app, you'd handle multiple files and subjects.
+      await addNoteFromReview({
+        aiConversationText: "Previously studied material",
+        files: [file],
+        subjects: [],
+        onProgress: handleProgress,
+        onComplete: (note, quiz) => {
+          setIsLoading(false);
+          navigate(`/note/${note.id}`);
+        },
+        onError: handleError,
+      });
+    } else if (mode === 'schedule') {
+      setLoadingMessage('시간표 이미지를 분석합니다...');
+      await addScheduleFromImage({
+        file,
+        onProgress: handleProgress,
+        onComplete: (events) => {
+          setIsLoading(false);
+          navigate('/schedule');
+        },
+        onError: handleError,
+      });
+    }
+    // Reset file input
+    event.target.value = '';
+  };
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setHeadline(prev => {
+        const currentIndex = HEADLINES.indexOf(prev);
+        const nextIndex = (currentIndex + 1) % HEADLINES.length;
+        return HEADLINES[nextIndex];
+      });
+    }, 3000);
+    return () => clearInterval(interval);
   }, []);
 
-  const isLoading = progressMessage !== null;
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const shareUrl = queryParams.get('share_url');
+    if (shareUrl) {
+      setYoutubeUrl(shareUrl);
+      // Automatically trigger submission
+      setIsLoading(true);
+      setLoadingMessage('공유된 YouTube 영상 요약을 시작합니다...');
+      addNote({ 
+        youtubeUrl: shareUrl, 
+        onProgress: handleProgress, 
+        onComplete: (note) => {
+          setIsLoading(false);
+          navigate(`/note/${note.id}`, { replace: true });
+        }, 
+        onError: (error) => {
+          setIsLoading(false);
+          alert(`오류가 발생했습니다: ${error}`);
+          navigate('/', { replace: true });
+        } 
+      });
+    }
+  }, [location, addNote, navigate]);
+
 
   return (
     <>
-      {isLoading && <LoadingOverlay message={progressMessage as string} />}
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4">
-        <div className="w-full max-w-3xl text-center">
-          
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-medium tracking-tight text-foreground mb-8">
-            {headline}
-          </h1>
-
-          <div className="bg-card p-2 rounded-full flex items-center justify-center space-x-1 sm:space-x-2 mb-4">
-            <button onClick={() => navigate('/chat')} className={`px-3 sm:px-4 py-2 rounded-full text-sm font-semibold transition-colors bg-transparent text-muted-foreground hover:bg-muted`}><Bot className="inline-block mr-1.5 h-4 w-4"/>AI 채팅</button>
-            <button onClick={() => setMode('youtube')} className={`px-3 sm:px-4 py-2 rounded-full text-sm font-semibold transition-colors ${mode === 'youtube' ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground hover:bg-muted'}`}><Youtube className="inline-block mr-1.5 h-4 w-4"/>유튜브</button>
-            <button onClick={() => setMode('review')} className={`px-3 sm:px-4 py-2 rounded-full text-sm font-semibold transition-colors ${mode === 'review' ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground hover:bg-muted'}`}><File className="inline-block mr-1.5 h-4 w-4"/>학습자료</button>
-            <button onClick={() => setMode('schedule')} className={`px-3 sm:px-4 py-2 rounded-full text-sm font-semibold transition-colors ${mode === 'schedule' ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground hover:bg-muted'}`}><Calendar className="inline-block mr-1.5 h-4 w-4"/>시간표</button>
-          </div>
-
-          <div className="relative mt-6" style={{ minHeight: '60vh' }}>
-            {mode === 'youtube' ? (
-              <div className="relative flex items-center w-full">
-                <Youtube className="absolute left-6 h-6 w-6 text-muted-foreground" />
-                <input
-                  ref={inputRef}
-                  type="url"
-                  value={youtubeUrl}
-                  onChange={(e) => setYoutubeUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSave()}
-                  className="w-full pl-16 pr-32 py-3 text-lg border bg-card rounded-full shadow-md focus:ring-2 focus:ring-primary focus:border-transparent focus:shadow-lg transition-all disabled:opacity-70"
-                  placeholder="유튜브 링크 붙여넣기"
-                  disabled={isLoading}
-                />
-                <button 
-                  onClick={handleSave} 
-                  disabled={isLoading}
-                  className={`absolute right-2.5 top-1/2 -translate-y-1/2 inline-flex items-center justify-center bg-primary text-primary-foreground h-11 w-11 rounded-full font-semibold hover:bg-primary/90 disabled:opacity-50 transition-all duration-300 ${youtubeUrl.trim() ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}
-                >
-                  {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
-                </button>
-              </div>
-            ) : (
-              <div className="w-full">
-                <div 
-                  className="w-full min-h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors p-4"
-                  onClick={() => document.getElementById('file-upload')?.click()}
-                >
-                  {files.length > 0 ? (
-                    <ul className="list-disc pl-5 text-left">
-                      {files.map((f, i) => <li key={i} className="text-sm">{f.name}</li>)}
-                    </ul>
-                  ) : (
-                    <p>여기에 파일을 드래그 앤 드롭하거나 클릭하여 업로드하세요.</p>
-                  )}
-                  <input id="file-upload" type="file" multiple className="hidden" onChange={(e) => setFiles(e.target.files ? Array.from(e.target.files) : [])} />
+      {isLoading && <LoadingOverlay />}
+      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4 relative">
+        
+        <div className="absolute top-4 right-4 z-10">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="외부 도구 바로가기">
+                <AppWindow className="h-5 w-5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-60" align="end">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center mb-1">
+                    <h4 className="font-medium text-sm px-2">바로가기</h4>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsEditLinks(!isEditLinks)}>
+                        {isEditLinks ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                    </Button>
                 </div>
-                {files.length > 0 && (
-                  <div className="mt-4 text-center">
-                    <button 
-                      onClick={handleSave} 
-                      disabled={isLoading}
-                      className={`inline-flex items-center justify-center bg-primary text-primary-foreground h-12 px-6 rounded-full font-semibold hover:bg-primary/90 disabled:opacity-50 transition-all duration-300`}
-                    >
-                      {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><ArrowRight className="h-5 w-5 mr-2" />생성하기</>}
-                    </button>
-                  </div>
+                <div className="grid grid-cols-1">
+                  {externalLinks.map(link => (
+                    <div key={link.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted group">
+                      <img src={link.iconUrl} alt={`${link.name} icon`} className="h-4 w-4" />
+                      <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex-1 text-sm truncate">{link.name}</a>
+                      {isEditLinks && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteLink(link.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                      )}
+                      {!isEditLinks && (
+                          <a href={link.url} target="_blank" rel="noopener noreferrer" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                          </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {isEditLinks && (
+                    <Button variant="outline" size="sm" className="w-full mt-2" onClick={handleAddLink}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        새 링크 추가
+                    </Button>
                 )}
               </div>
-            )}
-            {error && <p className="text-destructive text-sm mt-4 text-center">{error}</p>}
+            </PopoverContent>
+          </Popover>
+        </div>
+
+        <div className="w-full max-w-3xl text-center">
+          <h1 className="text-4xl md:text-5xl font-bold tracking-tight mb-4">
+            Studious
+          </h1>
+          <p className="text-muted-foreground text-lg md:text-xl mb-8 transition-opacity duration-500">
+            {headline}
+          </p>
+
+          <div className="mb-6 flex justify-center">
+            <div className="p-1 bg-muted rounded-full flex items-center gap-1">
+              <Button variant={mode === 'youtube' ? 'default' : 'ghost'} size="sm" className="rounded-full" onClick={() => setMode('youtube')}><Youtube className="h-4 w-4 mr-2"/>AI 영상 요약</Button>
+              <Button variant={mode === 'review' ? 'default' : 'ghost'} size="sm" className="rounded-full" onClick={() => navigate('/chat')}><Bot className="h-4 w-4 mr-2"/>AI 참고서</Button>
+              <Button variant={mode === 'schedule' ? 'default' : 'ghost'} size="sm" className="rounded-full" onClick={() => setMode('schedule')}><Calendar className="h-4 w-4 mr-2"/>AI 시간표</Button>
+            </div>
           </div>
 
+          {mode === 'youtube' && (
+            <form onSubmit={handleYoutubeSubmit} className="flex items-center gap-2 bg-card border rounded-full p-2 shadow-lg max-w-xl mx-auto">
+              <input
+                type="text"
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                placeholder="YouTube 영상 링크를 붙여넣으세요"
+                className="flex-grow bg-transparent px-4 py-2 focus:outline-none"
+              />
+              <Button type="submit" size="icon" className="rounded-full flex-shrink-0">
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+            </form>
+          )}
+
+          {(mode === 'review' || mode === 'schedule') && (
+            <div className="max-w-xl mx-auto">
+              <Button onClick={handleFileSelect} variant="secondary" size="lg" className="w-full rounded-full shadow-lg">
+                <File className="h-5 w-5 mr-3" />
+                {mode === 'review' ? '복습할 파일 선택' : '시간표 이미지 선택'}
+              </Button>
+              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept={mode === 'schedule' ? 'image/*' : undefined} />
+            </div>
+          )}
         </div>
       </div>
     </>

@@ -23,6 +23,7 @@ class handler(BaseHTTPRequestHandler):
             post_data = self.rfile.read(content_length)
             body = json.loads(post_data.decode('utf-8'))
             history = body.get('history', [])
+            note_context = body.get('noteContext', '') # Get the note context
             
             # ✨ 수정: 프론트엔드에서 보낸 모델 이름을 사용하고, 없으면 기본 모델 사용
             model_identifier = body.get('model', 'google/gemini-1.5-flash')
@@ -30,13 +31,26 @@ class handler(BaseHTTPRequestHandler):
             if not history:
                 raise ValueError("대화 내용이 비어있습니다.")
 
-            system_prompt = { "role": "system", "content": """
+            # New system prompt construction
+            system_prompt_text = """
             당신은 학습을 돕는 유능한 AI 어시스턴트입니다. 
             1. 사용자의 요청에 명확하고 구조적으로 답변해주세요.
-            2. 수학 수식이나 과학 기호는 KaTeX 문법을 사용해주세요 (인라인: $, 블록: $$).
+            2. 수학 수식이나 과학 기호는 KaTeX 문법을 사용해주세요 (인라인: $, 블록: $).
             3. 답변이 끝난 후, 사용자가 더 깊이 탐색해볼 만한 흥미로운 후속 질문 3개를 한국어로 제안해주세요.
             4. 최종 결과는 반드시 {"answer": "...", "followUp": ["...", "...", "..."]} 형식의 JSON 객체로만 응답해야 합니다. 다른 말은 절대 추가하지 마세요.
-            """}
+            """
+
+            if note_context:
+                system_prompt_text += f"""
+
+                ---
+                아래는 사용자가 현재 보고 있는 노트의 내용입니다. 이 내용을 바탕으로 답변해주세요.
+
+                {note_context}
+                ---
+                """
+            
+            system_prompt = { "role": "system", "content": system_prompt_text}
             messages = [{"role": "user" if msg['role'] == 'user' else "assistant", "content": msg['parts'][0]['text']} for msg in history]
 
             for i, api_key in enumerate(valid_keys):

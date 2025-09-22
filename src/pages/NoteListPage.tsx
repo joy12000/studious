@@ -10,7 +10,7 @@ import { useSidebar } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 
 export default function NoteListPage() {
-  const { notes, loading, filters, setFilters } = useNotes();
+  const { notes, loading, filters, setFilters, toggleFavorite } = useNotes();
   const { setIsSidebarOpen } = useSidebar();
   const navigate = useNavigate();
   

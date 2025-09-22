@@ -1,3 +1,5 @@
+// src/pages/ChatPage.tsx
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
@@ -5,8 +7,10 @@ import { ArrowUp, Loader2, RefreshCw, Copy, Save, ChevronsUpDown, Check, UploadC
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useNotes, Subject } from '../lib/useNotes';
-import { WeekPicker, getWeekNumber } from '../components/WeekPicker'; // WeekPicker 임포트
-import { format } from 'date-fns'; // date-fns 임포트
+import { WeekPicker, getWeekNumber } from '../components/WeekPicker';
+import { format } from 'date-fns';
+import { useLiveQuery } from 'dexie-react-hooks'; // ✨ dexie-react-hooks 임포트
+import { db } from '../lib/db'; // ✨ db 임포트
 
 const models = [
     { id: 'x-ai/grok-4-fast:free', name: '🚀 Grok 4 Fast (최신/대용량)' },
@@ -28,13 +32,17 @@ interface GeminiHistory {
 }
 
 export default function ChatPage() {
+  const { addNoteFromChat, allSubjects, addNoteFromTextbook } = useNotes();
+  const navigate = useNavigate();
+
+  // ✨ [추가] 데이터베이스에서 학기 시작일 설정 가져오기
+  const settings = useLiveQuery(() => db.settings.get('default'));
+
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { addNoteFromChat, allSubjects, addNoteFromTextbook } = useNotes();
-  const navigate = useNavigate();
   
   const [selectedModel, setSelectedModel] = useState(models[0].id);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -159,9 +167,13 @@ export default function ChatPage() {
     const formData = new FormData();
     uploadedFiles.forEach(file => formData.append('files', file));
     
-    const weekInfoText = selectedDate ? `${getWeekNumber(selectedDate)}주차` : '학습';
+    // ✨ [개선] 설정된 학기 시작일을 기준으로 주차 계산
+    const weekInfo = selectedDate 
+      ? `${getWeekNumber(selectedDate, settings?.semesterStartDate)}주차 (${format(selectedDate, 'M월 d일')})` 
+      : '[N주차]';
+
     formData.append('subject', selectedSubject.name);
-    formData.append('week', weekInfoText);
+    formData.append('week', weekInfo);
     formData.append('materialTypes', uploadedFiles.map(f => f.type).join(', ') || '[파일]');
 
     try {
@@ -180,7 +192,7 @@ export default function ChatPage() {
       
       // 2. 생성된 내용을 바탕으로 새 노트 자동 저장
       setLoadingMessage('생성된 참고서를 노트에 저장하는 중...');
-      const noteTitle = `${selectedSubject.name} - ${weekInfoText} 참고서`;
+      const noteTitle = `${selectedSubject.name} - ${weekInfo} 참고서`;
       
       const newNote = await addNoteFromTextbook(
         noteTitle,
@@ -242,7 +254,9 @@ export default function ChatPage() {
                             <div className="flex items-center">
                                 <CalendarDays className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                                 <span className="truncate">
-                                    {selectedDate ? `${getWeekNumber(selectedDate)}주차 (${format(selectedDate, "M월 d일")})` : "주차 선택 (날짜)"}
+                                    {selectedDate 
+                                        ? `${getWeekNumber(selectedDate, settings?.semesterStartDate)}주차 (${format(selectedDate, "M월 d일")})` 
+                                        : "주차 선택 (날짜)"}
                                 </span>
                             </div>
                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />

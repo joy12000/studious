@@ -75,6 +75,7 @@ export interface AppSettings {
   topicRules: TopicRule;
   theme: Theme;
   defaultTopics: string[];
+  semesterStartDate?: string; // ✨ [추가] 학기 시작일 (YYYY-MM-DD 형식)
 }
 
 // --- API 데이터 타입 ---
