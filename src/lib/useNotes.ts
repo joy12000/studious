@@ -1,14 +1,16 @@
 import { useState, useCallback } from 'react';
   import { useLiveQuery } from 'dexie-react-hooks';
   import { db } from './db';
-  import { Note, Subject, ScheduleEvent, Quiz, Attachment } from './types';
-  import { v4 as uuidv4 } from 'uuid';
-  export type Filters = {
-    search?: string;
-    subjectId?: string;
-    favorite?: boolean;
-    dateRange?: 'today' | '7days' | '30days' | 'all';
-  };
+import { Note, Subject, ScheduleEvent, Quiz, Attachment, NoteType } from './types'; // ✨ NoteType 임포트
+import { v4 as uuidv4 } from 'uuid';
+
+export type Filters = {
+  search?: string;
+  subjectId?: string;
+  favorite?: boolean;
+  dateRange?: 'today' | '7days' | '30days' | 'all';
+  noteType?: NoteType; // ✨ noteType 필터 추가
+};
 
   // 🚀 addNote의 인자 타입을 확장하여 콜백 함수들을 포함
   export interface AddNotePayload {
@@ -55,6 +57,10 @@ import { useState, useCallback } from 'react';
       }
 
       let notesFromDb = await query.reverse().sortBy('updatedAt');
+
+      if (filters.noteType) {
+        notesFromDb = notesFromDb.filter(n => n.noteType === filters.noteType);
+      }
 
       if (filters.search) {
         const searchQuery = filters.search.toLowerCase();
