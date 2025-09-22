@@ -16,33 +16,26 @@ class AppDB extends Dexie {
   }
 
   private setupSchema() {
-    this.version(1).stores({
-      notes: 'id, createdAt, *topics, favorite, sourceType',
-      settings: 'id',
-      topicRules: '++id, &topic, *keywords',
-    });
-
-    // GEMINI: DB 스키마 버전 2로 업그레이드하고 notes 테이블에 attachments 필드를 추가합니다.
-    this.version(2).stores({
-      notes: 'id, createdAt, *topics, favorite, sourceType, attachments',
-    });
-
-    // 🚀 신규 버전 추가
-    this.version(3).stores({
-      notes: 'id, createdAt, tag, favorite, sourceType', // topics -> tag 로 인덱스 변경
-      // key_insights는 배열이라 직접 인덱싱하지 않음
-    });
-
-    // 신규 버전 4: 학습 관리 시스템으로 확장
-    this.version(4).stores({
-      notes: 'id, createdAt, noteType, subjectId, favorite, sourceType', // 인덱스 업데이트
-      subjects: '&id, name', // 신규 테이블
-      schedule: '&id, startTime, endTime, subjectId, dayOfWeek', // 신규 테이블
-      quizzes: '&id, noteId', // 신규 테이블
-    });
-
+    // 여러 버전으로 흩어져 있던 스키마 정의를 최신 버전으로 통합하여
+    // 버전 업데이트 시 테이블이 삭제되는 치명적인 버그를 수정합니다.
     this.version(5).stores({
-      schedule: '&id, date, startTime, endTime, subjectId, dayOfWeek', // date 인덱스 추가
+      // notes 테이블: 모든 인덱스를 최신 기준으로 통합
+      notes: 'id, createdAt, noteType, subjectId, favorite, sourceType, attachments',
+      
+      // subjects 테이블
+      subjects: '&id, name',
+      
+      // schedule 테이블: date 인덱스 포함
+      schedule: '&id, date, startTime, endTime, subjectId, dayOfWeek',
+      
+      // quizzes 테이블
+      quizzes: '&id, noteId',
+      
+      // settings 테이블
+      settings: 'id',
+      
+      // topicRules 테이블
+      topicRules: '++id, &topic, *keywords',
     });
   }
 
