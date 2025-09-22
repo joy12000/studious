@@ -195,11 +195,11 @@ export type Filters = {
           attachments: [],
         };
 
-        const newQuiz: Quiz = {
-          id: crypto.randomUUID(),
-          noteId: newNote.id,
-          questions: quiz,
-        };
+      const newQuiz: Quiz = {
+        id: crypto.randomUUID(),
+        noteId: newNote.id,
+        questions: result.quiz.questions, // Access the actual questions array
+      };
 
         await db.notes.add(newNote);
         await db.quizzes.add(newQuiz);
