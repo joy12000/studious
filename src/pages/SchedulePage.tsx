@@ -115,7 +115,7 @@ const MonthlyCalendarView = ({ onDayClick, onEventClick }: { onDayClick: (date: 
     const startDay = firstDayOfMonth.getDay(); // 0 for Sunday
 
     const calendarDays = Array.from({ length: 42 }, (_, i) => {
-        const dayIndex = i - (startDay === 0 ? 6 : startDay - 1);
+        const dayIndex = 1 + i - (startDay === 0 ? 6 : startDay - 1);
         const date = new Date(firstDayOfMonth);
         date.setDate(dayIndex);
         return date;
