@@ -1,30 +1,44 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
-import { ArrowUp, Loader2, RefreshCw, Copy, Save } from 'lucide-react';
+import { ArrowUp, Loader2, RefreshCw, Copy, Save, ChevronsUpDown, Check } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import MarkdownRenderer from './MarkdownRenderer';
-import { useNotes } from '../lib/useNotes'; // useNotes 훅 임포트
+import { useNotes } from '../lib/useNotes';
 
-// 메시지 및 API 관련 타입 정의
+// ✨ 학습 목적에 맞는 무료 모델 5가지 엄선
+const models = [
+  { id: 'meta-llama/llama-3-8b-instruct', name: 'Llama 3 8B (범용/추론)' },
+  { id: 'deepseek/deepseek-coder-v2-lite-instruct', name: 'DeepSeek Coder V2 (코딩 특화)' },
+  { id: 'google/gemma-2-9b-it', name: 'Gemma 2 9B (Google 최신)' },
+  { id: 'nousresearch/hermes-2-pro-llama-3-8b', name: 'Hermes 2 Pro (Llama 3 튜닝)' },
+  { id: 'mistralai/mistral-7b-instruct', name: 'Mistral 7B (가볍고 빠름)' },
+];
+
+// ... (Message, GeminiHistory 인터페이스는 이전과 동일) ...
 interface Message {
   id: number;
   text: string;
   sender: 'user' | 'bot';
   followUp?: string[];
 }
-
 interface GeminiHistory {
   role: 'user' | 'model';
   parts: { text: string }[];
 }
+
 
 export const ChatUI: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { addNoteFromChat } = useNotes(); // 노트 저장 함수 가져오기
+  const { addNoteFromChat } = useNotes();
   const navigate = useNavigate();
+  
+  // ✨ 현재 선택된 모델을 관리하는 상태
+  const [selectedModel, setSelectedModel] = useState(models[0].id);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -79,12 +93,12 @@ export const ChatUI: React.FC = () => {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ history }),
+        // ✨ 요청 시 선택된 모델 ID를 함께 전송
+        body: JSON.stringify({ history, model: selectedModel }),
       });
       
       if (!response.ok) throw new Error('API 요청 실패');
 
-      // 이제 JSON으로 바로 파싱합니다 (스트리밍 X)
       const data = await response.json();
       
       const botMessage: Message = {
@@ -108,16 +122,43 @@ export const ChatUI: React.FC = () => {
     }
   };
 
+  const currentModelName = models.find(m => m.id === selectedModel)?.name || '모델 선택';
+
   return (
     <div className="flex flex-col h-full max-w-3xl mx-auto bg-card border rounded-lg shadow-lg">
-      <div className="p-4 border-b flex justify-between items-center">
-        <h2 className="text-lg font-semibold">AI 학습 도우미</h2>
-        <div className="flex items-center gap-2">
+      <div className="p-2 sm:p-4 border-b flex justify-between items-center">
+        {/* ✨ 모델 선택 Popover UI */}
+        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" role="combobox" aria-expanded={isPopoverOpen} className="w-[200px] sm:w-[280px] justify-between">
+              <span className="truncate">{currentModelName}</span>
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[200px] sm:w-[280px] p-0">
+            {models.map((model) => (
+              <Button
+                key={model.id}
+                variant="ghost"
+                className="w-full justify-start"
+                onClick={() => {
+                  setSelectedModel(model.id);
+                  setIsPopoverOpen(false);
+                }}
+              >
+                <Check className={`mr-2 h-4 w-4 ${selectedModel === model.id ? 'opacity-100' : 'opacity-0'}`} />
+                {model.name}
+              </Button>
+            ))}
+          </PopoverContent>
+        </Popover>
+
+        <div className="flex items-center gap-1 sm:gap-2">
           <Button variant="ghost" size="sm" onClick={handleSaveToNote} disabled={messages.length === 0}>
-            <Save className="h-4 w-4 mr-2" />노트로 저장
+            <Save className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">노트 저장</span>
           </Button>
           <Button variant="ghost" size="sm" onClick={handleNewChat}>
-            <RefreshCw className="h-4 w-4 mr-2" />새 대화
+            <RefreshCw className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">새 대화</span>
           </Button>
         </div>
       </div>
