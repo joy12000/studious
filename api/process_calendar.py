@@ -44,7 +44,7 @@ class handler(BaseHTTPRequestHandler):
                 raise ValueError("GEMINI_API_KEY environment variable not set.")
             
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-pro-latest')
+            model = genai.GenerativeModel('gemini-2.5-pro')
 
             prompt = f"""이 시간표 이미지에서 과목 이름(subjectName), 시작 시간(startTime), 종료 시간(endTime), 요일(dayOfWeek)을 추출하여 JSON 배열 형식으로 만들어줘.
             - subjectName: 한글 과목명을 그대로 추출해줘.
