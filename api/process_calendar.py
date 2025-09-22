@@ -59,7 +59,9 @@ class handler(BaseHTTPRequestHandler):
             raw_text = response.text
             print(f"Gemini Raw Response for Calendar: {raw_text}")
 
-            if not raw_text or not raw_text.strip().startswith('['):
+            cleaned_text = raw_text.replace('```json', '').replace('```', '').strip()
+
+            if not cleaned_text or not cleaned_text.startswith('['):
                 try:
                     if response.prompt_feedback.block_reason:
                         reason = response.prompt_feedback.block_reason
@@ -68,7 +70,7 @@ class handler(BaseHTTPRequestHandler):
                     pass
                 raise ValueError(f"AI model returned an empty or invalid response. Raw text: '{raw_text}'")
 
-            json_response = json.loads(raw_text.replace('```json', '').replace('```', '').strip())
+            json_response = json.loads(cleaned_text)
 
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
