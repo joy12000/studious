@@ -6,7 +6,7 @@ import ShareModal from '../components/ShareModal';
 import AttachmentPanel from '../components/AttachmentPanel';
 import { exportEncrypted, exportPlain, exportPlainSingleNote } from '../lib/backup';
 import { v4 as uuidv4 } from 'uuid';
-import { marked } from 'marked';
+import MarkdownRenderer from '../components/MarkdownRenderer';
 import { 
   ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit
 } from 'lucide-react';
@@ -328,8 +328,9 @@ export default function NotePage() {
                 </div>
               ) : (
                 <div>
-                  <div className="note-content-line-height prose prose-slate max-w-none dark:prose-invert prose-headings:font-semibold leading-relaxed" 
-                       dangerouslySetInnerHTML={{ __html: marked(note.content, { breaks: true }) as string }} />
+                  <div className="note-content-line-height prose prose-slate max-w-none dark:prose-invert prose-headings:font-semibold leading-relaxed">
+                    <MarkdownRenderer content={note.content} />
+                  </div>
 
                   {note.key_insights && note.key_insights.length > 0 && (
                     <div className="mt-8">
@@ -340,7 +341,7 @@ export default function NotePage() {
                         {note.key_insights.map((insight, index) => (
                           <div key={index} className="flex items-start gap-3 p-4 bg-primary/5 border-l-4 border-primary/40 rounded-r-lg">
                             <div className="text-primary font-bold mt-1">{index + 1}.</div>
-                            <p className="text-card-foreground m-0" dangerouslySetInnerHTML={{ __html: marked(insight) as string }} />
+                            <div className="text-card-foreground m-0"><MarkdownRenderer content={insight} /></div>
                           </div>
                         ))}
                       </div>

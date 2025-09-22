@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNotes } from "../lib/useNotes";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Loader2, Youtube, ArrowRight, File, Calendar, Bot } from "lucide-react"; // Bot 아이콘 추가
-// import { ChatUI } from '../components/ChatUI'; // 새로 만든 ChatUI 컴포넌트
+import { Loader2, Youtube, ArrowRight, File, Calendar, Bot } from "lucide-react";
+import { ChatUI } from '../components/ChatUI'; // 👈 주석 해제
 
-// 진행 메시지를 표시하도록 수정
+// 진행 메시지를 표시하는 오버레이 컴포넌트
 function LoadingOverlay({ message }: { message: string }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -20,10 +20,10 @@ function LoadingOverlay({ message }: { message: string }) {
 const HEADLINES = [
   "어떤 것을 학습할까요?",
   "오늘 탐색할 지식은 무엇인가요?",
-  "학습 자료를 업로드하거나 AI와 대화해보세요.", // 헤드라인 문구 수정
+  "학습 자료를 업로드하거나 AI와 대화해보세요.",
 ];
 
-type InputMode = 'youtube' | 'review' | 'schedule' | 'chat'; // 'chat' 모드 추가
+type InputMode = 'youtube' | 'review' | 'schedule' | 'chat';
 
 export default function HomePage() {
   const { addNote, addNoteFromReview, addScheduleFromImage, allSubjects } = useNotes();
@@ -31,7 +31,7 @@ export default function HomePage() {
   const location = useLocation();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [mode, setMode] = useState<InputMode>('youtube');
+  const [mode, setMode] = useState<InputMode>('chat'); // 기본 모드를 'chat'으로 설정
   const [youtubeUrl, setYoutubeUrl] = useState("");
   const [files, setFiles] = useState<File[]>([]);
   const [progressMessage, setProgressMessage] = useState<string | null>(null);
@@ -43,10 +43,10 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (location.state?.focusInput) {
+    if (location.state?.focusInput && mode === 'youtube') {
       inputRef.current?.focus();
     }
-  }, [location.state]);
+  }, [location.state, mode]);
 
   const handleSave = async () => {
     setError(null);
@@ -96,7 +96,6 @@ export default function HomePage() {
           onProgress: setProgressMessage,
           onComplete: (events) => {
             setProgressMessage(null);
-            // Navigate to schedule page or show a success message
             navigate(`/schedule`);
           },
           onError: (err) => {
@@ -124,19 +123,17 @@ export default function HomePage() {
             {headline}
           </h1>
 
-          {/* 모드 선택 버튼 그룹에 'AI 채팅' 추가 */}
-          <div className="bg-card p-2 rounded-full flex items-center justify-center space-x-2 mb-4">
-            <button onClick={() => setMode('chat')} className={`px-4 py-2 rounded-full text-sm font-semibold ${mode === 'chat' ? 'bg-primary text-primary-foreground' : 'bg-transparent'}`}><Bot className="inline-block mr-2 h-4 w-4"/>AI 채팅</button>
-            <button onClick={() => setMode('youtube')} className={`px-4 py-2 rounded-full text-sm font-semibold ${mode === 'youtube' ? 'bg-primary text-primary-foreground' : 'bg-transparent'}`}><Youtube className="inline-block mr-2 h-4 w-4"/>유튜브</button>
-            <button onClick={() => setMode('review')} className={`px-4 py-2 rounded-full text-sm font-semibold ${mode === 'review' ? 'bg-primary text-primary-foreground' : 'bg-transparent'}`}><File className="inline-block mr-2 h-4 w-4"/>학습자료</button>
-            <button onClick={() => setMode('schedule')} className={`px-4 py-2 rounded-full text-sm font-semibold ${mode === 'schedule' ? 'bg-primary text-primary-foreground' : 'bg-transparent'}`}><Calendar className="inline-block mr-2 h-4 w-4"/>시간표</button>
+          <div className="bg-card p-2 rounded-full flex items-center justify-center space-x-1 sm:space-x-2 mb-4">
+            <button onClick={() => setMode('chat')} className={`px-3 sm:px-4 py-2 rounded-full text-sm font-semibold transition-colors ${mode === 'chat' ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground hover:bg-muted'}`}><Bot className="inline-block mr-1.5 h-4 w-4"/>AI 채팅</button>
+            <button onClick={() => setMode('youtube')} className={`px-3 sm:px-4 py-2 rounded-full text-sm font-semibold transition-colors ${mode === 'youtube' ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground hover:bg-muted'}`}><Youtube className="inline-block mr-1.5 h-4 w-4"/>유튜브</button>
+            <button onClick={() => setMode('review')} className={`px-3 sm:px-4 py-2 rounded-full text-sm font-semibold transition-colors ${mode === 'review' ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground hover:bg-muted'}`}><File className="inline-block mr-1.5 h-4 w-4"/>학습자료</button>
+            <button onClick={() => setMode('schedule')} className={`px-3 sm:px-4 py-2 rounded-full text-sm font-semibold transition-colors ${mode === 'schedule' ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground hover:bg-muted'}`}><Calendar className="inline-block mr-1.5 h-4 w-4"/>시간표</button>
           </div>
 
-          <div className="relative">
-            {/* 'chat' 모드일 때 ChatUI를 렌더링 */}
+          <div className="relative mt-6" style={{ minHeight: '60vh' }}>
             {mode === 'chat' ? (
               <div className="h-[60vh] text-left">
-                {/* <ChatUI /> */}
+                <ChatUI /> {/* 👈 주석 해제 */}
               </div>
             ) : mode === 'youtube' ? (
               <div className="relative flex items-center w-full">
@@ -166,7 +163,7 @@ export default function HomePage() {
                   onClick={() => document.getElementById('file-upload')?.click()}
                 >
                   {files.length > 0 ? (
-                    <ul className="list-disc pl-5">
+                    <ul className="list-disc pl-5 text-left">
                       {files.map((f, i) => <li key={i} className="text-sm">{f.name}</li>)}
                     </ul>
                   ) : (
