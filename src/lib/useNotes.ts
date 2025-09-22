@@ -203,6 +203,7 @@ import { useState, useCallback } from 'react';
         onProgress("시간표 이미지를 분석하고 있습니다...");
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('subjects', JSON.stringify(allSubjects || []));
 
         const response = await fetch('/api/process_calendar', {
           method: 'POST',
@@ -213,37 +214,23 @@ import { useState, useCallback } from 'react';
           throw new Error('Schedule processing failed');
         }
 
-        const eventsFromApi: { subjectName: string, startTime: string, endTime: string, dayOfWeek: string }[] = await response.json();
+        const eventsFromApi: { subjectId: string, startTime: string, endTime: string, dayOfWeek: string }[] = await response.json();
 
         const newEvents: ScheduleEvent[] = [];
         
-        // --- Date Calculation Logic ---
-        const today = new Date();
-        const currentDay = today.getDay(); // Sunday: 0, Monday: 1, ..., Saturday: 6
-        const monday = new Date(today);
-        // Adjust to Monday of the current week (assuming Sunday is the first day of the week, day 0)
-        const dayOffset = (currentDay === 0) ? -6 : 1 - currentDay;
-        monday.setDate(today.getDate() + dayOffset);
-
-        const dayNameToIndex: { [key: string]: number } = {
-          '월': 0, '화': 1, '수': 2, '목': 3, '금': 4, '토': 5, '일': 6
-        };
-
         for (const event of eventsFromApi) {
-          let subject = await db.subjects.where('name').equalsIgnoreCase(event.subjectName).first();
-          if (!subject) {
-            const newSubjectId = crypto.randomUUID();
-            subject = { id: newSubjectId, name: event.subjectName };
-            await db.subjects.add(subject);
+          // Ensure the subjectId from the API is valid
+          if (!event.subjectId || !await db.subjects.get(event.subjectId)) {
+            console.warn(`Invalid or missing subjectId '${event.subjectId}' from API, skipping event.`);
+            continue;
           }
 
           newEvents.push({
             id: crypto.randomUUID(),
-            subjectId: subject.id,
+            subjectId: event.subjectId,
             startTime: event.startTime,
             endTime: event.endTime,
             dayOfWeek: event.dayOfWeek,
-            // date: dateString, // Recurring events should not have a fixed date.
           });
         }
 
