@@ -33,7 +33,7 @@ export default function ChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { addNoteFromChat, allSubjects } = useNotes();
+  const { addNoteFromChat, allSubjects, addNoteFromTextbook } = useNotes();
   const navigate = useNavigate();
   
   const [selectedModel, setSelectedModel] = useState(models[0].id);
@@ -148,30 +148,24 @@ export default function ChatPage() {
   };
   
   const handleGenerateTextbook = async () => {
-    if (uploadedFiles.length === 0) {
-      alert('하나 이상의 파일을 업로드해주세요.');
+    if (uploadedFiles.length === 0 || !selectedSubject) {
+      alert('과목과 하나 이상의 파일을 선택해주세요.');
       return;
-    }
-    if (!selectedSubject) {
-        alert('과목을 선택해주세요.');
-        return;
     }
 
     setIsLoading(true);
     setLoadingMessage('AI가 자료를 분석하여 참고서를 만들고 있어요...');
     
     const formData = new FormData();
-    uploadedFiles.forEach(file => {
-      formData.append('files', file);
-    });
+    uploadedFiles.forEach(file => formData.append('files', file));
     
-    const weekInfo = selectedDate ? `${getWeekNumber(selectedDate)}주차 (${format(selectedDate, 'M월 d일')})` : '[N주차]';
-
+    const weekInfoText = selectedDate ? `${getWeekNumber(selectedDate)}주차` : '학습';
     formData.append('subject', selectedSubject.name);
-    formData.append('week', weekInfo);
+    formData.append('week', weekInfoText);
     formData.append('materialTypes', uploadedFiles.map(f => f.type).join(', ') || '[파일]');
 
     try {
+      // 1. AI에게 참고서 내용 생성 요청
       const response = await fetch('/api/create_textbook', {
         method: 'POST',
         body: formData,
@@ -183,19 +177,27 @@ export default function ChatPage() {
       }
       
       const data = await response.json();
-      const firstMessage: Message = {
-        id: Date.now(),
-        text: data.textbook,
-        sender: 'bot',
-      };
-      setMessages([firstMessage]);
-      setPageState('chat');
+      
+      // 2. 생성된 내용을 바탕으로 새 노트 자동 저장
+      setLoadingMessage('생성된 참고서를 노트에 저장하는 중...');
+      const noteTitle = `${selectedSubject.name} - ${weekInfoText} 참고서`;
+      
+      const newNote = await addNoteFromTextbook(
+        noteTitle,
+        data.textbook,
+        selectedSubject.id,
+        uploadedFiles
+      );
+
+      // 3. 생성된 노트 페이지로 즉시 이동
+      alert("AI 참고서가 생성되어 노트에 저장되었습니다!");
+      navigate(`/note/${newNote.id}`);
 
     } catch(error) {
         alert(`오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
-    } finally {
-      setIsLoading(false);
+        setIsLoading(false); // 오류 발생 시 로딩 상태 해제
     }
+    // 성공 시에는 페이지 이동이 일어나므로 로딩 상태를 해제할 필요 없음
   };
 
   const currentModelName = models.find(m => m.id === selectedModel)?.name || '모델 선택';

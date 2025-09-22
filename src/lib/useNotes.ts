@@ -372,6 +372,40 @@ import { useState, useCallback } from 'react';
       return newNote;
     };
 
+    // ✨ [추가] AI 참고서를 노트로 저장하는 전용 함수
+    const addNoteFromTextbook = async (
+      title: string,
+      content: string,
+      subjectId: string,
+      files: File[]
+    ): Promise<Note> => {
+      
+      const attachments: Attachment[] = files.map(file => ({
+        id: uuidv4(),
+        type: 'file',
+        name: file.name,
+        mimeType: file.type,
+        data: file,
+      }));
+
+      const newNote: Note = {
+        id: uuidv4(),
+        title: title,
+        content: content,
+        key_insights: [], // 참고서 생성 시에는 key_insights를 AI 프롬프트에서 직접 생성하도록 유도할 수 있습니다.
+        subjectId: subjectId,
+        noteType: 'review', // '복습/학습' 타입으로 저장
+        sourceType: 'other',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().getTime(),
+        favorite: false,
+        attachments: attachments,
+      };
+      
+      await db.notes.add(newNote);
+      return newNote;
+    };
+
     return {
       notes: notes || [],
       loading,
@@ -394,6 +428,7 @@ import { useState, useCallback } from 'react';
           getNote, 
           getQuiz,
           importNote,
-          addNoteFromChat
+          addNoteFromChat,
+          addNoteFromTextbook
     };
   }
