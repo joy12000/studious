@@ -6,16 +6,16 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import MarkdownRenderer from './MarkdownRenderer';
 import { useNotes } from '../lib/useNotes';
 
-// ✨ 학습 목적에 맞는 무료 모델 5가지 엄선
+// ✨ 사용자 피드백을 반영한 최종 무료 모델 5가지
 const models = [
-  { id: 'meta-llama/llama-3-8b-instruct', name: 'Llama 3 8B (범용/추론)' },
-  { id: 'deepseek/deepseek-coder-v2-lite-instruct', name: 'DeepSeek Coder V2 (코딩 특화)' },
-  { id: 'google/gemma-2-9b-it', name: 'Gemma 2 9B (Google 최신)' },
+  { id: 'xai/grok-4-fast', name: 'Grok 4 Fast (최신/대용량)' },
+  { id: 'deepseek/deepseek-coder-v2-lite-instruct', name: 'DeepSeek Coder V2 (코딩/수학)' },
   { id: 'nousresearch/hermes-2-pro-llama-3-8b', name: 'Hermes 2 Pro (Llama 3 튜닝)' },
-  { id: 'mistralai/mistral-7b-instruct', name: 'Mistral 7B (가볍고 빠름)' },
+  { id: 'deepseek/r1-0528', name: 'DeepSeek R1 0528 (강력한 추론)' },
+  { id: 'google/gemma-2-9b-it', name: 'Gemma 2 9B (Google 최신)' },
 ];
 
-// ... (Message, GeminiHistory 인터페이스는 이전과 동일) ...
+// 메시지 및 API 관련 타입 정의
 interface Message {
   id: number;
   text: string;
@@ -36,7 +36,6 @@ export const ChatUI: React.FC = () => {
   const { addNoteFromChat } = useNotes();
   const navigate = useNavigate();
   
-  // ✨ 현재 선택된 모델을 관리하는 상태
   const [selectedModel, setSelectedModel] = useState(models[0].id);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
@@ -66,7 +65,6 @@ export const ChatUI: React.FC = () => {
 
   const sendNewMessage = (text: string) => {
       setInputValue(text);
-      // form submit을 프로그래매틱하게 트리거
       const form = document.getElementById('chat-form') as HTMLFormElement;
       if (form) {
         const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
@@ -93,7 +91,6 @@ export const ChatUI: React.FC = () => {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // ✨ 요청 시 선택된 모델 ID를 함께 전송
         body: JSON.stringify({ history, model: selectedModel }),
       });
       
@@ -127,7 +124,6 @@ export const ChatUI: React.FC = () => {
   return (
     <div className="flex flex-col h-full max-w-3xl mx-auto bg-card border rounded-lg shadow-lg">
       <div className="p-2 sm:p-4 border-b flex justify-between items-center">
-        {/* ✨ 모델 선택 Popover UI */}
         <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" role="combobox" aria-expanded={isPopoverOpen} className="w-[200px] sm:w-[280px] justify-between">
@@ -140,14 +136,14 @@ export const ChatUI: React.FC = () => {
               <Button
                 key={model.id}
                 variant="ghost"
-                className="w-full justify-start"
+                className="w-full justify-start h-auto py-2"
                 onClick={() => {
                   setSelectedModel(model.id);
                   setIsPopoverOpen(false);
                 }}
               >
                 <Check className={`mr-2 h-4 w-4 ${selectedModel === model.id ? 'opacity-100' : 'opacity-0'}`} />
-                {model.name}
+                <span className="whitespace-normal text-left">{model.name}</span>
               </Button>
             ))}
           </PopoverContent>
@@ -165,7 +161,7 @@ export const ChatUI: React.FC = () => {
       <div className="flex-1 p-4 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">학습하고 싶은 내용을 질문해보세요!</p>
+            <p className="text-muted-foreground">AI에게 무엇이든 물어보세요!</p>
           </div>
         ) : (
           <div className="space-y-4">
