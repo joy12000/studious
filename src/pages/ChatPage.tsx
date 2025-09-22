@@ -124,7 +124,7 @@ export default function ChatPage() {
       <div className="p-2 sm:p-4 border-b flex justify-between items-center">
         <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline" role="combobox" aria-expanded={isPopoverOpen} className="w-[200px] sm:w-[280px] justify-between">
+            <Button variant="outline" role="combobox" aria-expanded={isPopoverOpen} className="w-full max-w-[200px] sm:max-w-[280px] justify-between">
               <span className="truncate">{currentModelName}</span>
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
