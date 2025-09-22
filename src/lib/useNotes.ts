@@ -203,7 +203,6 @@ import { useState, useCallback } from 'react';
         onProgress("시간표 이미지를 분석하고 있습니다...");
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('subjects', JSON.stringify(allSubjects || []));
 
         const response = await fetch('/api/process_calendar', {
           method: 'POST',
@@ -211,12 +210,14 @@ import { useState, useCallback } from 'react';
         });
 
         if (!response.ok) {
-          throw new Error('Schedule processing failed');
+          const errorBody = await response.text();
+          throw new Error(`Schedule processing failed with status ${response.status}: ${errorBody}`);
         }
 
-        const eventsFromApi: { subjectId: string, startTime: string, endTime: string, dayOfWeek: string }[] = await response.json();
+        const eventsFromApi: { subjectName: string, startTime: string, endTime: string, dayOfWeek: string }[] = await response.json();
 
         const newEvents: ScheduleEvent[] = [];
+        const subjectsCache: Map<string, Subject> = new Map(allSubjects?.map(s => [s.name, s]));
 
         const today = new Date();
         const currentDay = today.getDay(); // 0 (Sun) - 6 (Sat)
@@ -227,11 +228,18 @@ import { useState, useCallback } from 'react';
         const dayOfWeekMap: { [key: string]: number } = { '월': 0, '화': 1, '수': 2, '목': 3, '금': 4, '토': 5, '일': 6 };
         
         for (const event of eventsFromApi) {
-          // Ensure the subjectId from the API is valid
-          if (!event.subjectId || !await db.subjects.get(event.subjectId)) {
-            console.warn(`Invalid or missing subjectId '${event.subjectId}' from API, skipping event.`);
+          if (!event.subjectName) {
+            console.warn(`Event from API is missing subjectName, skipping.`);
             continue;
           }
+
+          let subject = subjectsCache.get(event.subjectName);
+          if (!subject) {
+            onProgress(`새로운 과목 '${event.subjectName}'을 추가합니다...`);
+            subject = await addSubject(event.subjectName);
+            subjectsCache.set(subject.name, subject);
+          }
+          const subjectId = subject.id;
 
           const dayOffset = dayOfWeekMap[event.dayOfWeek];
           if (dayOffset === undefined) {
@@ -245,8 +253,8 @@ import { useState, useCallback } from 'react';
 
           newEvents.push({
             id: crypto.randomUUID(),
-            subjectId: event.subjectId,
-            date: dateString, // Add the calculated date
+            subjectId: subjectId,
+            date: dateString,
             startTime: event.startTime,
             endTime: event.endTime,
             dayOfWeek: event.dayOfWeek,

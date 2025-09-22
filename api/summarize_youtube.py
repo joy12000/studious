@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler
 # ==============================================================================
 # CONFIGURATION
 # ==============================================================================
-GENAI_MODEL = os.getenv("GENAI_MODEL", "models/gemini-1.5-flash-latest")
+GENAI_MODEL = os.getenv("GENAI_MODEL", "models/gemini-2.0-flash")
 API_KEY = os.getenv("GEMINI_API_KEY")
 APIFY_ENDPOINT = os.getenv("APIFY_ENDPOINT")
 APIFY_TOKEN = os.getenv("APIFY_TOKEN")

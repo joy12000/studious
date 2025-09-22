@@ -19,7 +19,6 @@ class handler(BaseHTTPRequestHandler):
             )
             
             uploaded_file = form['file']
-            subjects_list = form.getvalue('subjects', '[]')
             file_data = uploaded_file.file.read()
             file_type = uploaded_file.type
 
@@ -45,13 +44,12 @@ class handler(BaseHTTPRequestHandler):
                 raise ValueError("GEMINI_API_KEY environment variable not set.")
             
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
+            model = genai.GenerativeModel('gemini-1.5-flash-latest')
 
-            prompt = f"""이 시간표 이미지를 분석하여 각 항목을 아래 '과목 목록'과 비교해 가장 일치하는 과목의 'id'를 찾아 'subjectId' 필드에 담아라.
-            그리고 시작 시간(startTime), 종료 시간(endTime), 요일(dayOfWeek)을 포함하여 JSON 배열 형식으로 추출해줘.
-            요일은 '월','화','수','목','금','토','일' 중 하나로 표기해야 한다.
-
-            과목 목록 (JSON 형식): {subjects_list}
+            prompt = f"""이 시간표 이미지에서 과목 이름(subjectName), 시작 시간(startTime), 종료 시간(endTime), 요일(dayOfWeek)을 추출하여 JSON 배열 형식으로 만들어줘.
+            - subjectName: 한글 과목명을 그대로 추출해줘.
+            - startTime, endTime: 'HH:MM' 형식으로 추출해줘.
+            - dayOfWeek: '월','화','수','목','금','토','일' 중 하나로 표기해야 한다.
             """
 
             response = model.generate_content([prompt, img])
