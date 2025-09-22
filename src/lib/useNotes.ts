@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
   import { useLiveQuery } from 'dexie-react-hooks';
   import { db } from './db';
-  import { Note, Subject, ScheduleEvent, Quiz } from './types';
-
+  import { Note, Subject, ScheduleEvent, Quiz, Attachment } from './types';
+  import { v4 as uuidv4 } from 'uuid';
   export type Filters = {
     search?: string;
     subjectId?: string;
@@ -333,30 +333,39 @@ import { useState, useCallback } from 'react';
       return newNote;
     };
 
-    // Message 타입을 useNotes.ts에서도 사용할 수 있도록 정의하거나, types.ts에서 가져옵니다.
     interface Message {
       id: number;
       text: string;
       sender: 'user' | 'bot';
     }
 
-    const addNoteFromChat = async (messages: Message[], title?: string) => {
+    // ✨ [개선] addNoteFromChat 함수에 files 인자 추가
+    const addNoteFromChat = async (messages: Message[], title?: string, files: File[] = []) => {
       const content = messages
         .map(msg => `**${msg.sender === 'user' ? '나' : 'AI'}**: \n\n${msg.text}`)
         .join('\n\n---\n\n');
 
+      // ✨ [추가] File 객체를 Attachment 타입으로 변환
+      const attachments: Attachment[] = files.map(file => ({
+        id: uuidv4(),
+        type: 'file',
+        name: file.name,
+        mimeType: file.type,
+        data: file,
+      }));
+
       const newNote: Note = {
-        id: crypto.randomUUID(),
+        id: uuidv4(),
         title: title || `AI 채팅 기록: ${new Date().toLocaleString()}`,
         content: content,
         key_insights: [],
-        subjectId: 'AI 채팅', // 또는 사용자가 선택하게 할 수 있습니다.
+        subjectId: 'AI 채팅',
         noteType: 'general',
         sourceType: 'other',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().getTime(),
         favorite: false,
-        attachments: [],
+        attachments: attachments, // ✨ [개선] 변환된 첨부파일 저장
       };
       
       await db.notes.add(newNote);

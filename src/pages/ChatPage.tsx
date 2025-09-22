@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
-import { ArrowUp, Loader2, RefreshCw, Copy, Save, ChevronsUpDown, Check } from 'lucide-react';
+import { ArrowUp, Loader2, RefreshCw, Copy, Save, ChevronsUpDown, Check, Paperclip, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useNotes } from '../lib/useNotes';
@@ -30,7 +30,9 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { addNoteFromChat } = useNotes();
   const navigate = useNavigate();
   
@@ -43,7 +45,10 @@ export default function ChatPage() {
 
   useEffect(scrollToBottom, [messages]);
 
-  const handleNewChat = () => setMessages([]);
+  const handleNewChat = () => {
+    setMessages([]);
+    setFiles([]);
+  };
   const handleCopy = (text: string) => navigator.clipboard.writeText(text);
 
   const handleSaveToNote = async () => {
@@ -51,14 +56,25 @@ export default function ChatPage() {
     const title = prompt("노트의 제목을 입력하세요:", "AI 채팅 기록");
     if (title) {
       try {
-        const newNote = await addNoteFromChat(messages, title);
+        const newNote = await addNoteFromChat(messages, title, files);
         alert("채팅 기록이 노트로 저장되었습니다!");
+        setFiles([]);
         navigate(`/note/${newNote.id}`);
       } catch (error) {
         alert("노트 저장에 실패했습니다.");
         console.error(error);
       }
     }
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files) {
+      setFiles(prevFiles => [...prevFiles, ...Array.from(event.target.files!)]);
+    }
+  };
+
+  const removeFile = (fileName: string) => {
+    setFiles(prevFiles => prevFiles.filter(file => file.name !== fileName));
   };
 
   const sendNewMessage = (text: string) => {
@@ -157,9 +173,9 @@ export default function ChatPage() {
         </div>
       </div>
       <div className="flex-1 p-4 overflow-y-auto">
-        {messages.length === 0 ? (
+        {messages.length === 0 && files.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">AI에게 무엇이든 물어보세요!</p>
+            <p className="text-muted-foreground">AI에게 무엇이든 물어보세요! 파일을 첨부할 수도 있습니다.</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -193,17 +209,47 @@ export default function ChatPage() {
           </div>
         )}
       </div>
+      
+      {files.length > 0 && (
+        <div className="p-4 border-t flex flex-wrap gap-2 items-center bg-muted/50">
+          {files.map(file => (
+            <div key={file.name} className="flex items-center gap-2 bg-background rounded-full px-3 py-1 text-sm border">
+              <span className="truncate max-w-xs">{file.name}</span>
+              <button onClick={() => removeFile(file.name)} className="text-muted-foreground hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="p-4 border-t">
         <form id="chat-form" onSubmit={handleSendMessage} className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="rounded-full flex-shrink-0"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            <Paperclip className="h-5 w-5" />
+          </Button>
+          <input
+            type="file"
+            ref={fileInputRef}
+            multiple
+            onChange={handleFileChange}
+            className="hidden"
+          />
           <input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={isLoading ? "답변을 생성 중입니다..." : "메시지를 입력하세요..."}
-            className="w-full px-4 py-2 border rounded-full focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+            className="w-full px-4 py-2 bg-background border-2 border-muted rounded-full focus:ring-2 focus:ring-primary/50 focus:border-primary/80 transition-all placeholder:text-muted-foreground/60"
             disabled={isLoading}
           />
-          <Button type="submit" size="icon" className="rounded-full" disabled={isLoading}>
+          <Button type="submit" size="icon" className="rounded-full flex-shrink-0" disabled={isLoading || !inputValue.trim()}>
             {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowUp className="h-5 w-5" />}
           </Button>
         </form>
