@@ -47,7 +47,7 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
 
   if (view === 'list') {
     return (
-      <Card className="w-full transition-all hover:shadow-md">
+      <Card className="w-full transition-all hover:shadow-md relative">
         <div className="flex flex-row items-start gap-4 p-4">
           <div className="flex-1 min-w-0">
             <Link to={`/note/${note.id}`} className="block">
@@ -55,7 +55,7 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
             </Link>
             <Link to={`/note/${note.id}`} className="block">
               <div 
-                className="prose prose-sm dark:prose-invert line-clamp-2 text-sm text-muted-foreground"
+                className="prose prose-sm dark:prose-invert line-clamp-4 text-sm text-muted-foreground"
                 dangerouslySetInnerHTML={{ __html: marked(note.content) as string }}
               />
             </Link>
@@ -77,13 +77,13 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
                         {note.sourceType === 'youtube' ? <Youtube className="h-4 w-4 text-muted-foreground" /> : <ExternalLink className="h-4 w-4 text-muted-foreground" />}
                     </Button>
                 )}
-                {onToggleFavorite && (
-                    <Button variant="ghost" size="icon" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }} className="h-8 w-8">
-                        <Star className={`h-5 w-5 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
-                    </Button>
-                )}
             </div>
         </div>
+        {onToggleFavorite && (
+            <Button variant="ghost" size="icon" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }} className="absolute top-2 right-2 h-7 w-7">
+                <Star className={`h-4 w-4 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+            </Button>
+        )}
       </Card>
     );
   }
@@ -117,10 +117,10 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
                 {onToggleFavorite && (
                     <button
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }}
-                        className="h-8 w-8 flex items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
+                        className="h-7 w-7 flex items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
                         title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
                     >
-                        <Star className={`h-5 w-5 transition-all ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-white/80'}`} />
+                        <Star className={`h-4 w-4 transition-all ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-white/80'}`} />
                     </button>
                 )}
             </div>

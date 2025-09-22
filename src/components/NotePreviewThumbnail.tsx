@@ -24,7 +24,7 @@ const NotePreviewThumbnail: React.FC<NotePreviewThumbnailProps> = ({ title, cont
       style={{ backgroundColor: bgColor }}
     >
       <h3 className="font-bold text-lg leading-tight line-clamp-2 mb-2 shadow-sm">{title || '제목 없음'}</h3>
-      <p className="text-xs line-clamp-3 opacity-90">{cleanContent}</p>
+      <p className="text-xs line-clamp-6 opacity-90">{cleanContent}</p>
     </div>
   );
 };
