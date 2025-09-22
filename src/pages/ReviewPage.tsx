@@ -1,11 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNotes } from "../lib/useNotes";
 import { useNavigate } from "react-router-dom";
-import { Loader2, ArrowRight, UploadCloud, FileText, X, ChevronsUpDown, CalendarDays } from "lucide-react";
+import { Loader2, ArrowRight, UploadCloud, FileText, X, ChevronsUpDown, CalendarDays, Plus } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { WeekPicker } from '../components/WeekPicker';
 import { format } from 'date-fns';
+import { Note } from '../lib/types'; // Note 타입 임포트
+import { Checkbox } from '@/components/ui/checkbox'; // 체크박스 UI 컴포넌트 (가정)
 
 function LoadingOverlay({ message }: { message: string }) {
     return (
@@ -20,7 +22,7 @@ function LoadingOverlay({ message }: { message: string }) {
 }
 
 export default function ReviewPage() {
-  const { addNoteFromReview, allSubjects } = useNotes();
+  const { addNoteFromReview, allSubjects, notes } = useNotes(); // notes 추가
   const navigate = useNavigate();
   
   const [files, setFiles] = useState<File[]>([]);
@@ -30,10 +32,31 @@ export default function ReviewPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
+  // ✨ [추가] 기존 노트 선택 관련 상태
+  const [isNotePickerOpen, setIsNotePickerOpen] = useState(false);
+  const [selectedExistingNotes, setSelectedExistingNotes] = useState<Note[]>([]);
+  const [noteSearchQuery, setNoteSearchQuery] = useState('');
+
+  const filteredNotes = notes.filter(note => 
+    note.title.toLowerCase().includes(noteSearchQuery.toLowerCase()) ||
+    note.content.toLowerCase().includes(noteSearchQuery.toLowerCase())
+  );
+
+  const handleToggleNoteSelection = (note: Note) => {
+    setSelectedExistingNotes(prev => 
+      prev.some(n => n.id === note.id)
+        ? prev.filter(n => n.id !== note.id)
+        : [...prev, note]
+    );
+  };
+
+  const handleRemoveSelectedNote = (noteId: string) => {
+    setSelectedExistingNotes(prev => prev.filter(n => n.id !== noteId));
+  };
 
   const handleSave = async () => {
-    if (files.length === 0) {
-      setError("하나 이상의 학습 자료를 업로드해주세요.");
+    if (files.length === 0 && selectedExistingNotes.length === 0) {
+      setError("하나 이상의 학습 자료 또는 기존 노트를 선택해주세요.");
       return;
     }
     setError(null);
@@ -41,8 +64,28 @@ export default function ReviewPage() {
 
     const noteDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
 
+    // ✨ [개선] 기존 노트의 내용과 첨부파일을 취합
+    let combinedContent = "";
+    const combinedFiles: File[] = [...files];
+
+    selectedExistingNotes.forEach(note => {
+      combinedContent += `\n\n--- 기존 노트: ${note.title} ---\n${note.content}`;
+      if (note.attachments) {
+        note.attachments.forEach(att => {
+          // Assuming attachment.data is a File object or can be converted
+          if (att.type === 'file' && att.data instanceof File) {
+            combinedFiles.push(att.data);
+          }
+        });
+      }
+    });
+
+    // AI 대화 내역은 addNoteFromReview 내부에서 처리되므로 여기서는 빈 문자열로 전달
+    // 실제 AI 대화 내역은 ChatPage에서 addNoteFromChat을 통해 노트로 저장될 때 사용됨
+    const aiConversationText = combinedContent.trim(); // 기존 노트 내용을 AI 대화 내역으로 간주
+
     await addNoteFromReview({
-      files,
+      files: combinedFiles,
       subjects: allSubjects || [],
       onProgress: setProgressMessage,
       onComplete: (newNote, newQuiz) => {
@@ -54,6 +97,7 @@ export default function ReviewPage() {
         setProgressMessage(null);
       },
       noteDate: noteDateStr,
+      aiConversationText: aiConversationText, // ✨ [추가] 기존 노트 내용 전달
     });
   };
 
@@ -79,10 +123,10 @@ export default function ReviewPage() {
             <p className="text-muted-foreground mt-2">학습 자료를 올리면 AI가 요약하고 퀴즈를 만들어줘요.</p>
           </div>
 
-          <div className="mb-4">
+          <div className="mb-4 flex gap-2">
             <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between">
+                <Button variant="outline" role="combobox" className="flex-1 justify-between">
                   <div className="flex items-center">
                     <CalendarDays className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                     <span className="truncate">
@@ -97,6 +141,50 @@ export default function ReviewPage() {
                   setSelectedDate(date);
                   setIsCalendarOpen(false);
                 }} />
+              </PopoverContent>
+            </Popover>
+
+            {/* ✨ [추가] 기존 노트 선택 버튼 */}
+            <Popover open={isNotePickerOpen} onOpenChange={setIsNotePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="flex-1">
+                  <Plus className="mr-2 h-4 w-4" />
+                  기존 노트 추가
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-80 p-0">
+                <div className="p-2">
+                  <input 
+                    type="text" 
+                    placeholder="노트 검색..." 
+                    className="w-full p-2 border rounded-md mb-2"
+                    value={noteSearchQuery}
+                    onChange={(e) => setNoteSearchQuery(e.target.value)}
+                  />
+                  <div className="max-h-60 overflow-y-auto">
+                    {filteredNotes.length > 0 ? (
+                      filteredNotes.map(note => (
+                        <div key={note.id} className="flex items-center justify-between p-2 hover:bg-muted rounded-md">
+                          <label htmlFor={`note-${note.id}`} className="flex items-center gap-2 cursor-pointer flex-1">
+                            <input 
+                              type="checkbox" 
+                              id={`note-${note.id}`} 
+                              checked={selectedExistingNotes.some(n => n.id === note.id)}
+                              onChange={() => handleToggleNoteSelection(note)}
+                              className="form-checkbox h-4 w-4 text-primary rounded"
+                            />
+                            <span className="text-sm truncate">{note.title || '제목 없음'}</span>
+                          </label>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-muted-foreground text-center">노트가 없습니다.</p>
+                    )}
+                  </div>
+                </div>
+                <div className="p-2 border-t">
+                  <Button onClick={() => setIsNotePickerOpen(false)} className="w-full">선택 완료</Button>
+                </div>
               </PopoverContent>
             </Popover>
           </div>
@@ -128,11 +216,31 @@ export default function ReviewPage() {
               </ul>
             </div>
           )}
+
+          {/* ✨ [추가] 선택된 기존 노트 목록 표시 */}
+          {selectedExistingNotes.length > 0 && (
+            <div className="mt-4 text-left">
+              <h3 className="font-semibold text-sm mb-2">선택된 기존 노트:</h3>
+              <ul className="space-y-2">
+                {selectedExistingNotes.map(note => (
+                  <li key={note.id} className="flex items-center justify-between bg-muted/50 p-2 rounded-lg">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="h-4 w-4 flex-shrink-0" /> {/* 노트 아이콘으로 변경 가능 */}
+                      <span className="text-sm truncate">{note.title || '제목 없음'}</span>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => handleRemoveSelectedNote(note.id)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           
           {error && <p className="text-destructive text-sm mt-4 text-center">{error}</p>}
 
           <div className="mt-6 text-center">
-            <Button size="lg" onClick={handleSave} disabled={isLoading || files.length === 0}>
+            <Button size="lg" onClick={handleSave} disabled={isLoading || (files.length === 0 && selectedExistingNotes.length === 0)}>
               {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <ArrowRight className="mr-2 h-5 w-5"/>}
               복습 노트 생성
             </Button>
