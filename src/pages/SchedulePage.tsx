@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useNotes } from '../lib/useNotes';
 import { ScheduleEvent, Subject } from '../lib/types';
 import { Button } from '@/components/ui/button';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { ScheduleEditModal } from '../components/ScheduleEditModal';
 import ScheduleImportButton from '../components/ScheduleImportButton';
 
@@ -98,7 +99,7 @@ const MonthlyCalendarView = ({ onDayClick, onEventClick }: { onDayClick: (date: 
     const eventsByDate = useMemo(() => {
         const grouped: { [key: string]: ScheduleEvent[] } = {};
         schedule?.forEach(event => {
-            if (!event.date) return; // Guard against old data without a date
+            if (!event.date) return;
             if (!grouped[event.date]) {
                 grouped[event.date] = [];
             }
@@ -111,9 +112,7 @@ const MonthlyCalendarView = ({ onDayClick, onEventClick }: { onDayClick: (date: 
     }, [schedule]);
 
     const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const lastDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
-    const startDay = firstDayOfMonth.getDay(); // 0 for Sunday, 1 for Monday...
-    const daysInMonth = lastDayOfMonth.getDate();
+    const startDay = firstDayOfMonth.getDay(); // 0 for Sunday
 
     const calendarDays = Array.from({ length: 42 }, (_, i) => {
         const dayIndex = i - (startDay === 0 ? 6 : startDay - 1);
@@ -122,31 +121,60 @@ const MonthlyCalendarView = ({ onDayClick, onEventClick }: { onDayClick: (date: 
         return date;
     });
 
-  return (
-    <div className="grid grid-cols-7 gap-1">
-        {['월', '화', '수', '목', '금', '토', '일'].map(day => (
-            <div key={day} className="text-center font-semibold text-sm py-2">{day}</div>
-        ))}
-        {calendarDays.map((date, i) => {
-            const dateString = formatDate(date.getFullYear(), date.getMonth(), date.getDate());
-            const isCurrentMonth = date.getMonth() === currentDate.getMonth();
-            
-            const dailyEvents = eventsByDate[dateString] || [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-            return (
-                <div key={i} className={`h-24 border rounded-lg p-1 text-xs ${isCurrentMonth ? 'bg-card/50' : 'bg-muted/20'}`} onClick={() => onDayClick(dateString)}>
-                    <span className={`${isCurrentMonth ? '' : 'text-muted-foreground'}`}>{date.getDate()}</span>
-                    <div className="mt-1 space-y-0.5 overflow-y-auto h-[calc(100%-1.25rem)]">
-                        {dailyEvents.map(event => (
-                            <div key={event.id} className="flex items-center cursor-pointer" onClick={(e) => { e.stopPropagation(); onEventClick(event); }}>
-                                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${subjectsById.get(event.subjectId)?.color ? '' : 'bg-primary'}`} style={{ backgroundColor: subjectsById.get(event.subjectId)?.color }}></div>
-                                <span className="ml-1 text-xs truncate">{subjectsById.get(event.subjectId)?.name} {event.startTime}</span>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )
-        })}
+    const changeMonth = (amount: number) => {
+      setCurrentDate(prev => {
+        const newDate = new Date(prev);
+        newDate.setMonth(newDate.getMonth() + amount);
+        return newDate;
+      });
+    };
+
+  return (
+    <div>
+      <div className="flex items-center justify-center mb-4">
+        <Button variant="ghost" size="icon" onClick={() => changeMonth(-1)}>
+          <ChevronLeft className="h-6 w-6" />
+        </Button>
+        <h2 className="text-xl font-semibold w-40 text-center">
+          {currentDate.getFullYear()}년 {currentDate.getMonth() + 1}월
+        </h2>
+        <Button variant="ghost" size="icon" onClick={() => changeMonth(1)}>
+          <ChevronRight className="h-6 w-6" />
+        </Button>
+      </div>
+      <div className="grid grid-cols-7 gap-1">
+          {['월', '화', '수', '목', '금', '토', '일'].map(day => (
+              <div key={day} className="text-center font-semibold text-sm py-2">{day}</div>
+          ))}
+          {calendarDays.map((date, i) => {
+              const dateString = formatDate(date.getFullYear(), date.getMonth(), date.getDate());
+              const isCurrentMonth = date.getMonth() === currentDate.getMonth();
+              const isToday = date.getTime() === today.getTime();
+              
+              const dailyEvents = eventsByDate[dateString] || [];
+
+              const cellClasses = `h-24 border rounded-lg p-1 text-xs ${
+                isCurrentMonth ? 'bg-card/50' : 'bg-muted/20'
+              } ${isToday ? 'border-2 border-primary' : ''}`;
+
+              return (
+                  <div key={i} className={cellClasses} onClick={() => onDayClick(dateString)}>
+                      <span className={`${isCurrentMonth ? '' : 'text-muted-foreground'} ${isToday ? 'font-bold text-primary' : ''}`}>{date.getDate()}</span>
+                      <div className="mt-1 space-y-0.5 overflow-y-auto h-[calc(100%-1.25rem)]">
+                          {dailyEvents.map(event => (
+                              <div key={event.id} className="flex items-center cursor-pointer" onClick={(e) => { e.stopPropagation(); onEventClick(event); }}>
+                                  <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${subjectsById.get(event.subjectId)?.color ? '' : 'bg-primary'}`} style={{ backgroundColor: subjectsById.get(event.subjectId)?.color }}></div>
+                                  <span className="ml-1 text-xs truncate">{subjectsById.get(event.subjectId)?.name} {event.startTime}</span>
+                              </div>
+                          ))}
+                      </div>
+                  </div>
+              )
+          })}
+      </div>
     </div>
   );
 };
