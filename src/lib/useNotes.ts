@@ -217,6 +217,14 @@ import { useState, useCallback } from 'react';
         const eventsFromApi: { subjectId: string, startTime: string, endTime: string, dayOfWeek: string }[] = await response.json();
 
         const newEvents: ScheduleEvent[] = [];
+
+        const today = new Date();
+        const currentDay = today.getDay(); // 0 (Sun) - 6 (Sat)
+        const daysToMonday = (currentDay === 0) ? -6 : 1 - currentDay;
+        const monday = new Date(today);
+        monday.setDate(today.getDate() + daysToMonday);
+
+        const dayOfWeekMap: { [key: string]: number } = { '월': 0, '화': 1, '수': 2, '목': 3, '금': 4, '토': 5, '일': 6 };
         
         for (const event of eventsFromApi) {
           // Ensure the subjectId from the API is valid
@@ -225,9 +233,20 @@ import { useState, useCallback } from 'react';
             continue;
           }
 
+          const dayOffset = dayOfWeekMap[event.dayOfWeek];
+          if (dayOffset === undefined) {
+            console.warn(`Invalid dayOfWeek '${event.dayOfWeek}' from API, skipping event.`);
+            continue;
+          }
+          const eventDate = new Date(monday);
+          eventDate.setDate(monday.getDate() + dayOffset);
+          
+          const dateString = eventDate.toISOString().split('T')[0]; // "YYYY-MM-DD"
+
           newEvents.push({
             id: crypto.randomUUID(),
             subjectId: event.subjectId,
+            date: dateString, // Add the calculated date
             startTime: event.startTime,
             endTime: event.endTime,
             dayOfWeek: event.dayOfWeek,

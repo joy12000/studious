@@ -45,7 +45,7 @@ class handler(BaseHTTPRequestHandler):
                 raise ValueError("GEMINI_API_KEY environment variable not set.")
             
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            model = genai.GenerativeModel('gemini-2.5-flash')
 
             prompt = f"""이 시간표 이미지를 분석하여 각 항목을 아래 '과목 목록'과 비교해 가장 일치하는 과목의 'id'를 찾아 'subjectId' 필드에 담아라.
             그리고 시작 시간(startTime), 종료 시간(endTime), 요일(dayOfWeek)을 포함하여 JSON 배열 형식으로 추출해줘.

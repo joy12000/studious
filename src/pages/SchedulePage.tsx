@@ -94,16 +94,17 @@ const MonthlyCalendarView = ({ onDayClick, onEventClick }: { onDayClick: (date: 
         return map;
     }, [allSubjects]);
 
-    const eventsByDayOfWeek = useMemo(() => {
+    const eventsByDate = useMemo(() => {
         const grouped: { [key: string]: ScheduleEvent[] } = {};
-        DAYS.forEach(day => { grouped[day] = [] });
         schedule?.forEach(event => {
-            if (grouped[event.dayOfWeek]) {
-                grouped[event.dayOfWeek].push(event);
+            if (!event.date) return; // Guard against old data without a date
+            if (!grouped[event.date]) {
+                grouped[event.date] = [];
             }
+            grouped[event.date].push(event);
         });
-        for (const day in grouped) {
-          grouped[day].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+        for (const date in grouped) {
+          grouped[date].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
         }
         return grouped;
     }, [schedule]);
@@ -129,10 +130,7 @@ const MonthlyCalendarView = ({ onDayClick, onEventClick }: { onDayClick: (date: 
             const dateString = formatDate(date.getFullYear(), date.getMonth(), date.getDate());
             const isCurrentMonth = date.getMonth() === currentDate.getMonth();
             
-            const dayOfWeekIndex = date.getDay();
-            const dayOfWeek = DAYS[(dayOfWeekIndex + 6) % 7];
-            
-            const dailyEvents = eventsByDayOfWeek[dayOfWeek] || [];
+            const dailyEvents = eventsByDate[dateString] || [];
 
             return (
                 <div key={i} className={`h-24 border rounded-lg p-1 text-xs ${isCurrentMonth ? 'bg-card/50' : 'bg-muted/20'}`} onClick={() => onDayClick(dateString)}>
