@@ -56,7 +56,19 @@ class handler(BaseHTTPRequestHandler):
 
             response = model.generate_content([prompt, img])
 
-            json_response = json.loads(response.text.replace('```json', '').replace('```', ''))
+            raw_text = response.text
+            print(f"Gemini Raw Response for Calendar: {raw_text}")
+
+            if not raw_text or not raw_text.strip().startswith('['):
+                try:
+                    if response.prompt_feedback.block_reason:
+                        reason = response.prompt_feedback.block_reason
+                        raise ValueError(f"AI model blocked the request for safety reasons: {reason}")
+                except (AttributeError, IndexError):
+                    pass
+                raise ValueError(f"AI model returned an empty or invalid response. Raw text: '{raw_text}'")
+
+            json_response = json.loads(raw_text.replace('```json', '').replace('```', '').strip())
 
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
