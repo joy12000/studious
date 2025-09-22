@@ -19,6 +19,7 @@ class handler(BaseHTTPRequestHandler):
             )
             
             uploaded_file = form['file']
+            subjects_list = form.getvalue('subjects', '[]')
             file_data = uploaded_file.file.read()
             file_type = uploaded_file.type
 
@@ -44,17 +45,17 @@ class handler(BaseHTTPRequestHandler):
                 raise ValueError("GEMINI_API_KEY environment variable not set.")
             
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.5-pro')
+            model = genai.GenerativeModel('gemini-2.5-flash')
 
-            prompt = f"""이 시간표 이미지에서 과목 이름(subjectName), 시작 시간(startTime), 종료 시간(endTime), 요일(dayOfWeek)을 추출하여 JSON 배열 형식으로 만들어줘.
+            prompt = f"""이 시간표 이미지를 분석하여 JSON 배열 형식으로 추출해줘.
 
             추출 규칙:
-            1. **시간 계산:** 시간표의 한 칸은 보통 1시간을 의미합니다. 과목이 차지하는 칸 수를 바탕으로 시작 시간(startTime)과 종료 시간(endTime)을 정확히 계산해야 합니다.
-            2. **중복 및 분리:** 한 요일의 같은 시간대에 여러 과목이 겹쳐 있거나 나란히 있는 경우, 각 과목을 반드시 별개의 JSON 객체로 분리하여 추출해야 합니다.
-            3. **출력 형식:**
-               - subjectName: 한글 과목명을 그대로 추출합니다.
-               - startTime, endTime: 'HH:MM' 형식으로 추출합니다.
-               - dayOfWeek: '월','화','수','목','금','토','일' 중 하나로 표기합니다.
+            1. **과목 매칭:** 이미지의 각 수업 항목을 아래 '과목 목록'과 비교하여 가장 일치하는 과목을 찾고, 그 과목의 'id'를 'subjectId' 필드에 담아야 합니다.
+            2. **시간 계산:** 시간표의 한 칸은 보통 1시간을 의미합니다. 과목이 차지하는 칸 수를 바탕으로 시작 시간(startTime)과 종료 시간(endTime)을 'HH:MM' 형식으로 정확히 계산해야 합니다.
+            3. **중복 및 분리:** 한 요일의 같은 시간대에 여러 과목이 겹쳐 있거나 나란히 있는 경우, 각 과목을 반드시 별개의 JSON 객체로 분리하여 추출해야 합니다.
+            4. **요일 표기:** 요일(dayOfWeek)은 '월','화','수','목','금','토','일' 중 하나로 표기합니다.
+
+            과목 목록 (JSON 형식): {subjects_list}
             """
 
             response = model.generate_content([prompt, img])
