@@ -106,7 +106,7 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
         
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent p-2 flex flex-col justify-between">
             <div className="flex items-start justify-between">
-                {note.subjectId && (
+                {note.sourceType === 'youtube' && note.subjectId && (
                     <div
                         className="px-2 py-0.5 text-xs font-semibold rounded-full shadow-lg text-white"
                         style={{ backgroundColor: generatePastelColorFromText(note.subjectId, 0.7) }}

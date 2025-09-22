@@ -36,8 +36,8 @@ export type Filters = {
     onError: (error: string) => void;
   }
 
-  export function useNotes() {
-    const [filters, setFilters] = useState<Filters>({ dateRange: 'all' });
+  export function useNotes(defaultFilters?: Filters) {
+    const [filters, setFilters] = useState<Filters>(defaultFilters || { dateRange: 'all' });
 
     const notes = useLiveQuery(async () => {
       let query;

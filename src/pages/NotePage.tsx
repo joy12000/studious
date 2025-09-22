@@ -302,8 +302,8 @@ export default function NotePage() {
               </div>
             </header>
 
-            <main className="flex-1 overflow-y-auto p-4 md:p-8">
-              <article className={`mx-auto transition-all duration-300 ease-in-out ${isChatOpen ? 'max-w-full' : 'max-w-3xl'}`}>
+            <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-muted/40">
+              <article className={`mx-auto transition-all duration-300 ease-in-out ${isChatOpen ? 'max-w-full' : (note?.sourceType === 'youtube' ? 'max-w-3xl' : 'max-w-2xl bg-background shadow-lg rounded-lg p-8 md:p-12')}`}>
                 <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
@@ -333,9 +333,11 @@ export default function NotePage() {
                   )}
                 </div>
 
-                <div className="flex flex-wrap gap-2 mb-8">
-                  {note.subjectId && <Badge variant="secondary">{note.subjectId}</Badge>}
-                </div>
+                {note.sourceType === 'youtube' && (
+                  <div className="flex flex-wrap gap-2 mb-8">
+                    {note.subjectId && <Badge variant="secondary">{note.subjectId}</Badge>}
+                  </div>
+                )}
 
                 <div className="mb-8">
                   {editing ? (

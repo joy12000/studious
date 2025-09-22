@@ -80,10 +80,21 @@ class handler(BaseHTTPRequestHandler):
                     api_response_data = response.json()
                     content_str = api_response_data['choices'][0]['message']['content']
                     
+                    # Parse the string content into a Python dict
+                    try:
+                        parsed_content = json.loads(content_str)
+                    except json.JSONDecodeError:
+                        # If the AI didn't return valid JSON, wrap it.
+                        print("WARN: AI response was not valid JSON. Wrapping it.")
+                        parsed_content = {"answer": content_str, "followUp": []}
+
+                    # Dump it back to a properly escaped JSON string
+                    final_json_output = json.dumps(parsed_content, ensure_ascii=False)
+
                     self.send_response(200)
                     self.send_header('Content-type', 'application/json; charset=utf-8')
                     self.end_headers()
-                    self.wfile.write(content_str.encode('utf-8'))
+                    self.wfile.write(final_json_output.encode('utf-8'))
                     return
 
                 except requests.exceptions.RequestException as e:
