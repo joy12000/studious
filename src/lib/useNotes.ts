@@ -333,6 +333,36 @@ import { useState, useCallback } from 'react';
       return newNote;
     };
 
+    // Message 타입을 useNotes.ts에서도 사용할 수 있도록 정의하거나, types.ts에서 가져옵니다.
+    interface Message {
+      id: number;
+      text: string;
+      sender: 'user' | 'bot';
+    }
+
+    const addNoteFromChat = async (messages: Message[], title?: string) => {
+      const content = messages
+        .map(msg => `**${msg.sender === 'user' ? '나' : 'AI'}**: \n\n${msg.text}`)
+        .join('\n\n---\n\n');
+
+      const newNote: Note = {
+        id: crypto.randomUUID(),
+        title: title || `AI 채팅 기록: ${new Date().toLocaleString()}`,
+        content: content,
+        key_insights: [],
+        subjectId: 'AI 채팅', // 또는 사용자가 선택하게 할 수 있습니다.
+        noteType: 'general',
+        sourceType: 'other',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().getTime(),
+        favorite: false,
+        attachments: [],
+      };
+      
+      await db.notes.add(newNote);
+      return newNote;
+    };
+
     return {
       notes: notes || [],
       loading,
@@ -354,5 +384,7 @@ import { useState, useCallback } from 'react';
       deleteScheduleEvent,
           getNote, 
           getQuiz,
-          importNote    };
+          importNote,
+          addNoteFromChat
+    };
   }
