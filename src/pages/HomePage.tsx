@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { generateFallbackIconDataUrl } from '../lib/utils';
 
-const LoadingOverlay = () => (
+const LoadingOverlay = ({ message }: { message: string }) => (
   <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
     <div className="text-center">
       <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-      <p className="mt-4 text-lg font-semibold">노트를 생성하고 있습니다...</p>
+      <p className="mt-4 text-lg font-semibold">{message}</p>
       <p className="text-muted-foreground">잠시만 기다려주세요.</p>
     </div>
   </div>
@@ -24,26 +24,22 @@ const HEADLINES = [
   "당신의 두 번째 뇌가 되어줄게요"
 ];
 
-// ✨ [추가] 링크 객체 타입 정의
 interface ExternalLinkItem {
   id: string;
   name: string;
   url: string;
   iconUrl: string;
-  fallbackIconDataUrl: string; // Data URL for SVG fallback
+  fallbackIconDataUrl: string;
 }
 
-// ✨ [추가] 기본 링크 목록
 const defaultLinks: ExternalLinkItem[] = [
-  { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/', iconUrl: 'https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64' },
-  { id: 'perplexity', name: 'Perplexity', url: 'https://www.perplexity.ai/', iconUrl: 'https://www.google.com/s2/favicons?domain=perplexity.ai&sz=64' },
-  { id: 'chatgpt', name: 'ChatGPT', url: 'https://chat.openai.com/', iconUrl: 'https://www.google.com/s2/favicons?domain=openai.com&sz=64' },
-  { id: 'mathpix', name: 'Mathpix Snip', url: 'https://snip.mathpix.com/', iconUrl: 'https://www.google.com/s2/favicons?domain=mathpix.com&sz=64' }
+  { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/', iconUrl: 'https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64', fallbackIconDataUrl: generateFallbackIconDataUrl('G') },
+  { id: 'perplexity', name: 'Perplexity', url: 'https://www.perplexity.ai/', iconUrl: 'https://www.google.com/s2/favicons?domain=perplexity.ai&sz=64', fallbackIconDataUrl: generateFallbackIconDataUrl('P') },
+  { id: 'chatgpt', name: 'ChatGPT', url: 'https://chat.openai.com/', iconUrl: 'https://www.google.com/s2/favicons?domain=openai.com&sz=64', fallbackIconDataUrl: generateFallbackIconDataUrl('C') },
+  { id: 'mathpix', name: 'Mathpix Snip', url: 'https://snip.mathpix.com/', iconUrl: 'https://www.google.com/s2/favicons?domain=mathpix.com&sz=64', fallbackIconDataUrl: generateFallbackIconDataUrl('M') }
 ];
 
 const LINKS_STORAGE_KEY = 'studious-external-links';
-
-type InputMode = 'youtube' | 'review' | 'schedule';
 
 export default function HomePage() {
   const { addNote, addNoteFromReview, addScheduleFromImage } = useNotes();
@@ -52,10 +48,8 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
-  const [mode, setMode] = useState<InputMode>('youtube');
   const [headline, setHeadline] = useState(HEADLINES[0]);
 
-  // ✨ [개선] 외부 링크 목록을 상태로 관리하고 localStorage와 연동
   const [externalLinks, setExternalLinks] = useState<ExternalLinkItem[]>([]);
   const [isEditLinks, setIsEditLinks] = useState(false);
 
@@ -91,7 +85,7 @@ export default function HomePage() {
         name,
         url,
         iconUrl: `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
-        fallbackIconDataUrl: generateFallbackIconDataUrl(name) // Generate fallback here
+        fallbackIconDataUrl: generateFallbackIconDataUrl(name)
       };
       saveLinks([...externalLinks, newLink]);
     } catch (error) {
@@ -127,47 +121,6 @@ export default function HomePage() {
     await addNote({ youtubeUrl, onProgress: handleProgress, onComplete: handleComplete, onError: handleError });
   };
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFileSelect = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsLoading(true);
-    if (mode === 'review') {
-      setLoadingMessage('AI 복습 노트를 생성합니다...');
-      // This is a simplified version. In a real app, you'd handle multiple files and subjects.
-      await addNoteFromReview({
-        aiConversationText: "Previously studied material",
-        files: [file],
-        subjects: [],
-        onProgress: handleProgress,
-        onComplete: (note, quiz) => {
-          setIsLoading(false);
-          navigate(`/note/${note.id}`);
-        },
-        onError: handleError,
-      });
-    } else if (mode === 'schedule') {
-      setLoadingMessage('시간표 이미지를 분석합니다...');
-      await addScheduleFromImage({
-        file,
-        onProgress: handleProgress,
-        onComplete: (events) => {
-          setIsLoading(false);
-          navigate('/schedule');
-        },
-        onError: handleError,
-      });
-    }
-    // Reset file input
-    event.target.value = '';
-  };
-  
   useEffect(() => {
     const interval = setInterval(() => {
       setHeadline(prev => {
@@ -175,7 +128,7 @@ export default function HomePage() {
         const nextIndex = (currentIndex + 1) % HEADLINES.length;
         return HEADLINES[nextIndex];
       });
-    }, 3000);
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -184,7 +137,6 @@ export default function HomePage() {
     const shareUrl = queryParams.get('share_url');
     if (shareUrl) {
       setYoutubeUrl(shareUrl);
-      // Automatically trigger submission
       setIsLoading(true);
       setLoadingMessage('공유된 YouTube 영상 요약을 시작합니다...');
       addNote({ 
@@ -206,7 +158,7 @@ export default function HomePage() {
 
   return (
     <>
-      {isLoading && <LoadingOverlay />}
+      {isLoading && <LoadingOverlay message={loadingMessage} />}
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4 relative">
         
         <div className="absolute top-4 right-4 z-10">
@@ -270,36 +222,24 @@ export default function HomePage() {
 
           <div className="mb-6 flex justify-center">
             <div className="p-1 bg-muted rounded-full flex items-center gap-1">
-              <Button variant={mode === 'youtube' ? 'default' : 'ghost'} size="sm" className="rounded-full" onClick={() => setMode('youtube')}><Youtube className="h-4 w-4 mr-2"/>AI 영상 요약</Button>
-              <Button variant={mode === 'review' ? 'default' : 'ghost'} size="sm" className="rounded-full" onClick={() => navigate('/review')}><Bot className="h-4 w-4 mr-2"/>AI 복습</Button>
-
+              <Button variant={'default'} size="sm" className="rounded-full"><Youtube className="h-4 w-4 mr-2"/>AI 영상 요약</Button>
+              <Button variant={'ghost'} size="sm" className="rounded-full" onClick={() => navigate('/review')}><File className="h-4 w-4 mr-2"/>AI 복습</Button>
+              <Button variant={'ghost'} size="sm" className="rounded-full" onClick={() => navigate('/chat')}><BrainCircuit className="h-4 w-4 mr-2"/>AI 참고서</Button>
             </div>
           </div>
 
-          {mode === 'youtube' && (
-            <form onSubmit={handleYoutubeSubmit} className="flex items-center gap-2 bg-card border rounded-full p-2 shadow-lg max-w-xl mx-auto">
-              <input
-                type="text"
-                value={youtubeUrl}
-                onChange={(e) => setYoutubeUrl(e.target.value)}
-                placeholder="YouTube 영상 링크를 붙여넣으세요"
-                className="flex-grow bg-transparent px-4 py-2 focus:outline-none"
-              />
-              <Button type="submit" size="icon" className="rounded-full flex-shrink-0">
-                <ArrowRight className="h-5 w-5" />
-              </Button>
-            </form>
-          )}
-
-          {(mode === 'review') && (
-            <div className="max-w-xl mx-auto">
-              <Button onClick={handleFileSelect} variant="secondary" size="lg" className="w-full rounded-full shadow-lg">
-                <File className="h-5 w-5 mr-3" />
-                {mode === 'review' ? '복습할 파일 선택' : '시간표 이미지 선택'}
-              </Button>
-              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept={mode === 'schedule' ? 'image/*' : undefined} />
-            </div>
-          )}
+          <form onSubmit={handleYoutubeSubmit} className="flex items-center gap-2 bg-card border rounded-full p-2 shadow-lg max-w-xl mx-auto">
+            <input
+              type="text"
+              value={youtubeUrl}
+              onChange={(e) => setYoutubeUrl(e.target.value)}
+              placeholder="YouTube 영상 링크를 붙여넣으세요"
+              className="flex-grow bg-transparent px-4 py-2 focus:outline-none"
+            />
+            <Button type="submit" size="icon" className="rounded-full flex-shrink-0">
+              <ArrowRight className="h-5 w-5" />
+            </Button>
+          </form>
         </div>
       </div>
     </>
