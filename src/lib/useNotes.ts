@@ -141,7 +141,8 @@ export function useNotes(defaultFilters?: Filters) {
         });
 
         if (!response.ok) {
-          throw new Error('Review note creation failed');
+          const errorData = await response.json().catch(() => ({ error: "서버 응답을 파싱할 수 없습니다.", details: response.statusText }));
+          throw new Error(errorData.details || errorData.error || 'Review note creation failed');
         }
 
         const result = await response.json();

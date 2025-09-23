@@ -9,7 +9,34 @@ import traceback
 from pdf2image import convert_from_bytes
 
 class handler(BaseHTTPRequestHandler):
+    def handle_error(self, e, message="오류 발생", status_code=500):
+        print(f"ERROR: {message} - {e}")
+        traceback.print_exc()
+        if not hasattr(self, '_headers_sent') or not self._headers_sent:
+            try:
+                self.send_response(status_code)
+                self.send_header('Content-type', 'application/json; charset=utf-8')
+                self.end_headers()
+                error_details = {"error": message, "details": str(e)}
+                self.wfile.write(json.dumps(error_details).encode('utf-8'))
+            except Exception as write_error:
+                print(f"FATAL: 오류 응답 전송 중 추가 오류 발생: {write_error}")
+
     def do_POST(self):
+        api_keys = [
+            os.environ.get('GEMINI_API_KEY_PRIMARY'),
+            os.environ.get('GEMINI_API_KEY_SECONDARY'),
+            os.environ.get('GEMINI_API_KEY_TERTIARY'),
+            os.environ.get('GEMINI_API_KEY_QUATERNARY'),
+            os.environ.get('GEMINI_API_KEY')
+        ]
+        valid_keys = [key for key in api_keys if key]
+
+        if not valid_keys:
+            return self.handle_error(ValueError("설정된 Gemini API 키가 없습니다."), "API 키 설정 오류", 500)
+
+        last_error = None
+        
         try:
             form = cgi.FieldStorage(
                 fp=self.rfile,
@@ -21,13 +48,6 @@ class handler(BaseHTTPRequestHandler):
             learning_material_files = form.getlist('files')
             subjects_list_str = form.getvalue('subjects', '[]')
             subjects_list = json.loads(subjects_list_str)
-
-            api_key = os.environ.get('GEMINI_API_KEY')
-            if not api_key:
-                raise ValueError("GEMINI_API_KEY environment variable not set.")
-
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-pro-latest')
 
             prompt_text = f"""
             # 역할: 학습 전문가
@@ -36,38 +56,7 @@ class handler(BaseHTTPRequestHandler):
             # 🎨 출력 서식 규칙 (★★★★★ 가장 중요)
             `summary`, `key_insights` 필드의 내용은 아래 규칙을 **반드시** 따라야 합니다.
             
-            1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 KaTeX 문법으로 감싸야 합니다. (인라인: `from http.server import BaseHTTPRequestHandler
-import json
-import os
-import google.generativeai as genai
-import cgi
-from PIL import Image
-import io
-import traceback
-from pdf2image import convert_from_bytes
-
-class handler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        try:
-            form = cgi.FieldStorage(
-                fp=self.rfile,
-                headers=self.headers,
-                environ={'REQUEST_METHOD': 'POST', 'CONTENT_TYPE': self.headers['Content-Type']}
-            )
-
-            ai_conversation_text = form.getvalue('aiConversationText', '')
-            learning_material_files = form.getlist('files')
-            subjects_list_str = form.getvalue('subjects', '[]')
-            subjects_list = json.loads(subjects_list_str)
-
-            api_key = os.environ.get('GEMINI_API_KEY')
-            if not api_key:
-                raise ValueError("GEMINI_API_KEY environment variable not set.")
-
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-pro-latest')
-
-, 블록: `$`)
+            1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 KaTeX 문법으로 감싸야 합니다. (인라인: `$`, 블록: `$$`)
             2.  **다이어그램 (Mermaid):** 복잡한 개념 설명 시 Mermaid.js 문법으로 시각화해야 합니다. (```mermaid...```)
             3.  **코드 (Code Block):** 모든 소스 코드는 언어를 명시한 코드 블록으로 작성해야 합니다. (```python...```)
             4.  **핵심 용어 (Tooltip):** 중요한 전공 용어는 `<dfn title="설명">용어</dfn>` HTML 태그로 감싸 설명을 제공해야 합니다.
@@ -128,24 +117,27 @@ class handler(BaseHTTPRequestHandler):
                     except Exception as txt_err:
                         print(f"텍스트 파일 '{filename}' 처리 중 오류: {txt_err}")
 
-            response = model.generate_content(request_contents)
+            for i, api_key in enumerate(valid_keys):
+                try:
+                    print(f"INFO: API 키 #{i + 1} (으)로 Gemini API 호출 시도...")
+                    genai.configure(api_key=api_key)
+                    model = genai.GenerativeModel('gemini-1.5-pro-latest')
+                    response = model.generate_content(request_contents)
+                    
+                    cleaned_text = response.text.strip().replace('```json', '').replace('```', '')
+                    json_response = json.loads(cleaned_text)
 
-            cleaned_text = response.text.strip().replace('```json', '').replace('```', '')
-            json_response = json.loads(cleaned_text)
-
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json; charset=utf-8')
-            self.end_headers()
-            self.wfile.write(json.dumps(json_response).encode('utf-8'))
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json; charset=utf-8')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(json_response).encode('utf-8'))
+                    return
+                except Exception as e:
+                    last_error = e
+                    print(f"WARN: API 키 #{i + 1} 사용 실패. 다음 키로 폴백합니다. 오류: {e}")
+                    continue
+            
+            raise ConnectionError("모든 Gemini API 키로 요청에 실패했습니다.") from last_error
 
         except Exception as e:
-            print(f"Error processing request: {e}")
-            traceback.print_exc()
-            self.send_response(500)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            error_details = {
-                "error": str(e),
-                "traceback": traceback.format_exc()
-            }
-            self.wfile.write(json.dumps(error_details).encode('utf-8'))
+            self.handle_error(e, "복습 노트 생성 중 오류 발생")
