@@ -10,7 +10,7 @@ import { useNotes, Subject } from '../lib/useNotes';
 import { WeekPicker, getWeekNumber } from '../components/WeekPicker';
 import { format } from 'date-fns';
 import { useLiveQuery } from 'dexie-react-hooks'; // 💡 dexie-react-hooks 사용
-import { db } from '../lib/db'; //  db ы
+import { db } from '../lib/db'; // 💡 db 사용
 
 const models = [
     { id: 'x-ai/grok-4-fast:free', name: '🚀 Grok 4 Fast (최신/가장빠름)' },
@@ -151,7 +151,7 @@ export default function ChatPage() {
       console.error('API 통신 오류:', error);
       const errorMessage: Message = {
         id: Date.now() + 1,
-        text: '二≫⑸, 듬 깊 以 ㅻ媛 諛듬.',
+        text: '죄송합니다, 답변을 생성하는 중에 오류가 발생했습니다.',
         sender: 'bot',
       };
       setMessages((prev) => [...prev, errorMessage]);
@@ -172,27 +172,27 @@ export default function ChatPage() {
   
   const handleGenerateTextbook = async () => {
     if (uploadedFiles.length === 0 || !selectedSubject) {
-      alert('怨쇰ぉ怨  댁 쇱 댁＜몄.');
+      alert('과목과 하나 이상의 파일을 업로드해주세요.');
       return;
     }
 
     setIsLoading(true);
-    setLoadingMessage('AI媛 猷瑜 遺 李멸瑜 留ㅺ 댁...');
+    setLoadingMessage('AI가 자료를 분석해 참고서를 만들고 있어요...');
     
     const formData = new FormData();
     uploadedFiles.forEach(file => formData.append('files', file));
     
-    //  [媛] ㅼ 湲  ㅼ 媛몄ㅺ린
+    // 💡 [추가] 셋팅값 가져오기
     const weekInfo = selectedDate 
-      ? `${getWeekNumber(selectedDate, settings?.semesterStartDate)}二쇱감 (${format(selectedDate, 'M d')})` 
-      : '[N二쇱감]';
+      ? `${getWeekNumber(selectedDate, settings?.semesterStartDate)}주차 (${format(selectedDate, 'M월 d일')})` 
+      : '[N주차]';
 
     formData.append('subject', selectedSubject.name);
     formData.append('week', weekInfo);
-    formData.append('materialTypes', uploadedFiles.map(f => f.type).join(', ') || '[]');
+    formData.append('materialTypes', uploadedFiles.map(f => f.type).join(', ') || '[파일]');
 
     try {
-      // 1. AI寃 李멸 댁  泥
+      // 1. AI에게 참고서 생성 요청
       const response = await fetch('/api/create_textbook', {
         method: 'POST',
         body: formData,
@@ -200,16 +200,16 @@ export default function ChatPage() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.details || '李멸 깆 ㅽ⑦듬.');
+        throw new Error(errorData.details || '참고서 생성에 실패했습니다.');
       }
       
       const data = await response.json();
       
-      // 2. 깅 댁⑹ 諛쇰  명  
-      setLoadingMessage('깅 李멸瑜 명몄 ν 以...');
+      // 2. 생성된 내용을 받아 노트에 저장
+      setLoadingMessage('생성된 참고서를 노트에 저장하는 중...');
       const noteTitle = `${selectedSubject.name} - ${weekInfo} 李멸`;
       
-      //  [듭 ]  吏瑜 "YYYY-MM-DD" 쇰 蹂 
+      // 💡 [추가] 노트 날짜를 "YYYY-MM-DD" 형식으로 변환
       const noteDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
 
       const newNote = await addNoteFromTextbook(
@@ -217,16 +217,16 @@ export default function ChatPage() {
         data.textbook,
         selectedSubject.id,
         uploadedFiles,
-        noteDateStr //   吏 蹂 
+        noteDateStr // 💡 노트 날짜 추가
       );
 
-      // 3. 깅 명 댁濡 利 대
-      alert("AI 李멸媛 깅 명몄 λ듬!");
+      // 3. 생성된 노트 페이지로 이동
+      alert("AI 참고서가 성공적으로 노트에 저장되었습니다!");
       navigate(`/note/${newNote.id}`);
 
     } catch(error) {
         alert(`ㅻ媛 諛듬: ${error instanceof Error ? error.message : '   ㅻ'}`);
-        setIsLoading(false); // ㅻ 諛  濡  댁
+        setIsLoading(false); // 오류 발생 시 로딩 해제
     }
     // 깃났  댁 대 쇱대誘濡 濡 瑜 댁  
   };
