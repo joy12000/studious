@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useNotes } from "../lib/useNotes";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Loader2, Youtube, ArrowRight, File, Calendar, Bot, ExternalLink, AppWindow, Trash2, Pencil, Plus, Check } from "lucide-react";
+import { Loader2, Youtube, ArrowRight, File, BrainCircuit, AppWindow, Pencil, Check, Trash2, Plus, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { generateFallbackIconDataUrl } from '../lib/utils';
@@ -41,8 +41,9 @@ const defaultLinks: ExternalLinkItem[] = [
 
 const LINKS_STORAGE_KEY = 'studious-external-links';
 
+
 export default function HomePage() {
-  const { addNote, addNoteFromReview, addScheduleFromImage } = useNotes();
+  const { addNote } = useNotes();
   const navigate = useNavigate();
   const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
@@ -99,15 +100,11 @@ export default function HomePage() {
     }
   };
 
-  const handleProgress = (status: string) => {
-    setLoadingMessage(status);
-  };
-
+  const handleProgress = (status: string) => setLoadingMessage(status);
   const handleComplete = (note: any) => {
     setIsLoading(false);
     navigate(`/note/${note.id}`);
   };
-
   const handleError = (error: string) => {
     setIsLoading(false);
     alert(`오류가 발생했습니다: ${error}`);
@@ -154,7 +151,6 @@ export default function HomePage() {
       });
     }
   }, [location, addNote, navigate]);
-
 
   return (
     <>
@@ -220,11 +216,18 @@ export default function HomePage() {
             {headline}
           </p>
 
+          {/* ✨ [핵심 수정] 기능별 페이지로 이동하는 명확한 버튼 그룹 */}
           <div className="mb-6 flex justify-center">
             <div className="p-1 bg-muted rounded-full flex items-center gap-1">
-              <Button variant={'default'} size="sm" className="rounded-full"><Youtube className="h-4 w-4 mr-2"/>AI 영상 요약</Button>
-              <Button variant={'ghost'} size="sm" className="rounded-full" onClick={() => navigate('/review')}><File className="h-4 w-4 mr-2"/>AI 복습</Button>
-              <Button variant={'ghost'} size="sm" className="rounded-full" onClick={() => navigate('/chat')}><BrainCircuit className="h-4 w-4 mr-2"/>AI 참고서</Button>
+              <Button variant={'default'} size="sm" className="rounded-full">
+                <Youtube className="h-4 w-4 mr-2"/>AI 영상 요약
+              </Button>
+              <Button variant={'ghost'} size="sm" className="rounded-full" onClick={() => navigate('/review')}>
+                <File className="h-4 w-4 mr-2"/>AI 복습
+              </Button>
+              <Button variant={'ghost'} size="sm" className="rounded-full" onClick={() => navigate('/chat')}>
+                <BrainCircuit className="h-4 w-4 mr-2"/>AI 참고서
+              </Button>
             </div>
           </div>
 
