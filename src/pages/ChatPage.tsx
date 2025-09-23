@@ -9,15 +9,15 @@ import MarkdownRenderer from '../components/MarkdownRenderer';
 import { useNotes, Subject } from '../lib/useNotes';
 import { WeekPicker, getWeekNumber } from '../components/WeekPicker';
 import { format } from 'date-fns';
-import { useLiveQuery } from 'dexie-react-hooks'; //  dexie-react-hooks ы
+import { useLiveQuery } from 'dexie-react-hooks'; // 💡 dexie-react-hooks 사용
 import { db } from '../lib/db'; //  db ы
 
 const models = [
-    { id: 'x-ai/grok-4-fast:free', name: ' Grok 4 Fast (理/⑸)' },
-    { id: 'deepseek/deepseek-r1-0528:free', name: ' DeepSeek R1 (媛ν 異濡)' },
-    { id: 'deepseek/deepseek-chat-v3.1', name: ' DeepSeek V3.1 (洹)' },
-    { id: 'meta-llama/llama-4-maverick:free', name: ' Llama 4 (理)' },
-    { id: 'mistralai/mistral-7b-instruct', name: ' Mistral 7B (媛蹂怨 鍮由)' },
+    { id: 'x-ai/grok-4-fast:free', name: '🚀 Grok 4 Fast (최신/가장빠름)' },
+    { id: 'deepseek/deepseek-r1-0528:free', name: '💡 DeepSeek R1 (간단한 질문)' },
+    { id: 'deepseek/deepseek-chat-v3.1', name: '⭐ DeepSeek V3.1 (기본)' },
+    { id: 'meta-llama/llama-4-maverick:free', name: '🦙 Llama 4 (최신)' },
+    { id: 'mistralai/mistral-7b-instruct', name: '🧠 Mistral 7B (가볍고 빠름)' },
 ];
 
 interface Message {
@@ -36,7 +36,7 @@ export default function ChatPage() {
   const navigate = useNavigate();
   const location = useLocation(); // location 훅 사용
 
-  //  [異媛] 곗댄곕댁ㅼ 湲  ㅼ 媛몄ㅺ린
+  // 💡 [추가] 덱시-리액트 훅스에 셋팅값 가져오기
   const settings = useLiveQuery(() => db.settings.get('default'));
 
   // ✨ [핵심 추가] 페이지 진입 시 SchedulePage에서 보낸 상태(state)를 확인
@@ -90,14 +90,14 @@ export default function ChatPage() {
 
   const handleSaveToNote = async () => {
     if (messages.length === 0) return;
-    const title = prompt("명몄 紐⑹ ν몄:", "AI 梨 湲곕");
+    const title = prompt("노트의 제목을 입력해주세요:", "AI 채팅 기록");
     if (title) {
       try {
         const newNote = await addNoteFromChat(messages, title, uploadedFiles);
-        alert("梨 湲곕 명몃 λ듬!");
+        alert("AI 채팅 기록이 노트에 저장되었습니다!");
         navigate(`/note/${newNote.id}`);
       } catch (error) {
-        alert("명 μ ㅽ⑦듬.");
+        alert("노트 저장에 실패했습니다.");
         console.error(error);
       }
     }
@@ -121,7 +121,7 @@ export default function ChatPage() {
     setMessages(currentMessages);
     setInputValue('');
     setIsLoading(true);
-    setLoadingMessage('AI媛 듬 媛怨 댁...');
+    setLoadingMessage('AI가 답변을 생성하고 있어요...');
 
     const history: GeminiHistory[] = currentMessages.map(msg => ({
       role: msg.sender === 'user' ? 'user' : 'model',
@@ -135,7 +135,7 @@ export default function ChatPage() {
         body: JSON.stringify({ history, model: selectedModel }),
       });
       
-      if (!response.ok) throw new Error('API 泥 ㅽ');
+      if (!response.ok) throw new Error('API 호출 실패');
 
       const data = await response.json();
       
@@ -148,7 +148,7 @@ export default function ChatPage() {
       setMessages(prev => [...prev, botMessage]);
 
     } catch (error) {
-      console.error('API 듭 ㅻ:', error);
+      console.error('API 통신 오류:', error);
       const errorMessage: Message = {
         id: Date.now() + 1,
         text: '二≫⑸, 듬 깊 以 ㅻ媛 諛듬.',
@@ -231,14 +231,14 @@ export default function ChatPage() {
     // 깃났  댁 대 쇱대誘濡 濡 瑜 댁  
   };
 
-  const currentModelName = models.find(m => m.id === selectedModel)?.name || '紐⑤ ';
+  const currentModelName = models.find(m => m.id === selectedModel)?.name || '모델 선택';
 
   if (pageState === 'upload') {
     return (
       <div className="flex flex-col h-full w-full bg-card items-center justify-center p-4">
         <div className="w-full max-w-2xl text-center">
-            <h1 className="text-2xl font-bold mb-2">AI 李멸 留ㅺ린</h1>
-            <p className="text-muted-foreground mb-6">PDF, PPT, 대吏, ㅽ   猷瑜 щㅼ＜몄. AI媛 醫 ⑺ 留異 李멸瑜 留ㅼ 由쎈.</p>
+            <h1 className="text-2xl font-bold mb-2">AI 참고서 만들기</h1>
+            <p className="text-muted-foreground mb-6">PDF, PPT, 이미지, 텍스트 등 학습 자료를 업로드해주세요. AI가 맞춤 참고서를 만들어 드립니다.</p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <Popover open={isSubjectPopoverOpen} onOpenChange={setIsSubjectPopoverOpen}>
@@ -246,7 +246,7 @@ export default function ChatPage() {
                         <Button variant="outline" role="combobox" aria-expanded={isSubjectPopoverOpen} className="w-full justify-between">
                             <div className="flex items-center">
                                 <BookMarked className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                                <span className="truncate">{selectedSubject ? selectedSubject.name : "怨쇰ぉ "}</span>
+                                <span className="truncate">{selectedSubject ? selectedSubject.name : "과목 선택"}</span>
                             </div>
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
@@ -274,8 +274,8 @@ export default function ChatPage() {
                                 <CalendarDays className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                                 <span className="truncate">
                                     {selectedDate 
-                                        ? `${getWeekNumber(selectedDate, settings?.semesterStartDate)}二쇱감 (${format(selectedDate, "M d")})` 
-                                        : "二쇱감  (吏)"}
+                                        ? `${getWeekNumber(selectedDate, settings?.semesterStartDate)}주차 (${format(selectedDate, "M월 d일")})` 
+                                        : "주차 선택 (날짜)"}
                                 </span>
                             </div>
                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -295,13 +295,13 @@ export default function ChatPage() {
               onClick={() => fileInputRef.current?.click()}
             >
               <UploadCloud className="h-12 w-12 mb-4" />
-              <p className="font-semibold">쇱 洹명嫄곕 대┃댁 濡</p>
+              <p className="font-semibold">파일을 드래그앤드롭하거나 클릭하여 업로드</p>
               <input ref={fileInputRef} type="file" multiple onChange={onFileChange} className="hidden" />
             </div>
 
             {uploadedFiles.length > 0 && (
               <div className="mt-6 text-left">
-                <h3 className="font-semibold mb-2">濡 :</h3>
+                <h3 className="font-semibold mb-2">업로드된 파일:</h3>
                 <ul className="space-y-2">
                   {uploadedFiles.map((file, index) => (
                     <li key={index} className="flex items-center justify-between bg-muted/50 p-2 rounded-lg text-sm">
@@ -321,7 +321,7 @@ export default function ChatPage() {
             <div className="mt-8">
               <Button onClick={handleGenerateTextbook} size="lg" disabled={isLoading || uploadedFiles.length === 0 || !selectedSubject}>
                 {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
-                {isLoading ? loadingMessage : 'AI 李멸 '}
+                {isLoading ? loadingMessage : 'AI 참고서 생성'}
               </Button>
             </div>
         </div>
@@ -359,17 +359,17 @@ export default function ChatPage() {
 
         <div className="flex items-center gap-1 sm:gap-2">
           <Button variant="ghost" size="sm" onClick={handleSaveToNote} disabled={messages.length === 0}>
-            <Save className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">명 </span>
+            <Save className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">노트 저장</span>
           </Button>
           <Button variant="ghost" size="sm" onClick={handleNewChat}>
-            <RefreshCw className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline"> </span>
+            <RefreshCw className="h-4 w-4 sm:mr-2" /><span className="hidden sm:inline">새 채팅</span>
           </Button>
         </div>
       </div>
       <div className="flex-1 p-4 overflow-y-auto">
         {messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">AI寃 臾댁대 臾쇱대낫몄!</p>
+            <p className="text-muted-foreground">AI에게 무엇이든 물어보세요!</p>
           </div>
         ) : (
           <div className="space-y-4">
@@ -409,7 +409,7 @@ export default function ChatPage() {
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder={isLoading ? loadingMessage : "硫吏瑜 ν몄..."}
+            placeholder={isLoading ? loadingMessage : "메시지를 입력해주세요..."}
             className="w-full px-4 py-2 border rounded-full focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
             disabled={isLoading}
           />
