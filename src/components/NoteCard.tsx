@@ -136,7 +136,7 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
             {note.sourceType === 'youtube' && note.subjectId && (
                 <div
                     className="px-2 py-0.5 text-xs font-semibold rounded-full shadow-lg text-white"
-                    style={{ backgroundColor: generatePastelColorFromText(note.subjectId, 0.7) }}
+                    style={{ backgroundColor: generatePastelColorFromText(note.subjectId || '') }}
                 >
                     {note.subjectId}
                 </div>
