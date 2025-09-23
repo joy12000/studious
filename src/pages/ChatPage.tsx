@@ -207,7 +207,7 @@ export default function ChatPage() {
       
       // 2. 생성된 내용을 받아 노트에 저장
       setLoadingMessage('생성된 참고서를 노트에 저장하는 중...');
-      const noteTitle = `${selectedSubject.name} - ${weekInfo} 李멸`;
+      const noteTitle = `${selectedSubject.name} - ${weekInfo} 참고서`;
       
       // 💡 [추가] 노트 날짜를 "YYYY-MM-DD" 형식으로 변환
       const noteDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
@@ -228,7 +228,7 @@ export default function ChatPage() {
         alert(`ㅻ媛 諛듬: ${error instanceof Error ? error.message : '   ㅻ'}`);
         setIsLoading(false); // 오류 발생 시 로딩 해제
     }
-    // 깃났  댁 대 쇱대誘濡 濡 瑜 댁  
+    // 항상 로딩 상태 해제
   };
 
   const currentModelName = models.find(m => m.id === selectedModel)?.name || '모델 선택';
