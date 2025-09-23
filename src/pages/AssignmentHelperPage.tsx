@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Note } from '../lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import * as pdfjsLib from 'pdfjs-dist';
 
 // PDF.js 워커 경로 설정
