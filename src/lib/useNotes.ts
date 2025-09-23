@@ -35,7 +35,18 @@ export type Filters = {
     onComplete: (events: ScheduleEvent[]) => void;
     onError: (error: string) => void;
   }
-
+  
+  // ✨ [추가] 과제 도우미 페이로드 인터페이스
+  export interface AddNoteFromAssignmentPayload {
+      referenceFiles: File[];
+      problemFiles: File[];
+      answerFiles: File[];
+      noteContext: string;
+      subjectId: string;
+      onProgress: (status: string) => void;
+      onComplete: (note: Note) => void;
+      onError: (error: string) => void;
+  }
   export function useNotes(defaultFilters?: Filters) {
     const [filters, setFilters] = useState<Filters>(defaultFilters || { dateRange: 'all' });
 
@@ -281,9 +292,57 @@ export type Filters = {
 
       } catch (err) {
         console.error("Schedule processing failed:", err);
-        const message = err instanceof Error ? err.message : "시간표 처리 중 알 수 없는 오류가 발생했습니다.";
         onError(message);
       }
+    };
+    // ✨ [추가] AI 과제 도우미 결과 저장 함수
+    const addNoteFromAssignment = async (payload: AddNoteFromAssignmentPayload) => {
+        const { referenceFiles, problemFiles, answerFiles, noteContext, subjectId, onProgress, onComplete, onError } = payload;
+        
+        try {
+            onProgress("AI 과제 도우미를 실행 중입니다...");
+            const formData = new FormData();
+            referenceFiles.forEach(file => formData.append('reference_files', file));
+            problemFiles.forEach(file => formData.append('problem_files', file));
+            answerFiles.forEach(file => formData.append('answer_files', file));
+            formData.append('note_context', noteContext);
+            formData.append('subjectId', subjectId);
+
+            const response = await fetch('/api/assignment_helper', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.details || `서버 오류: ${response.status}`);
+            }
+
+            const result = await response.json();
+
+            const newNote: Note = {
+                id: uuidv4(),
+                title: result.title,
+                content: result.content,
+                subjectId: result.subjectId,
+                noteType: 'assignment', // 노트 타입을 'assignment'로 지정
+                sourceType: 'other',
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().getTime(),
+                noteDate: format(new Date(), 'yyyy-MM-dd'),
+                favorite: false,
+                key_insights: [], // 과제 도우미는 key_insights를 사용하지 않음
+                attachments: [], // 첨부파일은 필요 시 별도 처리
+            };
+
+            await db.notes.add(newNote);
+            onComplete(newNote);
+
+        } catch (err) {
+            console.error("Assignment helper failed:", err);
+            const message = err instanceof Error ? err.message : "AI 과제 도우미 실행 중 알 수 없는 오류가 발생했습니다.";
+            onError(message);
+        }
     };
 
     const updateNote = async (id: string, patch: Partial<Note>) => {
@@ -428,6 +487,7 @@ export type Filters = {
       addNote,
       addNoteFromReview,
       addScheduleFromImage,
+      addNoteFromAssignment, // ✨ 추가
       updateNote,
       deleteNote,
       addSubject,

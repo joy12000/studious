@@ -66,46 +66,43 @@ export default function AssignmentHelperPage() {
         setter(prev => prev.filter((_, i) => i !== index));
     };
 
+    // ✨ [핵심 수정] handleSubmit 함수가 addNoteFromAssignment를 호출하도록 변경
     const handleSubmit = async () => {
         if (problemFiles.length === 0) {
             setError("과제 문제 파일을 반드시 업로드해야 합니다.");
             return;
         }
+        if (!selectedSubject) {
+            setError("과제를 제출할 과목을 선택해주세요.");
+            return;
+        }
 
         if (answerFiles.length === 0) {
             if (!window.confirm("답안 파일이 없습니다. AI가 문제에 대한 모범 풀이를 생성하도록 할까요?")) {
-                return; // 사용자가 취소하면 중단
+                return;
             }
         }
         setError(null);
-        setProgressMessage("AI 과제 도우미를 실행하는 중...");
-
-        // 여기에 실제 API 호출 로직을 구현합니다.
-        // 1. FormData 생성
-        const formData = new FormData();
-
-        // 2. 참고자료, 문제, 답안 파일 추가
-        referenceFiles.forEach(file => formData.append('reference_files', file));
-        problemFiles.forEach(file => formData.append('problem_files', file));
-        answerFiles.forEach(file => formData.append('answer_files', file));
         
-        // 3. 기존 노트 내용 추가
-        const combinedNoteContent = selectedExistingNotes.map(n => `[기존 노트: ${n.title}]\n${n.content}`).join('\n\n');
-        formData.append('note_context', combinedNoteContent);
+        const noteContext = selectedExistingNotes.map(n => `[기존 노트: ${n.title}]\n${n.content}`).join('\n\n');
 
-        console.log("API로 전송될 데이터:", {
+        await addNoteFromAssignment({
             referenceFiles,
             problemFiles,
             answerFiles,
-            combinedNoteContent
+            noteContext,
+            subjectId: selectedSubject.id,
+            onProgress: setProgressMessage,
+            onComplete: (newNote) => {
+                setProgressMessage(null);
+                alert("AI 과제 도우미 작업이 완료되었습니다! 생성된 노트로 이동합니다.");
+                navigate(`/note/${newNote.id}`);
+            },
+            onError: (err) => {
+                setProgressMessage(null);
+                setError(err);
+            }
         });
-        
-        // 가상의 API 호출 및 결과 처리
-        setTimeout(() => {
-            setProgressMessage(null);
-            alert("API 호출 기능이 구현되면 이곳에서 결과 페이지로 이동합니다.");
-            // navigate(`/note/new-assignment-note-id`);
-        }, 3000);
     };
     
     const isLoading = progressMessage !== null;

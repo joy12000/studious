@@ -46,7 +46,7 @@ export type Attachment = FileAttachment | LinkAttachment;
   id: string;
   title: string;
   content: string;
-  noteType: 'general' | 'review' | 'textbook'; // 노트 타입 추가
+  noteType: 'general' | 'review' | 'textbook' | 'assignment'; // ✨ 'assignment' 타입 추가
   subjectId?: string; // subject의 id와 연결 (기존 tag 대체)
   sourceType: SourceType;
   sourceUrl?: string | null;
@@ -56,7 +56,6 @@ export type Attachment = FileAttachment | LinkAttachment;
   key_insights: string[];
   favorite: boolean;
   attachments?: Attachment[];
-  // 기존의 tag, topics, labels 등은 레거시 데이터 호환을 위해 유지하거나 마이그레이션 과정에서 제거
 }
 
 /**
