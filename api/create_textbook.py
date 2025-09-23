@@ -44,7 +44,71 @@ class handler(BaseHTTPRequestHandler):
             과목: {subject_name}
             주차: {week_info}
             제공 자료: {material_types}
-            ... (이하 프롬프트 동일) ...
+
+            🧠 인지과학 원리 적용 필수사항:
+            - 인지부하 최적화: 한 번에 처리할 정보량을 7±2개 덩어리로 제한하고, 불필요한 정보는 제거
+            - 인출 연습 강화: 단순 재독보다 능동적 회상이 학습효과 50% 향상
+            - 간격 반복 적용: 학습→1일 후→3일 후→1주 후 복습 스케줄 제안
+            - 교차 연습 도입: 비슷한 문제를 섞어서 전략 선택 능력 향상
+
+            # 📊 시각 자료 활용 규칙 (Mermaid.js)
+            - **핵심 내용 구조화** 단계에서 개념 간의 관계, 시스템 구조, 프로세스 흐름 등 복잡한 내용을 설명할 때는, 이해를 돕기 위해 **반드시 Mermaid.js 문법을 사용하여 다이어그램(순서도, 클래스 다이어그램 등)으로 시각화**해야 합니다.
+            - 다이어그램 코드는 ```mermaid ... ``` 코드 블록으로 감싸야 합니다.
+
+            📚 결과물 구조 (Gagne의 9단계 + 백워드 설계):
+            1단계: 주의집중 & 학습목표
+            🎯 핵심 질문: 이번 주에 해결할 핵심 문제 1개
+            📍 구체적 목표: Bloom 분류에 따른 행동동사로 측정 가능한 학습목표 3-5개
+            🔗 연결고리: 이전 주차 내용과의 연관성
+
+            2단계: 선행지식 활성화
+            📝 사전 점검: 필요한 선행지식 간단 퀴즈 3문항
+            🔄 기억 환기: 관련 개념/공식 요약 정리
+
+            3단계: 핵심 내용 구조화
+            각 주요 개념마다:
+            - 정의: 한 문장으로 명확히
+            - 시각화: 도표/그림으로 관계 설명 (텍스트 기반으로 표현, 필요시 Mermaid 활용)
+            - 구체적 예시: 실생활 연결 사례
+            - 주의사항: 자주 하는 실수와 방지법
+
+            4단계: 단계별 예제 (Worked Examples)
+            문제 유형별로:
+            - 모범 풀이: 각 단계의 사고과정까지 상세 설명
+            - 변형 문제: 비슷하지만 약간 다른 문제로 전이 연습
+            - 자기설명: "왜 이렇게 푸는가?" 유도 질문
+
+            5단계: 능동 연습 설계
+            - 기초 연습: 개념 확인 문제 5개
+            - 응용 연습: 실제 상황 문제 3개
+            - 교차 연습: 이전 주차 내용과 섞인 문제 2개
+            - 자가 채점: 즉시 피드백과 해설
+
+            6단계: 요약 및 연결
+            - 핵심 요약: 3-5개 bullet point로 정리
+            - 공식/개념 카드: 암기용 요약
+            - 다음 주 예고: 연속성 확보
+
+            7단계: 복습 스케줄링
+            - 즉시 복습: 학습 직후 5분 재정리
+            - 1일 후: 핵심 개념 인출 퀴즈
+            - 3일 후: 응용 문제 재도전
+            - 1주 후: 종합 점검
+
+            🎨 표현 방식 최적화:
+            - 이중 채널 활용: 시각+텍스트 정보 동시 제공
+            - 신호 강화: 중요한 부분은 `**굵은 글씨**`로 강조
+            - 중복 제거: 같은 정보를 다른 형태로 반복하지 않음
+            
+            ✅ 품질 체크리스트:
+            - 학습목표가 구체적이고 측정 가능한가?
+            - 각 개념마다 예제+연습+피드백이 있는가?
+            - 인지부하가 적절히 분산되었는가?
+            - 이전/다음 주차와 연결점이 명확한가?
+            - 자기주도 학습이 가능한 구조인가?
+
+            출력 형식:
+            스마트폰에서 읽기 좋게 섹션별로 나누어 제시하되, 각 섹션은 5분 이내에 완독 가능한 분량으로 구성해주세요.
             """
             
             request_contents = [prompt]
@@ -75,7 +139,7 @@ class handler(BaseHTTPRequestHandler):
                         img = Image.open(io.BytesIO(file_content))
                         request_contents.append(img)
                     except Exception as img_err:
-                         print(f"WARN: 이미지 파일 처리 실패 ('{filename}'): {img_err}")
+                        print(f"WARN: 이미지 파일 처리 실패 ('{filename}'): {img_err}")
                 else:
                     try:
                         text_content = file_content.decode('utf-8', errors='ignore')
@@ -120,7 +184,11 @@ class handler(BaseHTTPRequestHandler):
                 self.send_response(status_code)
                 self.send_header('Content-type', 'application/json; charset=utf-8')
                 self.end_headers()
-                error_details = {"error": message, "details": str(e), "traceback": traceback.format_exc()}
+                error_details = {
+                    "error": message,
+                    "details": str(e),
+                    "traceback": traceback.format_exc()
+                }
                 self.wfile.write(json.dumps(error_details).encode('utf-8'))
             except Exception as write_error:
                 print(f"FATAL: 오류 응답을 보내는 중 추가 오류 발생: {write_error}")

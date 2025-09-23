@@ -342,6 +342,7 @@ export default function NotePage() {
       }
     } catch (error) {
       console.error("Share failed", error);
+    }
     dispatch({ type: 'TOGGLE_SHARE_MODAL', payload: false });
   };
 

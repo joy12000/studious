@@ -5,7 +5,7 @@ import { Loader2, UploadCloud, FileText, X, Plus, ExternalLink, BrainCircuit, Ch
 import { Button } from "@/components/ui/button";
 import { Note } from '../lib/types';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import *t as pdfjsLib from 'pdfjs-dist';
+import * as pdfjsLib from 'pdfjs-dist';
 
 // PDF.js 워커 경로 설정
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.mjs`;
