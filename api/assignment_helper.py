@@ -1,10 +1,8 @@
-# api/assignment_helper.py
-
 from http.server import BaseHTTPRequestHandler
 import json
 import os
 import google.generativeai as genai
-import cgi
+import requests
 from PIL import Image
 import io
 import traceback
@@ -40,79 +38,23 @@ class handler(BaseHTTPRequestHandler):
         last_error = None
 
         try:
-            form = cgi.FieldStorage(
-                fp=self.rfile,
-                headers=self.headers,
-                environ={'REQUEST_METHOD': 'POST', 'CONTENT_TYPE': self.headers['Content-Type']}
-            )
-            
-            note_context = form.getvalue('note_context', '')
-            reference_files = form.getlist('reference_files')
-            problem_files = form.getlist('problem_files')
-            answer_files = form.getlist('answer_files')
-            subject_id = form.getvalue('subjectId', None)
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data)
 
-            has_answer = bool(answer_files)
+            note_context = data.get('note_context', '')
+            reference_file_urls = data.get('reference_file_urls', [])
+            problem_file_urls = data.get('problem_file_urls', [])
+            answer_file_urls = data.get('answer_file_urls', [])
+            subject_id = data.get('subjectId')
+
+            has_answer = bool(answer_file_urls)
             
             shared_formatting_rules = """
             # 🎨 출력 서식 규칙 (★★★★★ 가장 중요)
             당신이 생성하는 모든 텍스트는 아래 규칙을 **반드시** 따라야 합니다.
             
-            1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 **반드시** KaTeX 문법으로 감싸야 합니다. (인라인: `# api/assignment_helper.py
-
-from http.server import BaseHTTPRequestHandler
-import json
-import os
-import google.generativeai as genai
-import cgi
-from PIL import Image
-import io
-import traceback
-from pdf2image import convert_from_bytes
-
-class handler(BaseHTTPRequestHandler):
-    def handle_error(self, e, message="오류 발생", status_code=500):
-        print(f"ERROR: {message} - {e}")
-        traceback.print_exc()
-        if not hasattr(self, '_headers_sent') or not self._headers_sent:
-            try:
-                self.send_response(status_code)
-                self.send_header('Content-type', 'application/json; charset=utf-8')
-                self.end_headers()
-                error_details = {"error": message, "details": str(e)}
-                self.wfile.write(json.dumps(error_details).encode('utf-8'))
-            except Exception as write_error:
-                print(f"FATAL: 오류 응답 전송 중 추가 오류 발생: {write_error}")
-
-    def do_POST(self):
-        api_keys = [
-            os.environ.get('GEMINI_API_KEY_PRIMARY'),
-            os.environ.get('GEMINI_API_KEY_SECONDARY'),
-            os.environ.get('GEMINI_API_KEY_TERTIARY'),
-            os.environ.get('GEMINI_API_KEY_QUATERNARY'),
-            os.environ.get('GEMINI_API_KEY')
-        ]
-        valid_keys = [key for key in api_keys if key]
-
-        if not valid_keys:
-            return self.handle_error(ValueError("설정된 Gemini API 키가 없습니다."), "API 키 설정 오류", 500)
-
-        last_error = None
-
-        try:
-            form = cgi.FieldStorage(
-                fp=self.rfile,
-                headers=self.headers,
-                environ={'REQUEST_METHOD': 'POST', 'CONTENT_TYPE': self.headers['Content-Type']}
-            )
-            
-            note_context = form.getvalue('note_context', '')
-            reference_files = form.getlist('reference_files')
-            problem_files = form.getlist('problem_files')
-            answer_files = form.getlist('answer_files')
-            subject_id = form.getvalue('subjectId', None)
-
-, 블록: `$`)
+            1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 **반드시** KaTeX 문법으로 감싸야 합니다. (인라인: `$`, 블록: `$$`)
             2.  **다이어그램 (Mermaid):** 복잡한 시스템, 알고리즘, 상태 변화는 **반드시** Mermaid.js 문법으로 시각화해야 합니다. (```mermaid...```)
             3.  **코드 (Code Block):** 모든 소스 코드는 **반드시** 언어를 명시한 코드 블록으로 작성해야 합니다. (```python...```)
             4.  **핵심 용어 (Tooltip):** 중요한 전공 용어는 **반드시** `<dfn title="설명">용어</dfn>` HTML 태그로 감싸 설명을 제공해야 합니다.
@@ -161,35 +103,36 @@ class handler(BaseHTTPRequestHandler):
             
             prompt_template = prompt_template_grading if has_answer else prompt_template_solving
 
-            def process_file(file_storage):
-                filename = getattr(file_storage, 'filename', 'unknown')
-                print(f"INFO: Processing file '{filename}'...")
-                content = getattr(file_storage, 'value', file_storage)
-                if isinstance(content, bytes):
-                    file_type = getattr(file_storage, 'type', 'application/octet-stream')
-                    if file_type == 'application/pdf':
-                        try:
-                            return convert_from_bytes(content)
-                        except Exception as pdf_err:
-                            print(f"WARN: PDF 처리 중 오류 ('{filename}'): {pdf_err}")
-                            return []
-                    elif 'image' in file_type:
-                        return [Image.open(io.BytesIO(content))]
-                print(f"WARN: '{filename}'은(는) 처리할 수 없는 파일 형식입니다.")
-                return []
+            def process_url(url):
+                try:
+                    response = requests.get(url, stream=True)
+                    response.raise_for_status() 
+                    content_type = response.headers.get('content-type', '')
+                    file_content = response.content
+
+                    if 'application/pdf' in content_type:
+                        return convert_from_bytes(file_content)
+                    elif 'image' in content_type:
+                        return [Image.open(io.BytesIO(file_content))]
+                    else:
+                        # Try to decode as text as a fallback
+                        return [file_content.decode('utf-8')]
+                except Exception as e:
+                    print(f"Error processing URL {url}: {e}")
+                    return []
 
             request_contents = [prompt_template]
             
             if note_context:
                 request_contents.append(f"\n--- 기존 노트 내용 ---\n{note_context}\n")
-            if reference_files:
+            if reference_file_urls:
                 request_contents.append("\n--- 참고 자료 파일 ---\n")
-                for f in reference_files: request_contents.extend(process_file(f))
+                for url in reference_file_urls: request_contents.extend(process_url(url))
             request_contents.append("\n--- 문제 파일 ---\n")
-            for f in problem_files: request_contents.extend(process_file(f))
+            for url in problem_file_urls: request_contents.extend(process_url(url))
             if has_answer:
                 request_contents.append("\n--- 학생 답안 파일 ---\n")
-                for f in answer_files: request_contents.extend(process_file(f))
+                for url in answer_file_urls: request_contents.extend(process_url(url))
 
             for i, api_key in enumerate(valid_keys):
                 try:

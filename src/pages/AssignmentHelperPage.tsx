@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useNotes, Subject } from "../lib/useNotes";
 import { useNavigate } from "react-router-dom";
 import { Loader2, UploadCloud, FileText, X, Plus, ExternalLink, BrainCircuit, ChevronsUpDown, BookMarked, Check } from "lucide-react";
+import { upload } from '@vercel/blob/client';
 import { Button } from "@/components/ui/button";
 import { Note } from '../lib/types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -137,27 +138,47 @@ export default function AssignmentHelperPage() {
             }
         }
         setError(null);
-        setProgressMessage('AI가 노트를 분석하고 생성하는 중입니다...');
+        setProgressMessage('파일을 Vercel Blob에 업로드하는 중...');
 
-        const noteContext = selectedExistingNotes.map(n => `[기존 노트: ${n.title}]\n${n.content}`).join('\n\n');
+        try {
+            const uploadFile = async (file: File) => {
+                const newBlob = await upload(file.name, file, {
+                    access: 'public',
+                    handleUploadUrl: '/api/upload/route',
+                });
+                return newBlob.url;
+            };
 
-        await addNoteFromAssignment({
-            referenceFiles,
-            problemFiles,
-            answerFiles,
-            noteContext,
-            subjectId: selectedSubject.id,
-            onProgress: setProgressMessage,
-            onComplete: (newNote) => {
-                setProgressMessage(null);
-                alert("AI 과제 도우미 작업이 완료되었습니다! 생성된 노트로 이동합니다.");
-                navigate(`/note/${newNote.id}`);
-            },
-            onError: (err) => {
-                setProgressMessage(null);
-                setError(err);
-            }
-        });
+            const referenceFileUrls = await Promise.all(referenceFiles.map(uploadFile));
+            setProgressMessage('참고 자료 업로드 완료. 과제 문제 업로드 중...');
+            const problemFileUrls = await Promise.all(problemFiles.map(uploadFile));
+            setProgressMessage('과제 문제 업로드 완료. 답안 파일 업로드 중...');
+            const answerFileUrls = await Promise.all(answerFiles.map(uploadFile));
+            setProgressMessage('모든 파일 업로드 완료. AI 분석 시작...');
+
+            const noteContext = selectedExistingNotes.map(n => `[기존 노트: ${n.title}]\n${n.content}`).join('\n\n');
+
+            await addNoteFromAssignment({
+                referenceFileUrls,
+                problemFileUrls,
+                answerFileUrls,
+                noteContext,
+                subjectId: selectedSubject.id,
+                onProgress: setProgressMessage,
+                onComplete: (newNote) => {
+                    setProgressMessage(null);
+                    alert("AI 과제 도우미 작업이 완료되었습니다! 생성된 노트로 이동합니다.");
+                    navigate(`/note/${newNote.id}`);
+                },
+                onError: (err) => {
+                    setProgressMessage(null);
+                    setError(err);
+                }
+            });
+        } catch (error) {
+            setProgressMessage(null);
+            setError(error instanceof Error ? error.message : '파일 업로드 또는 노트 생성 중 오류가 발생했습니다.');
+        }
     };
 
     const isLoading = progressMessage !== null;

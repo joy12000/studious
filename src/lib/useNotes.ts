@@ -257,21 +257,33 @@ export function useNotes(defaultFilters?: Filters) {
       }
     };
     // ✨ [추가] AI 과제 도우미 결과 저장 함수
-    const addNoteFromAssignment = async (payload: AddNoteFromAssignmentPayload) => {
-        const { referenceFiles, problemFiles, answerFiles, noteContext, subjectId, onProgress, onComplete, onError } = payload;
+    const addNoteFromAssignment = async (payload: {
+        referenceFileUrls: string[];
+        problemFileUrls: string[];
+        answerFileUrls: string[];
+        noteContext: string;
+        subjectId: string;
+        onProgress: (message: string) => void;
+        onComplete: (newNote: Note) => void;
+        onError: (error: string) => void;
+    }) => {
+        const { referenceFileUrls, problemFileUrls, answerFileUrls, noteContext, subjectId, onProgress, onComplete, onError } = payload;
         
         try {
             onProgress("AI 과제 도우미를 실행 중입니다...");
-            const formData = new FormData();
-            referenceFiles.forEach(file => formData.append('reference_files', file));
-            problemFiles.forEach(file => formData.append('problem_files', file));
-            answerFiles.forEach(file => formData.append('answer_files', file));
-            formData.append('note_context', noteContext);
-            formData.append('subjectId', subjectId);
 
             const response = await fetch('/api/assignment_helper', {
                 method: 'POST',
-                body: formData,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    reference_file_urls: referenceFileUrls,
+                    problem_file_urls: problemFileUrls,
+                    answer_file_urls: answerFileUrls,
+                    note_context: noteContext,
+                    subjectId: subjectId,
+                }),
             });
 
             if (!response.ok) {
