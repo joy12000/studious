@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNotes } from "../lib/useNotes";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Loader2, Youtube, ArrowRight, File, BrainCircuit, AppWindow, Pencil, Check, Trash2, Plus, ExternalLink } from "lucide-react";
+// ✨ [수정] Calendar 아이콘 임포트 추가
+import { Loader2, Youtube, ArrowRight, File, Calendar, Bot, ExternalLink, AppWindow, Trash2, Pencil, Plus, Check, BrainCircuit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { generateFallbackIconDataUrl } from '../lib/utils';
@@ -41,14 +42,16 @@ const defaultLinks: ExternalLinkItem[] = [
 
 const LINKS_STORAGE_KEY = 'studious-external-links';
 
+type InputMode = 'youtube' | 'review' | 'schedule';
 
 export default function HomePage() {
-  const { addNote } = useNotes();
+  const { addNote, addNoteFromReview, addScheduleFromImage } = useNotes();
   const navigate = useNavigate();
   const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [mode, setMode] = useState<InputMode>('youtube');
   const [headline, setHeadline] = useState(HEADLINES[0]);
 
   const [externalLinks, setExternalLinks] = useState<ExternalLinkItem[]>([]);
@@ -100,11 +103,15 @@ export default function HomePage() {
     }
   };
 
-  const handleProgress = (status: string) => setLoadingMessage(status);
+  const handleProgress = (status: string) => {
+    setLoadingMessage(status);
+  };
+
   const handleComplete = (note: any) => {
     setIsLoading(false);
     navigate(`/note/${note.id}`);
   };
+
   const handleError = (error: string) => {
     setIsLoading(false);
     alert(`오류가 발생했습니다: ${error}`);
@@ -118,6 +125,47 @@ export default function HomePage() {
     await addNote({ youtubeUrl, onProgress: handleProgress, onComplete: handleComplete, onError: handleError });
   };
   
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsLoading(true);
+    if (mode === 'review') {
+      setLoadingMessage('AI 복습 노트를 생성합니다...');
+      // This is a simplified version. In a real app, you'd handle multiple files and subjects.
+      await addNoteFromReview({
+        aiConversationText: "Previously studied material",
+        files: [file],
+        subjects: [],
+        onProgress: handleProgress,
+        onComplete: (note, quiz) => {
+          setIsLoading(false);
+          navigate(`/note/${note.id}`);
+        },
+        onError: handleError,
+      });
+    } else if (mode === 'schedule') {
+      setLoadingMessage('시간표 이미지를 분석합니다...');
+      await addScheduleFromImage({
+        file,
+        onProgress: handleProgress,
+        onComplete: (events) => {
+          setIsLoading(false);
+          navigate('/schedule');
+        },
+        onError: handleError,
+      });
+    }
+    // Reset file input
+    event.target.value = '';
+  };
+  
   useEffect(() => {
     const interval = setInterval(() => {
       setHeadline(prev => {
@@ -125,7 +173,7 @@ export default function HomePage() {
         const nextIndex = (currentIndex + 1) % HEADLINES.length;
         return HEADLINES[nextIndex];
       });
-    }, 5000);
+    }, 3000);
     return () => clearInterval(interval);
   }, []);
 
@@ -134,6 +182,7 @@ export default function HomePage() {
     const shareUrl = queryParams.get('share_url');
     if (shareUrl) {
       setYoutubeUrl(shareUrl);
+      // Automatically trigger submission
       setIsLoading(true);
       setLoadingMessage('공유된 YouTube 영상 요약을 시작합니다...');
       addNote({ 
@@ -151,6 +200,7 @@ export default function HomePage() {
       });
     }
   }, [location, addNote, navigate]);
+
 
   return (
     <>
@@ -216,33 +266,38 @@ export default function HomePage() {
             {headline}
           </p>
 
-          {/* ✨ [핵심 수정] 기능별 페이지로 이동하는 명확한 버튼 그룹 */}
           <div className="mb-6 flex justify-center">
             <div className="p-1 bg-muted rounded-full flex items-center gap-1">
-              <Button variant={'default'} size="sm" className="rounded-full">
-                <Youtube className="h-4 w-4 mr-2"/>AI 영상 요약
-              </Button>
-              <Button variant={'ghost'} size="sm" className="rounded-full" onClick={() => navigate('/review')}>
-                <File className="h-4 w-4 mr-2"/>AI 복습
-              </Button>
-              <Button variant={'ghost'} size="sm" className="rounded-full" onClick={() => navigate('/chat')}>
-                <BrainCircuit className="h-4 w-4 mr-2"/>AI 참고서
-              </Button>
+              <button onClick={() => setMode('youtube')} className={`px-3 sm:px-4 py-2 rounded-full text-sm font-semibold transition-colors ${mode === 'youtube' ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground hover:bg-muted'}`}><Youtube className="inline-block mr-1.5 h-4 w-4"/>유튜브</button>
+              <button onClick={() => setMode('review')} className={`px-3 sm:px-4 py-2 rounded-full text-sm font-semibold transition-colors ${mode === 'review' ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground hover:bg-muted'}`}><File className="inline-block mr-1.5 h-4 w-4"/>학습자료</button>
+              <button onClick={() => setMode('schedule')} className={`px-3 sm:px-4 py-2 rounded-full text-sm font-semibold transition-colors ${mode === 'schedule' ? 'bg-primary text-primary-foreground' : 'bg-transparent text-muted-foreground hover:bg-muted'}`}><Calendar className="inline-block mr-1.5 h-4 w-4"/>시간표</button>
             </div>
           </div>
 
-          <form onSubmit={handleYoutubeSubmit} className="flex items-center gap-2 bg-card border rounded-full p-2 shadow-lg max-w-xl mx-auto">
-            <input
-              type="text"
-              value={youtubeUrl}
-              onChange={(e) => setYoutubeUrl(e.target.value)}
-              placeholder="YouTube 영상 링크를 붙여넣으세요"
-              className="flex-grow bg-transparent px-4 py-2 focus:outline-none"
-            />
-            <Button type="submit" size="icon" className="rounded-full flex-shrink-0">
-              <ArrowRight className="h-5 w-5" />
-            </Button>
-          </form>
+          {mode === 'youtube' && (
+            <form onSubmit={handleYoutubeSubmit} className="flex items-center gap-2 bg-card border rounded-full p-2 shadow-lg max-w-xl mx-auto">
+              <input
+                type="text"
+                value={youtubeUrl}
+                onChange={(e) => setYoutubeUrl(e.target.value)}
+                placeholder="YouTube 영상 링크를 붙여넣으세요"
+                className="flex-grow bg-transparent px-4 py-2 focus:outline-none"
+              />
+              <Button type="submit" size="icon" className="rounded-full flex-shrink-0">
+                <ArrowRight className="h-5 w-5" />
+              </Button>
+            </form>
+          )}
+
+          {(mode === 'review' || mode === 'schedule') && (
+            <div className="max-w-xl mx-auto">
+              <Button onClick={handleFileSelect} variant="secondary" size="lg" className="w-full rounded-full shadow-lg">
+                <File className="h-5 w-5 mr-3" />
+                {mode === 'review' ? '복습할 파일 선택' : '시간표 이미지 선택'}
+              </Button>
+              <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept={mode === 'schedule' ? 'image/*' : undefined} />
+            </div>
+          )}
         </div>
       </div>
     </>
