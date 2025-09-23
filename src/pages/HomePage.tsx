@@ -1,3 +1,5 @@
+import { generateFallbackIconDataUrl } from '../lib/utils';
+
 import React, { useState, useEffect } from "react";
 import { useNotes } from "../lib/useNotes";
 import { useNavigate, useLocation } from "react-router-dom";
