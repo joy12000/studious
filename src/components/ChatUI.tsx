@@ -14,7 +14,7 @@ const models = [
     { id: 'mistralai/mistral-7b-instruct', name: '💨 Mistral 7B (가볍고 빠름)' },
 ];
 
-interface Message {
+export interface Message {
   id: number;
   text: string;
   sender: 'user' | 'bot';
@@ -41,15 +41,24 @@ const createInitialMessage = (): Message => ({
 interface ChatUIProps {
   noteContext: string;
   onClose: () => void;
-  onSaveConversation: (conversation: Message[]) => void; // New prop
+  initialMessage?: string;
+  // ✨ [핵심 추가] 대화 내역을 부모 컴포넌트로 전달하기 위한 Ref prop
+  messagesRef?: React.MutableRefObject<Message[] | undefined>;
 }
 
-export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, onSaveConversation }) => {
+export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, initialMessage, messagesRef }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+
+  // ✨ [핵심 추가] messages 상태가 변경될 때마다 ref를 업데이트합니다.
+  useEffect(() => {
+    if (messagesRef) {
+      messagesRef.current = messages;
+    }
+  }, [messages, messagesRef]);
   
   const [selectedModel, setSelectedModel] = useState(models[0].id);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -157,7 +166,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, onSaveConv
         </Popover>
 
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={() => onSaveConversation(messages)} disabled={messages.length <= 1} title="현재 노트에 대화 저장">
+          <Button variant="ghost" size="icon" disabled={messages.length <= 1} title="현재 노트에 대화 저장">
             <Save className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="icon" onClick={handleNewChat} title="새 대화">

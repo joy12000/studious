@@ -1,6 +1,6 @@
 // src/pages/NotePage.tsx
 
-import React, { useState, useEffect, useMemo } from 'react'; // ✨ [수정] useMemo를 react에서 import
+import React, { useState, useEffect, useMemo, useRef } from 'react'; // useRef 임포트
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Note, Attachment, Quiz } from '../lib/types';
 import { useNotes } from '../lib/useNotes';
@@ -9,11 +9,12 @@ import AttachmentPanel from '../components/AttachmentPanel';
 import { exportPlainSingleNote } from '../lib/backup';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { 
-  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit, Bot, ChevronsUpDown
+  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit, Bot, ChevronsUpDown, ClipboardCopy
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChatUI } from '../components/ChatUI';
+import { ChatUI, Message } from '../components/ChatUI'; // ✨ Message 타입 임포트
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // ✨ Popover 임포트
 
 // ✨ AI 참고서 내용을 섹션별로 파싱하는 함수
 type TextbookSection = {
@@ -69,6 +70,13 @@ const QuizComponent = ({ quiz }: { quiz: Quiz }) => {
 };
 
 
+// ✨ [추가] 외부 AI 링크 목록
+const externalAiLinks = [
+  { name: 'Gemini', url: 'https://gemini.google.com/' },
+  { name: 'Perplexity', url: 'https://www.perplexity.ai/' },
+  { name: 'ChatGPT', url: 'https://chat.openai.com/' },
+];
+
 export default function NotePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -83,6 +91,10 @@ export default function NotePage() {
   const [editAttachments, setEditAttachments] = useState<Attachment[]>([]);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
+  const [initialChatMessage, setInitialChatMessage] = useState<string | undefined>();
+  
+  // ✨ [추가] ChatUI의 대화 내역을 저장하기 위한 Ref
+  const chatMessagesRef = useRef<Message[]>();
 
   useEffect(() => {
     if (!id) return;
@@ -161,31 +173,31 @@ export default function NotePage() {
     }
   };
 
-  interface Message { // Define Message interface here
-    id: number;
-    text: string;
-    sender: 'user' | 'bot';
-    followUp?: string[];
-  }
+  // ✨ [핵심 추가] 노트 내용과 채팅 기록을 클립보드에 복사하고 새 탭을 여는 함수
+  const handleExportToExternalAI = async (url: string) => {
+    if (!note) return;
 
-  const handleSaveConversationToNote = async (conversation: Message[]) => {
-    if (!note || !id) return;
+    // 1. 노트 본문 준비
+    const noteContent = `--- 학습 노트 본문 ---\n${note.content}`;
 
-    const formattedConversation = conversation
-      .map(msg => `**${msg.sender === 'user' ? '나' : 'AI'}**: \n\n${msg.text}`)
-      .join('\n\n---
-\n');
+    // 2. 채팅 기록 준비
+    const chatHistory = (chatMessagesRef.current || [])
+      .map(msg => `${msg.sender === 'user' ? '사용자' : 'AI'}: ${msg.text}`)
+      .join('\n');
+    
+    const fullContext = `${noteContent}\n\n--- 이전 대화 기록 ---\n${chatHistory}`;
 
-    const newContent = `${note.content}\n\n---
-\n## AI 챗봇 대화 기록\n\n${formattedConversation}`;
-
-    await updateNote(id, {
-      content: newContent,
-      updatedAt: Date.now(),
-    });
-
-    setNote(prev => prev ? { ...prev, content: newContent, updatedAt: Date.now() } : null);
-    setIsChatOpen(false); // Close chat after saving
+    try {
+      // 3. 클립보드에 복사
+      await navigator.clipboard.writeText(fullContext);
+      alert('노트와 대화 내용이 클립보드에 복사되었습니다. 외부 AI에 붙여넣어 질문을 이어가세요.');
+      
+      // 4. 새 탭에서 외부 사이트 열기
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (err) {
+      console.error('클립보드 복사 실패:', err);
+      alert('클립보드 복사에 실패했습니다.');
+    }
   };
 
   const handleTestUnderstanding = () => {
@@ -304,7 +316,12 @@ export default function NotePage() {
       <div className="flex h-screen w-full overflow-hidden">
         {/* Chat Panel */}
         <div className={`transition-all duration-300 ease-in-out ${isChatOpen ? 'w-full md:w-2/5' : 'w-0'}`}>
-          {isChatOpen && <ChatUI noteContext={note.content} onClose={() => setIsChatOpen(false)} onSaveConversation={(conversation) => handleSaveConversationToNote(conversation)} />}
+          {isChatOpen &&             <ChatUI 
+              noteContext={note.content} 
+              onClose={() => setIsChatOpen(false)} 
+              initialMessage={initialChatMessage} 
+              messagesRef={chatMessagesRef} // ✨ Ref 전달
+            />}
         </div>
         
         {/* Note Panel */}
@@ -323,6 +340,35 @@ export default function NotePage() {
                 <Button variant="ghost" size="sm" onClick={() => setIsShareModalOpen(true)} title="공유/내보내기">
                   <Share2 className="h-5 w-5" />
                 </Button>
+                
+                {/* ✨ [핵심 추가] 외부 AI 내보내기 버튼 */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" title="외부 AI로 내보내기">
+                      <ClipboardCopy className="h-5 w-5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56" align="end">
+                    <div className="space-y-1">
+                      <h4 className="font-medium text-sm px-2">다른 AI로 질문하기</h4>
+                      <p className="text-xs text-muted-foreground px-2 pb-2">노트와 대화 내용을 복사하여 새 탭에서 엽니다.</p>
+                      <div className="grid grid-cols-1">
+                        {externalAiLinks.map(link => (
+                          <button
+                            key={link.name}
+                            onClick={() => handleExportToExternalAI(link.url)}
+                            className="flex items-center gap-2 p-2 rounded-md hover:bg-muted text-sm text-left w-full"
+                          >
+                            <img src={`https://www.google.com/s2/favicons?domain=${new URL(link.url).hostname}&sz=32`} alt={link.name} className="h-4 w-4" />
+                            {link.name}
+                            <ExternalLink className="h-3 w-3 text-muted-foreground ml-auto" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
                 <Button variant="ghost" size="sm" onClick={handleDelete} className="text-destructive hover:text-destructive" title="삭제">
                   <Trash2 className="h-5 w-5" />
                 </Button>

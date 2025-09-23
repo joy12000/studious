@@ -5,37 +5,41 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ScheduleImportButton from '../components/ScheduleImportButton';
 import { ClassPortalModal } from '../components/ClassPortalModal';
-import { format, isSameDay, startOfWeek, endOfWeek, eachDayOfInterval, addDays, isToday, getDay, addWeeks, subWeeks, startOfMonth, endOfMonth, eachWeekOfInterval, addMonths, subMonths } from 'date-fns';
+import { format, isSameDay, startOfWeek, endOfWeek, eachDayOfInterval, isToday, getDay, addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNavigate } from 'react-router-dom';
-
 
 const timeToMinutes = (time: string) => {
   const [hours, minutes] = time.split(':').map(Number);
   return hours * 60 + minutes;
 };
 
+// --- Improved WeeklyEventCard ---
 const WeeklyEventCard = ({ event, subjects, notes, onClick }: { event: ScheduleEvent, subjects: Subject[], notes: Note[], onClick: () => void }) => {
   const subject = subjects.find(s => s.id === event.subjectId);
-  const relatedNotes = (notes || []).filter(n => n.subjectId === event.subjectId);
+  const relatedNotesCount = (notes || []).filter(n => n.subjectId === event.subjectId).length;
 
-  const top = `${((timeToMinutes(event.startTime) - 480) / (1320 - 480)) * 100}%`;
-  const height = `${((timeToMinutes(event.endTime) - timeToMinutes(event.startTime)) / (1320 - 480)) * 100}%`;
+  const START_HOUR = 8; // 8 AM
+  const TOTAL_HOURS = 15; // 8 AM to 11 PM
+
+  const top = `${((timeToMinutes(event.startTime) - START_HOUR * 60) / (TOTAL_HOURS * 60)) * 100}%`;
+  const height = `${((timeToMinutes(event.endTime) - timeToMinutes(event.startTime)) / (TOTAL_HOURS * 60)) * 100}%`;
 
   return (
     <div
       onClick={onClick}
-      className="absolute w-full p-2 rounded-lg shadow-md text-white transition-all hover:scale-105 hover:z-10 cursor-pointer"
+      className="absolute w-[calc(100%-4px)] left-0.5 p-2 rounded-lg text-white transition-all shadow-md hover:shadow-lg hover:z-10 cursor-pointer overflow-hidden"
       style={{ top, height, backgroundColor: subject?.color || '#6b7280' }}
     >
-      <p className="font-bold text-sm truncate">{subject?.name || '과목 없음'}</p>
-      <p className="text-xs">{event.startTime} - {event.endTime}</p>
-      {relatedNotes.length > 0 && <p className="text-xs mt-1">관련 노트: {relatedNotes.length}개</p>}
+      <p className="font-bold text-xs truncate">{subject?.name || '과목 없음'}</p>
+      <p className="text-[10px] opacity-80">{event.startTime} - {event.endTime}</p>
+      {relatedNotesCount > 0 && <p className="text-[10px] opacity-80 mt-1">노트 {relatedNotesCount}개</p>}
     </div>
   );
 };
 
+// --- Redesigned WeeklyCalendarView ---
 const WeeklyCalendarView = ({ onEventClick }: { onEventClick: (event: ScheduleEvent) => void }) => {
     const { schedule, allSubjects, notes } = useNotes();
     const [currentWeek, setCurrentWeek] = useState(new Date());
@@ -49,11 +53,13 @@ const WeeklyCalendarView = ({ onEventClick }: { onEventClick: (event: ScheduleEv
         schedule.forEach(event => {
             const dayIndex = dayOfWeekMap[event.dayOfWeek];
             if (dayIndex !== undefined) {
-                grouped[dayIndex] = [...(grouped[dayIndex] || []), event].sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
+                grouped[dayIndex] = [...(grouped[dayIndex] || []), event];
             }
         });
         return grouped;
-    }, [schedule, currentWeek]);
+    }, [schedule]);
+
+    const timeSlots = Array.from({ length: 15 }, (_, i) => `${i + 8}:00`); // 8 AM to 10 PM
 
     return (
         <div className="flex-1 flex flex-col bg-card p-4 rounded-lg shadow-inner">
@@ -62,27 +68,35 @@ const WeeklyCalendarView = ({ onEventClick }: { onEventClick: (event: ScheduleEv
                 <h2 className="text-lg font-semibold">{format(startOfWeek(currentWeek, { weekStartsOn: 1 }), 'yyyy년 M월', { locale: ko })}</h2>
                 <Button variant="outline" size="icon" onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}><ChevronRight className="h-4 w-4" /></Button>
             </div>
-            <div className="grid grid-cols-7 flex-1 -mx-4 -mb-4 border-t border-l">
-                {weekDays.map((day) => (
-                    <div key={day.toString()} className="flex flex-col border-r border-b">
-                        <div className={`text-center py-2 border-b ${isToday(day) ? 'text-primary font-bold' : ''}`}>
-                            <p className="text-sm font-medium">{['일', '월', '화', '수', '목', '금', '토'][getDay(day)]}</p>
-                            <p className={`text-lg ${isToday(day) ? 'text-primary' : ''}`}>{format(day, 'd')}</p>
+            <div className="flex-1 flex overflow-hidden">
+                <div className="flex flex-col text-xs text-muted-foreground text-center">
+                    {timeSlots.map(time => <div key={time} className="h-16 flex-shrink-0 pr-2 pt-[-4px]">{time}</div>)}
+                </div>
+                <div className="flex-1 grid grid-cols-7 border-l">
+                    {weekDays.map((day) => (
+                        <div key={day.toString()} className="flex flex-col border-r">
+                            <div className={`text-center py-2 border-b ${isToday(day) ? 'bg-primary/10' : ''}`}>
+                                <p className="text-sm font-medium">{['일', '월', '화', '수', '목', '금', '토'][getDay(day)]}</p>
+                                <p className={`text-lg font-bold ${isToday(day) ? 'text-primary' : ''}`}>{format(day, 'd')}</p>
+                            </div>
+                            <div className="relative flex-1 bg-grid [background-size:100%_4rem]">
+                                {Array.from({ length: 15 }).map((_, i) => <div key={i} className="h-16 border-b"></div>)}
+                                {eventsByDay[getDay(day)]?.map(event => (
+                                    <WeeklyEventCard key={event.id} event={event} subjects={allSubjects} notes={notes} onClick={() => onEventClick(event)} />
+                                ))}
+                            </div>
                         </div>
-                        <div className="relative flex-1">
-                            {eventsByDay[getDay(day)]?.map(event => (
-                                <WeeklyEventCard key={event.id} event={event} subjects={allSubjects} notes={notes} onClick={() => onEventClick(event)} />
-                            ))}
-                        </div>
-                    </div>
-                ))}
+                    ))}
+                </div>
             </div>
         </div>
     );
 };
 
+
+// --- Improved MonthlyCalendarView ---
 const MonthlyCalendarView = () => {
-    const { notes, allSubjects, schedule } = useNotes();
+    const { notes, allSubjects } = useNotes();
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const navigate = useNavigate();
 
@@ -95,7 +109,7 @@ const MonthlyCalendarView = () => {
         return dates;
     }, [notes]);
     
-    const daysInMonth = eachDayOfInterval({
+    const daysInGrid = eachDayOfInterval({
         start: startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 0 }),
         end: endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 0 })
     });
@@ -148,12 +162,13 @@ const MonthlyCalendarView = () => {
             </div>
             <div className="grid grid-cols-7 flex-1 border-r border-b rounded-lg overflow-hidden">
                 {daysOfWeek.map(day => <div key={day} className="text-center font-medium text-xs py-2 border-l border-t bg-muted/30">{day}</div>)}
-                {daysInMonth.map(day => <DayCell key={day.toString()} day={day} />)}
+                {daysInGrid.map(day => <DayCell key={day.toString()} day={day} />)}
             </div>
         </div>
     );
 };
 
+// --- Main Page Component ---
 export default function SchedulePage() {
   const [view, setView] = useState<'weekly' | 'monthly'>('weekly');
   const { notes, allSubjects, schedule } = useNotes();
@@ -169,7 +184,6 @@ export default function SchedulePage() {
     if (!subject) return;
 
     setPortalTitle(`${subject.name} 수업 포털`);
-    // ✨ [핵심 수정] notes가 undefined일 경우를 대비하여 (notes || [])로 안전하게 처리
     setPortalNotes((notes || []).filter(n => n.subjectId === subject.id));
     setContextSubject(subject);
     setIsPortalOpen(true);
