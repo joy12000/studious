@@ -1,9 +1,7 @@
 import React from 'react';
 import { Star, ExternalLink, Youtube, BrainCircuit, Notebook, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { marked } from 'marked';
 import type { Note } from '../lib/types';
-import { generatePastelColorFromText } from '../lib/utils';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import NotePreviewThumbnail from './NotePreviewThumbnail';
@@ -16,17 +14,28 @@ interface NoteCardProps {
 
 const NoteTypeIcon = ({ type }: { type: Note['noteType'] }) => {
     const iconMap = {
-        general: <Youtube className="h-3 w-3" />,
-        review: <Notebook className="h-3 w-3" />,
-        textbook: <BrainCircuit className="h-3 w-3" />,
-        assignment: <FileText className="h-3 w-3" />,
+        general: <Youtube className="h-4 w-4" />,
+        review: <Notebook className="h-4 w-4" />,
+        textbook: <BrainCircuit className="h-4 w-4" />,
+        assignment: <FileText className="h-4 w-4" />,
     };
     return (
-        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
-            {iconMap[type] || <Notebook className="h-3 w-3" />}
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            {iconMap[type] || <Notebook className="h-4 w-4" />}
             <span className="capitalize">{type}</span>
         </div>
     );
+};
+
+// A simple content cleaner for previews
+const cleanContentForPreview = (content: string) => {
+    return content
+        .replace(/(\*\*|__)(.*?)\1/g, '$2') // Bold
+        .replace(/(\*|_)(.*?)\1/g, '$2')   // Italic
+        .replace(/`{1,3}[^`]*`{1,3}/g, '')    // Code blocks
+        .replace(/#{1,6}\s/g, '')           // Headers
+        .replace(/!?\[(.*?)\]\(.*\)/g, '$1') // Links and images
+        .replace(/\n/g, ' ');                 // Newlines
 };
 
 export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: NoteCardProps) {
@@ -49,38 +58,36 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
   };
 
   if (view === 'list') {
+    // List view remains largely the same for a more detailed look
     return (
-      <Card className="w-full transition-all hover:shadow-md relative">
-        <div className="flex flex-row items-start gap-4 p-3">
+      <Card className="w-full transition-all hover:shadow-md relative overflow-hidden">
+        <div className="flex flex-row items-start gap-4 p-4">
           <div className="flex-1 min-w-0">
-            <Link to={`/note/${note.id}`} className="block">
-              <h2 className="mb-2 line-clamp-2 text-base font-semibold leading-snug">{note.title || '제목 없음'}</h2>
+            <Link to={`/note/${note.id}`} className="block mb-2">
+              <h2 className="line-clamp-2 text-base font-semibold leading-snug hover:text-primary">{note.title || '제목 없음'}</h2>
             </Link>
-            <Link to={`/note/${note.id}`} className="block">
-              <div 
-                className="prose prose-sm dark:prose-invert line-clamp-4 text-xs text-muted-foreground"
-                dangerouslySetInnerHTML={{ __html: marked(note.content) as string }}
-              />
-            </Link>
+            <p className="line-clamp-3 text-xs text-muted-foreground">
+                {cleanContentForPreview(note.content)}
+            </p>
           </div>
           <Link to={`/note/${note.id}`} className="block flex-shrink-0 w-28 sm:w-36 aspect-video rounded-md overflow-hidden bg-muted">
             {thumbnailUrl ? (
                 <img src={thumbnailUrl} alt={note.title} className="h-full w-full object-cover"/>
             ) : (
-                <NotePreviewThumbnail title={note.title} content={note.content} isTitleOnly={true} />
+                <NotePreviewThumbnail title={note.title} />
             )}
           </Link>
         </div>
-        <div className="flex items-center justify-between px-4 pb-3 pt-2">
+        <div className="flex items-center justify-between px-4 pb-3 pt-2 bg-muted/50 border-t">
             <NoteTypeIcon type={note.noteType} />
             {note.sourceUrl && (
                 <Button variant="ghost" size="icon" onClick={openSource} className="h-8 w-8">
-                    {note.sourceType === 'youtube' ? <Youtube className="h-4 w-4 text-muted-foreground" /> : <ExternalLink className="h-4 w-4 text-muted-foreground" />}
+                    <ExternalLink className="h-4 w-4 text-muted-foreground" />
                 </Button>
             )}
         </div>
         {onToggleFavorite && (
-            <Button variant="ghost" size="icon" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }} className="absolute top-2 right-2 h-7 w-7">
+            <Button variant="ghost" size="icon" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }} className="absolute top-2 right-2 h-7 w-7 bg-background/50 backdrop-blur-sm">
                 <Star className={`h-4 w-4 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
             </Button>
         )}
@@ -88,16 +95,21 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
     );
   }
 
-  // Grid View
+  // Grid View (New Design)
   return (
     <Link to={`/note/${note.id}`} className="group block">
-      <Card className="w-full flex flex-col overflow-hidden transition-all duration-300 group-hover:shadow-xl group-hover:-translate-y-1 aspect-[4/5]">
-        <div className="relative w-full flex-grow-[2] flex items-center justify-center p-2 text-center overflow-hidden">
-            <NotePreviewThumbnail title={note.title} isTitleOnly={true} />
+      <Card className="w-full h-full flex flex-col overflow-hidden transition-all duration-300 group-hover:shadow-xl group-hover:-translate-y-1">
+        {/* Thumbnail Area */}
+        <div className="relative w-full aspect-video bg-muted overflow-hidden">
+            {thumbnailUrl ? (
+                <img src={thumbnailUrl} alt={note.title} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
+            ) : (
+                <NotePreviewThumbnail title={note.title} />
+            )}
             {onToggleFavorite && (
               <button
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }}
-                className="absolute top-2 right-2 h-7 w-7 flex items-center justify-center rounded-full bg-black/10 dark:bg-black/30 text-white backdrop-blur-sm transition-colors hover:bg-black/20 dark:hover:bg-black/50"
+                className="absolute top-2 right-2 h-7 w-7 flex items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition-colors hover:bg-black/50"
                 title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
               >
                 <Star className={`h-4 w-4 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-white/80'}`} />
@@ -105,24 +117,14 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
             )}
         </div>
 
-        <div className="p-3 flex-grow-[3] flex flex-col overflow-hidden bg-card border-t">
-            <div 
-              className="font-handwriting text-xs text-muted-foreground flex-grow overflow-hidden leading-snug"
-              style={{ wordBreak: 'break-all' }}
-            >
-              {note.content.replace(/#+\s/g, '').replace(/(\*\*|__)(.*?)\1/g, '$2').split('\n').filter(line => line.trim() !== '').slice(0, 5).join('\n')}
-            </div>
+        {/* Text & Footer Area */}
+        <div className="p-3 flex-grow flex flex-col">
+            <h3 className="text-sm font-semibold leading-snug line-clamp-2 mb-1 h-[2.5em]">{note.title || '제목 없음'}</h3>
+            <p className="text-xs text-muted-foreground flex-grow overflow-hidden line-clamp-2">
+              {cleanContentForPreview(note.content)}
+            </p>
             <div className="flex items-center justify-between mt-2 pt-2 border-t">
                 <NoteTypeIcon type={note.noteType} />
-                {/* 👈 [기능 수정] YouTube 노트일 때만 태그 표시 */}
-                {note.sourceType === 'youtube' && note.subjectId && (
-                    <div
-                        className="px-1.5 py-0.5 text-[10px] font-bold rounded-full text-white"
-                        style={{ backgroundColor: generatePastelColorFromText(note.subjectId, 0.8) }}
-                    >
-                        {note.subjectId}
-                    </div>
-                )}
             </div>
         </div>
       </Card>

@@ -236,9 +236,11 @@ export default function ChatPage() {
   if (pageState === 'upload') {
     return (
       <div className="flex flex-col h-full w-full bg-card items-center justify-center p-4">
-        <div className="w-full max-w-2xl text-center">
-            <h1 className="text-2xl font-bold mb-2">AI 참고서 만들기</h1>
-            <p className="text-muted-foreground mb-6">PDF, PPT, 이미지, 텍스트 등 학습 자료를 업로드해주세요. AI가 맞춤 참고서를 만들어 드립니다.</p>
+        <div className="w-full max-w-2xl">
+            <div className="text-center mb-8">
+                <h1 className="text-3xl font-bold tracking-tight text-foreground">AI 참고서 만들기</h1>
+                <p className="text-muted-foreground mt-2">PDF, PPT, 이미지, 텍스트 등 학습 자료를 업로드해주세요. AI가 맞춤 참고서를 만들어 드립니다.</p>
+            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <Popover open={isSubjectPopoverOpen} onOpenChange={setIsSubjectPopoverOpen}>
