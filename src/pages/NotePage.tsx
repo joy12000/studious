@@ -146,6 +146,7 @@ const externalAiLinks = [
 ];
 
 export default function NotePage() {
+  const { id } = useParams();
   // ... (이하 기존 NotePage 컴포넌트 로직은 이전 답변과 동일) ...
   const { getNote, updateNote, deleteNote, getQuiz, addQuizToReviewDeck } = useNotes(); // 🧠 addQuizToReviewDeck 임포트
   
