@@ -1,7 +1,7 @@
 // src/pages/NoteListPage.tsx
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { useNotes, Filters } from '../lib/useNotes'; // ✨ Filters 타입 임포트
+import { useNavigate } from 'react-router-dom';
+import { useNotes, Filters } from '../lib/useNotes';
 import NoteCard from '../components/NoteCard';
 import { Plus, LayoutGrid, List, Menu, Search, X, Youtube, BrainCircuit, Notebook } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
@@ -10,14 +10,13 @@ import { useSidebar } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 
 export default function NoteListPage() {
-  const { notes, loading, filters, setFilters, toggleFavorite } = useNotes({ noteType: 'textbook' });
+  const { notes, loading, filters, setFilters, toggleFavorite } = useNotes();
   const { setIsSidebarOpen } = useSidebar();
   const navigate = useNavigate();
   
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [localSearch, setLocalSearch] = useState(filters.search || '');
 
-  // 검색어 입력 시 디바운스를 적용하여 필터 업데이트
   useEffect(() => {
     const handler = setTimeout(() => {
       setFilters({ ...filters, search: localSearch || undefined });
@@ -26,12 +25,13 @@ export default function NoteListPage() {
   }, [localSearch, setFilters]);
 
   const sortedNotes = useMemo(() => {
+    if (!notes) return [];
     const arr = [...notes];
-    arr.sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    arr.sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.updatedAt - a.updatedAt);
     return arr;
   }, [notes]);
   
-  const handleNoteTypeFilter = (type: 'general' | 'review' | 'textbook' | undefined) => {
+  const handleNoteTypeFilter = (type: 'general' | 'review' | 'textbook' | 'assignment' | undefined) => {
     setFilters({ ...filters, noteType: type });
   };
   
@@ -42,30 +42,19 @@ export default function NoteListPage() {
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="md:hidden h-10 w-10" onClick={() => setIsSidebarOpen(true)}>
-                  <Menu className="h-6 w-6" />
-                </Button>
                 <h1 className="text-xl font-bold">내 노트</h1>
               </div>
               <div className="flex items-center gap-2">
-                <TooltipProvider>
-                    <ToggleGroup type="single" value={view} onValueChange={(value) => { if (value) setView(value as 'grid' | 'list'); }}>
-                        <Tooltip><TooltipTrigger asChild><ToggleGroupItem value="grid"><LayoutGrid className="h-5 w-5" /></ToggleGroupItem></TooltipTrigger><TooltipContent><p>그리드 뷰</p></TooltipContent></Tooltip>
-                        <Tooltip><TooltipTrigger asChild><ToggleGroupItem value="list"><List className="h-5 w-5" /></ToggleGroupItem></TooltipTrigger><TooltipContent><p>리스트 뷰</p></TooltipContent></Tooltip>
-                    </ToggleGroup>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" onClick={() => navigate('/')}>
-                                <Plus className="h-5 w-5" />
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>새 노트 만들기</p></TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
+                <ToggleGroup type="single" value={view} onValueChange={(value) => { if (value) setView(value as 'grid' | 'list'); }}>
+                    <ToggleGroupItem value="grid"><LayoutGrid className="h-5 w-5" /></ToggleGroupItem>
+                    <ToggleGroupItem value="list"><List className="h-5 w-5" /></ToggleGroupItem>
+                </ToggleGroup>
+                <Button variant="outline" size="icon" onClick={() => navigate('/')}>
+                    <Plus className="h-5 w-5" />
+                </Button>
               </div>
             </div>
 
-            {/* ✨ [개선] 검색 및 노트 타입 필터 */}
             <div className="flex flex-col sm:flex-row gap-2">
                 <div className="flex-1 relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -88,7 +77,7 @@ export default function NoteListPage() {
                     className="justify-start"
                 >
                     <ToggleGroupItem value="textbook" aria-label="Textbooks"><BrainCircuit className="h-4 w-4 mr-1.5"/>참고서</ToggleGroupItem>
-                    <ToggleGroupItem value="review" aria-label="Reviews"><BrainCircuit className="h-4 w-4 mr-1.5"/>복습</ToggleGroupItem>
+                    <ToggleGroupItem value="review" aria-label="Reviews"><Notebook className="h-4 w-4 mr-1.5"/>복습</ToggleGroupItem>
                     <ToggleGroupItem value="general" aria-label="General Notes"><Youtube className="h-4 w-4 mr-1.5"/>요약</ToggleGroupItem>
                 </ToggleGroup>
             </div>
@@ -111,7 +100,7 @@ export default function NoteListPage() {
           )}
           
           <div className={view === 'grid' 
-            ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4" 
+            ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4" // 👈 간격과 컬럼 수 조정
             : "grid grid-cols-1 md:grid-cols-2 gap-4"
           }>
             {sortedNotes.map(n => (
