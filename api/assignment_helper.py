@@ -26,6 +26,19 @@ class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
+            # API 키 폴백 기능 구현
+            api_keys = [
+                os.environ.get('GEMINI_API_KEY_PRIMARY'),
+                os.environ.get('GEMINI_API_KEY_SECONDARY'),
+                os.environ.get('GEMINI_API_KEY') # 기존 키 호환
+            ]
+            valid_keys = [key for key in api_keys if key]
+
+            if not valid_keys:
+                return self.handle_error(ValueError("설정된 Gemini API 키가 없습니다."), "API 키 설정 오류", 500)
+
+            last_error = None
+
             # --- 1. 데이터 파싱 ---
             form = cgi.FieldStorage(
                 fp=self.rfile,
@@ -38,13 +51,6 @@ class handler(BaseHTTPRequestHandler):
             problem_files = form.getlist('problem_files')
             answer_files = form.getlist('answer_files')
             subject_id = form.getvalue('subjectId', None)
-
-            # --- 2. API 키 설정 ---
-            api_key = os.environ.get('GEMINI_API_KEY')
-            if not api_key:
-                raise ValueError("GEMINI_API_KEY is not set.")
-            genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-pro-latest')
 
             # --- 3. 프롬프트 및 요청 데이터 구성 ---
             has_answer = bool(answer_files)
@@ -122,16 +128,30 @@ class handler(BaseHTTPRequestHandler):
                 for f in answer_files: request_contents.extend(process_file(f))
 
             # --- 4. AI 모델 호출 ---
-            response = model.generate_content(request_contents)
-            
-            # --- 5. 결과 반환 ---
-            cleaned_text = response.text.strip().replace('```json', '').replace('```', '')
-            json_response = json.loads(cleaned_text)
+            for i, api_key in enumerate(valid_keys):
+                try:
+                    print(f"INFO: Generating assignment helper response with gemini-1.5-pro-latest using API key #{i + 1}...")
+                    genai.configure(api_key=api_key)
+                    model = genai.GenerativeModel('gemini-1.5-pro-latest')
+                    
+                    response = model.generate_content(request_contents)
+                    
+                    # --- 5. 결과 반환 ---
+                    cleaned_text = response.text.strip().replace('```json', '').replace('```', '')
+                    json_response = json.loads(cleaned_text)
 
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json; charset=utf-8')
-            self.end_headers()
-            self.wfile.write(json.dumps(json_response).encode('utf-8'))
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json; charset=utf-8')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(json_response).encode('utf-8'))
+                    return # 성공 시 함수 종료
+
+                except Exception as e:
+                    last_error = e
+                    print(f"WARN: API key #{i + 1} failed. Fallback to next key. Error: {e}")
+                    continue
+
+            raise ConnectionError("모든 Gemini API 키로 요청에 실패했습니다.") from last_error
 
         except Exception as e:
             self.handle_error(e)
