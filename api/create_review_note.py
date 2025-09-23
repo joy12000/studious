@@ -27,21 +27,58 @@ class handler(BaseHTTPRequestHandler):
                 raise ValueError("GEMINI_API_KEY environment variable not set.")
 
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-1.5-flash-latest') # 모델명을 최신으로 업데이트
+            model = genai.GenerativeModel('gemini-1.5-pro-latest')
 
             prompt_text = f"""
-            너는 학습 전문가다.
-            주어진 대화 내용과 여러 학습 자료를 종합하고, 아래 '과목 목록'을 참고하여 가장 관련 있는 과목의 'id'를 'subjectId' 필드에 담아라.
-            그리고 해당 과목의 복습 노트(요약, 핵심 개념)와 객관식 퀴즈 3개를 포함하여 {{"title": "...", "summary": "...", "key_insights": ["...", "..."], "quiz": {{"questions": [{{"question": "...", "options": ["...", "..."], "answer": "..."}}]}}, "subjectId": "..."}} 형식의 JSON으로 출력해줘.
+            # 역할: 학습 전문가
+            주어진 대화 내용, 학습 자료, 과목 목록을 종합하여 복습 노트와 퀴즈를 생성합니다.
 
-            AI 대화 내용: {ai_conversation_text}
-            과목 목록 (JSON 형식): {subjects_list}
+            # 제공 자료
+            - AI 대화 내용: {ai_conversation_text}
+            - 과목 목록 (JSON): {subjects_list}
+            - 학습 자료 파일 (첨부됨)
+
+            # 출력 규칙 (★★★★★ 반드시 완벽하게 준수)
+            1.  **전체 형식:** 다른 설명 없이, 아래 명시된 키를 가진 단일 JSON 객체로만 응답해야 합니다.
+            2.  **`summary`, `key_insights`:** 내용은 마크다운 형식으로 작성합니다.
+                -   **코드:** ` ```python ... ``` ` 처럼 언어를 명시해야 합니다.
+                -   **핵심 용어:** `<dfn title="설명">용어</dfn>` 태그를 사용합니다.
+            3.  **`quiz` 객체:**
+                -   `questions` 배열은 3개의 객관식 질문 객체를 포함해야 합니다.
+                -   각 질문 객체는 `question`(string), `options`(string 배열), `answer`(string) 키를 가져야 합니다.
+                -   **매우 중요:** `answer` 값은 반드시 `options` 배열에 포함된 문자열 중 하나와 정확히 일치해야 합니다.
+
+            # 최종 JSON 출력 형식
+            {{
+                "title": "[핵심 주제] 복습 노트",
+                "summary": "AI가 생성한 마크다운 형식의 상세 요약...",
+                "key_insights": ["핵심 개념 또는 통찰 1", "핵심 개념 또는 통찰 2"],
+                "quiz": {{
+                    "questions": [
+                        {{
+                            "question": "첫 번째 질문 내용",
+                            "options": ["선택지 A", "선택지 B", "선택지 C", "선택지 D"],
+                            "answer": "선택지 B"
+                        }},
+                        {{
+                            "question": "두 번째 질문 내용",
+                            "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+                            "answer": "Option 1"
+                        }},
+                        {{
+                            "question": "세 번째 질문 내용",
+                            "options": ["1", "2", "3", "4"],
+                            "answer": "3"
+                        }}
+                    ]
+                }},
+                "subjectId": "주어진 과목 목록에서 가장 관련 있는 과목의 id"
+            }}
             """
             
             request_contents = [prompt_text]
             
             for learning_material_file in learning_material_files:
-                # ✨ [오류 수정] getattr를 사용하여 안정적으로 파일 내용물 가져오기
                 file_content = getattr(learning_material_file, 'value', learning_material_file)
                 file_type = getattr(learning_material_file, 'type', 'application/octet-stream')
                 filename = getattr(learning_material_file, 'filename', 'unknown')
@@ -53,7 +90,6 @@ class handler(BaseHTTPRequestHandler):
                     try:
                         images = convert_from_bytes(file_content)
                         if images:
-                            # PDF의 모든 페이지를 이미지로 추가
                             request_contents.extend(images)
                     except Exception as e:
                         if "Poppler" in str(e):

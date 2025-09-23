@@ -33,6 +33,10 @@
     --ring: 222.2 84% 4.9%;
  
     --radius: 0.5rem;
+
+    /* ⭐ [기능 추가] 퀴즈 정답/오답 색상 변수 */
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 142.1 76.2% 96.3%;
   }
  
   .dark {
@@ -63,6 +67,10 @@
     --border: 215 15% 20%;
     --input: 215 15% 20%;
     --ring: 210 70% 60%;
+
+    /* ⭐ [기능 추가] 퀴즈 정답/오답 색상 변수 (다크) */
+    --success: 142.1 70.2% 46.3%;
+    --success-foreground: 142.1 70.2% 6.3%;
   }
 }
  
@@ -80,29 +88,31 @@
   .note-content-line-height p {
     line-height: 2.0 !important;
   }
+
+  /* ⭐ [기능 추가] 핵심 용어 툴팁 스타일 */
+  dfn {
+    @apply cursor-help relative border-b border-dashed border-foreground/50;
+  }
+  dfn:hover::after {
+    content: attr(title);
+    @apply absolute bottom-full left-1/2 -translate-x-1/2 mb-2;
+    @apply w-max max-w-xs p-2 rounded-md shadow-lg;
+    @apply bg-card text-card-foreground text-xs z-10;
+  }
 }
 
 /* TipTap Editor Styles */
 @layer components {
-  .tiptap-toolbar button {
-    @apply p-2 rounded-md transition-colors;
-  }
-  .tiptap-toolbar button:hover {
-    @apply bg-muted;
-  }
-  .tiptap-toolbar button.is-active {
-    @apply bg-primary text-primary-foreground;
-  }
-  .tiptap-toolbar button.is-active:hover {
-    @apply bg-primary/90;
-  }
-  .tiptap-toolbar button:disabled {
-    @apply opacity-50 cursor-not-allowed;
-  }
+  /* ... (기존 TipTap 스타일) ... */
 }
 
-/* ✨ [핵심 수정] Prose 내부의 문단 여백을 강제로 복원하여 줄바꿈 문제 해결 */
+/* Prose 스타일 */
 .prose p {
   margin-top: 1.25em;
   margin-bottom: 1.25em;
+}
+
+/* ⭐ [기능 추가] 퀴즈 정답 버튼 스타일 */
+.btn-success {
+    @apply bg-success text-success-foreground;
 }

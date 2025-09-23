@@ -1,8 +1,8 @@
 // src/pages/NotePage.tsx
 
-import React, { useState, useEffect, useMemo, useRef } from 'react'; // useRef 임포트
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Note, Attachment, Quiz } from '../lib/types';
+import { Note, Attachment, Quiz, QuizQuestion } from '../lib/types';
 import { useNotes } from '../lib/useNotes';
 import ShareModal from '../components/ShareModal';
 import AttachmentPanel from '../components/AttachmentPanel';
@@ -13,108 +13,31 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChatUI, Message } from '../components/ChatUI'; // ✨ Message 타입 임포트
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // ✨ Popover 임포트
-import { useReducer } from 'react'; // useReducer 임포트
-import LoadingOverlay from '../components/LoadingOverlay'; // ✨ LoadingOverlay 임포트
+import { ChatUI, Message } from '../components/ChatUI';
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
-// useReducer를 위한 상태 및 액션 타입 정의
-interface NotePageState {
-  note: Note | null;
-  quiz: Quiz | null;
-  loading: boolean;
-  editing: boolean;
-  editContent: string;
-  editTitle: string;
-  editAttachments: Attachment[];
-  isShareModalOpen: boolean;
-  isChatOpen: boolean;
-  initialChatMessage?: string;
-}
 
-type NotePageAction =
-  | { type: 'SET_NOTE_DATA'; payload: { note: Note | null; quiz?: Quiz | null } }
-  | { type: 'SET_LOADING'; payload: boolean }
-  | { type: 'SET_EDITING'; payload: boolean }
-  | { type: 'SET_EDIT_CONTENT'; payload: string }
-  | { type: 'SET_EDIT_TITLE'; payload: string }
-  | { type: 'SET_EDIT_ATTACHMENTS'; payload: Attachment[] }
-  | { type: 'TOGGLE_SHARE_MODAL'; payload?: boolean }
-  | { type: 'TOGGLE_CHAT_PANEL'; payload?: boolean; initialMessage?: string }
-  | { type: 'UPDATE_NOTE_FIELD'; payload: Partial<Note> }
-  | { type: 'RESET_EDIT_STATE' };
-
-// useReducer 함수
-function notePageReducer(state: NotePageState, action: NotePageAction): NotePageState {
-  switch (action.type) {
-    case 'SET_NOTE_DATA':
-      return {
-        ...state,
-        note: action.payload.note,
-        quiz: action.payload.quiz !== undefined ? action.payload.quiz : state.quiz,
-        editContent: action.payload.note?.content || '',
-        editTitle: action.payload.note?.title || '',
-        editAttachments: action.payload.note?.attachments || [],
-        loading: false,
-      };
-    case 'SET_LOADING':
-      return { ...state, loading: action.payload };
-    case 'SET_EDITING':
-      return { ...state, editing: action.payload };
-    case 'SET_EDIT_CONTENT':
-      return { ...state, editContent: action.payload };
-    case 'SET_EDIT_TITLE':
-      return { ...state, editTitle: action.payload };
-    case 'SET_EDIT_ATTACHMENTS':
-      return { ...state, editAttachments: action.payload };
-    case 'TOGGLE_SHARE_MODAL':
-      return { ...state, isShareModalOpen: action.payload !== undefined ? action.payload : !state.isShareModalOpen };
-    case 'TOGGLE_CHAT_PANEL':
-      return { 
-        ...state, 
-        isChatOpen: action.payload !== undefined ? action.payload : !state.isChatOpen,
-        initialChatMessage: action.payload?.initialMessage,
-      };
-    case 'UPDATE_NOTE_FIELD':
-      if (!state.note) return state;
-      return { ...state, note: { ...state.note, ...action.payload } };
-    case 'RESET_EDIT_STATE':
-      return {
-        ...state,
-        editContent: state.note?.content || '',
-        editTitle: state.note?.title || '',
-        editAttachments: state.note?.attachments || [],
-        editing: false,
-      };
-    default:
-      return state;
-  }
-}
-
-// ✨ AI 참고서 내용을 섹션별로 파싱하는 함수
 type TextbookSection = {
   title: string;
   content: string;
-  id: string; // ✨ [추가] 섹션별 고유 ID
+  id: string;
 };
 
 function parseTextbookContent(markdownText: string): TextbookSection[] {
   if (!markdownText) return [];
   
-  // Markdown 제목(## 또는 ###)을 기준으로 텍스트를 분리합니다.
   const sections = markdownText.split(/\n(?=##\s|###\s)/).filter(part => part.trim() !== '');
 
-  return sections.map(sectionText => {
+  return sections.map((sectionText, index) => {
     const lines = sectionText.split('\n');
-    const title = lines[0].replace(/^[#\s]+/, '').trim(); // 제목 추출
-    const content = lines.slice(1).join('\n').trim(); // 나머지 내용
-    // ✨ [개선] 제목을 기반으로 URL 친화적인 ID 생성
-    const id = `section-${title.toLowerCase().replace(/\s+/g, '-')}.replace(/[^\w-]+/g, '') || index}`;
+    const title = lines[0].replace(/^[#\s]+/, '').trim();
+    const content = lines.slice(1).join('\n').trim();
+    const id = `section-${title.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '') || index}`;
     return { title, content, id };
   });
 }
 
-// ✨ [핵심 추가] 목차 컴포넌트
 const TableOfContents = ({ sections }: { sections: TextbookSection[] }) => {
   const handleScrollTo = (id: string) => {
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -146,8 +69,6 @@ const TableOfContents = ({ sections }: { sections: TextbookSection[] }) => {
   );
 };
 
-
-// Helper to format dates robustly
 const formatDate = (dateValue: string | number) => {
   if (!dateValue) return '날짜 없음';
   try {
@@ -159,29 +80,65 @@ const formatDate = (dateValue: string | number) => {
   } catch { return '날짜 오류'; }
 };
 
+// --- ⭐ [기능 수정] 대화형 퀴즈 컴포넌트 ---
 const QuizComponent = ({ quiz }: { quiz: Quiz }) => {
-  // Quiz component logic here
-  return (
-    <div className="mt-8">
-      <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-        📝 퀴즈
-      </h3>
-      {quiz.questions.map((q, i) => (
-        <div key={i} className="mb-4 p-4 border rounded-lg">
-          <p className="font-semibold">{i + 1}. {q.question}</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-            {q.options.map((opt, j) => (
-              <Button key={j} variant="outline" className="w-full justify-start text-left h-auto whitespace-normal">{opt}</Button>
-            ))}
+    const [userAnswers, setUserAnswers] = useState<(string | null)[]>(() => Array(quiz.questions.length).fill(null));
+    const [submitted, setSubmitted] = useState(false);
+
+    const handleOptionClick = (questionIndex: number, option: string) => {
+        if (submitted) return; // 제출 후에는 변경 불가
+        const newAnswers = [...userAnswers];
+        newAnswers[questionIndex] = option;
+        setUserAnswers(newAnswers);
+    };
+
+    const getButtonVariant = (question: QuizQuestion, questionIndex: number, option: string) => {
+        if (!submitted) {
+            return userAnswers[questionIndex] === option ? 'secondary' : 'outline';
+        }
+        // 제출 후 스타일
+        const isCorrect = option === question.answer;
+        const isSelected = userAnswers[questionIndex] === option;
+
+        if (isCorrect) return 'success'; // 정답은 항상 녹색
+        if (isSelected && !isCorrect) return 'destructive'; // 내가 선택한 오답은 적색
+        return 'outline'; // 나머지
+    };
+    
+    const handleSubmit = () => setSubmitted(true);
+
+    return (
+      <div className="mt-8">
+        <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+          📝 퀴즈로 복습하기
+        </h3>
+        {quiz.questions.map((q, i) => (
+          <div key={i} className="mb-6 p-4 border rounded-lg">
+            <p className="font-semibold">{i + 1}. {q.question}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
+              {q.options.map((opt, j) => (
+                <Button 
+                  key={j} 
+                  variant={getButtonVariant(q, i, opt)}
+                  onClick={() => handleOptionClick(i, opt)}
+                  className="w-full justify-start text-left h-auto whitespace-normal"
+                >
+                  {opt}
+                </Button>
+              ))}
+            </div>
           </div>
+        ))}
+        <div className="text-center mt-6">
+            <Button onClick={handleSubmit} disabled={submitted || userAnswers.includes(null)}>
+                {submitted ? '채점 완료!' : '정답 확인'}
+            </Button>
         </div>
-      ))}
-    </div>
-  );
+      </div>
+    );
 };
 
 
-// ✨ [추가] 외부 AI 링크 목록
 const externalAiLinks = [
   { name: 'Gemini', url: 'https://gemini.google.com/' },
   { name: 'Perplexity', url: 'https://www.perplexity.ai/' },
@@ -189,52 +146,54 @@ const externalAiLinks = [
 ];
 
 export default function NotePage() {
+  // ... (이하 기존 NotePage 컴포넌트 로직은 이전 답변과 동일) ...
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { getNote, updateNote, deleteNote, getQuiz } = useNotes();
   
-  const initialState: NotePageState = {
-    note: null,
-    quiz: null,
-    loading: true,
-    editing: false,
-    editContent: '',
-    editTitle: '',
-    editAttachments: [],
-    isShareModalOpen: false,
-    isChatOpen: false,
-    initialChatMessage: undefined,
-  };
-
-  const [state, dispatch] = useReducer(notePageReducer, initialState);
-  const { note, quiz, loading, editing, editContent, editTitle, editAttachments, isShareModalOpen, isChatOpen, initialChatMessage } = state;
+  const [note, setNote] = useState<Note | null>(null);
+  const [quiz, setQuiz] = useState<Quiz | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState('');
+  const [editTitle, setEditTitle] = useState('');
+  const [editAttachments, setEditAttachments] = useState<Attachment[]>([]);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [initialChatMessage, setInitialChatMessage] = useState<string | undefined>();
   
-  // ✨ [추가] ChatUI의 대화 내역을 저장하기 위한 Ref
   const chatMessagesRef = useRef<Message[]>();
 
   useEffect(() => {
     if (!id) return;
 
-            const loadNoteAndQuiz = async () => {
-              dispatch({ type: 'SET_LOADING', payload: true });
-              try {
-                const foundNote = await getNote(id);
-                let foundQuiz: Quiz | null = null;
-                if (foundNote) {
-                  if (foundNote.noteType === 'review') {
-                    foundQuiz = await getQuiz(foundNote.id);
-                  }
-                  dispatch({ type: 'SET_NOTE_DATA', payload: { note: foundNote, quiz: foundQuiz } });
-                } else {
-                  navigate('/');
-                }
-              } catch (error) {
-                console.error('Error loading note and quiz:', error);
-                navigate('/');
-              } finally {
-                dispatch({ type: 'SET_LOADING', payload: false });
-              }
-            };
+    const loadNoteAndQuiz = async () => {
+      setLoading(true);
+      try {
+        const foundNote = await getNote(id);
+        if (foundNote) {
+          setNote(foundNote);
+          setEditContent(foundNote.content);
+          setEditTitle(foundNote.title);
+          setEditAttachments(foundNote.attachments || []);
+
+          if (foundNote.noteType === 'review') {
+            const foundQuiz = await getQuiz(foundNote.id);
+            if (foundQuiz) {
+              setQuiz(foundQuiz);
+            }
+          }
+        } else {
+          navigate('/');
+        }
+      } catch (error) {
+        console.error('Error loading note and quiz:', error);
+        navigate('/');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     loadNoteAndQuiz();
   }, [id, navigate, getNote, getQuiz]);
   
@@ -256,18 +215,22 @@ export default function NotePage() {
       updatedAt: Date.now(),
     });
     
-    dispatch({ type: 'UPDATE_NOTE_FIELD', payload: { title: editTitle.trim(), content: editContent.trim(), attachments: editAttachments, updatedAt: Date.now() } });
-    dispatch({ type: 'SET_EDITING', payload: false });
+    setNote(prev => prev ? { ...prev, title: editTitle.trim(), content: editContent.trim(), attachments: editAttachments, updatedAt: Date.now() } : null);
+    setEditing(false);
   };
 
   const handleCancelEdit = () => {
-    dispatch({ type: 'RESET_EDIT_STATE' });
+    setEditContent(note?.content || '');
+    setEditTitle(note?.title || '');
+    setEditAttachments(note?.attachments || []);
+    setEditing(false);
   };
 
   const handleToggleFavorite = () => {
     if (!note) return;
     const newFavState = !note.favorite;
-    dispatch({ type: 'UPDATE_NOTE_FIELD', payload: { favorite: newFavState } });
+    updateNote(note.id, { favorite: newFavState });
+    setNote(prev => prev ? { ...prev, favorite: newFavState } : null);
   };
 
   const handleDelete = async () => {
@@ -278,14 +241,10 @@ export default function NotePage() {
     }
   };
 
-  // ✨ [핵심 추가] 노트 내용과 채팅 기록을 클립보드에 복사하고 새 탭을 여는 함수
   const handleExportToExternalAI = async (url: string) => {
     if (!note) return;
 
-    // 1. 노트 본문 준비
     const noteContent = `--- 학습 노트 본문 ---\n${note.content}`;
-
-    // 2. 채팅 기록 준비
     const chatHistory = (chatMessagesRef.current || [])
       .map(msg => `${msg.sender === 'user' ? '사용자' : 'AI'}: ${msg.text}`)
       .join('\n');
@@ -293,11 +252,8 @@ export default function NotePage() {
     const fullContext = `${noteContent}\n\n--- 이전 대화 기록 ---\n${chatHistory}`;
 
     try {
-      // 3. 클립보드에 복사
       await navigator.clipboard.writeText(fullContext);
       alert('노트와 대화 내용이 클립보드에 복사되었습니다. 외부 AI에 붙여넣어 질문을 이어가세요.');
-      
-      // 4. 새 탭에서 외부 사이트 열기
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (err) {
       console.error('클립보드 복사 실패:', err);
@@ -342,8 +298,9 @@ export default function NotePage() {
       }
     } catch (error) {
       console.error("Share failed", error);
+      alert('공유에 실패했습니다.');
     }
-    dispatch({ type: 'TOGGLE_SHARE_MODAL', payload: false });
+    setIsShareModalOpen(false);
   };
 
   const handleDownload = async () => {
@@ -356,7 +313,7 @@ export default function NotePage() {
       console.error("Download failed", error);
       alert('다운로드에 실패했습니다.');
     }
-    dispatch({ type: 'TOGGLE_SHARE_MODAL', payload: false });
+    setIsShareModalOpen(false);
   };
 
   const openSource = (e?: React.MouseEvent) => {
@@ -394,7 +351,14 @@ export default function NotePage() {
   };
 
   if (loading) {
-    return <LoadingOverlay message="노트를 불러오는 중..." />;
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">노트를 불러오는 중...</p>
+        </div>
+      </div>
+    );
   }
 
   if (!note) {
@@ -413,11 +377,11 @@ export default function NotePage() {
       <div className="flex h-screen w-full overflow-hidden">
         {/* Chat Panel */}
         <div className={`transition-all duration-300 ease-in-out ${isChatOpen ? 'w-full md:w-2/5' : 'w-0'}`}>
-          {isChatOpen &&             <ChatUI 
+          {isChatOpen && <ChatUI 
               noteContext={note.content} 
-              onClose={() => dispatch({ type: 'TOGGLE_CHAT_PANEL', payload: false })} 
+              onClose={() => setIsChatOpen(false)} 
               initialMessage={initialChatMessage} 
-              messagesRef={chatMessagesRef} // ✨ Ref 전달
+              messagesRef={chatMessagesRef}
             />}
         </div>
         
@@ -438,7 +402,6 @@ export default function NotePage() {
                   <Share2 className="h-5 w-5" />
                 </Button>
                 
-                {/* ✨ [핵심 추가] 외부 AI 내보내기 버튼 */}
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="sm" title="외부 AI로 내보내기">
@@ -538,29 +501,27 @@ export default function NotePage() {
                     </div>
                   ) : (
                     <div>
-                                        {/* ✨ [핵심 개선] 목차 렌더링 */}
-                                        {textbookSections.length > 0 && <TableOfContents sections={textbookSections} />}
+                        {textbookSections.length > 0 && <TableOfContents sections={textbookSections} />}
 
-                                        {textbookSections.length > 0 ? (
-                                            <div className="space-y-3">
-                                                {textbookSections.map((section) => (
-                                                    // ✨ [개선] 각 섹션에 고유 ID 추가
-                                                    <details key={section.id} id={section.id} className="group rounded-lg border bg-card p-4 ...">
-                                                        <summary className="cursor-pointer ...">
-                                                            {section.title}
-                                                            {/* ... */}
-                                                        </summary>
-                                                        <div className="mt-4 ...">
-                                                            <MarkdownRenderer content={section.content} />
-                                                        </div>
-                                                    </details>
-                                                ))}
-                                            </div>
-                                        ) : (
-                        <div className="note-content-line-height prose prose-lg max-w-none dark:prose-invert prose-p:leading-relaxed prose-headings:font-semibold">
-                          <MarkdownRenderer content={note.content} />
-                        </div>
-                      )}
+                        {textbookSections.length > 0 ? (
+                            <div className="space-y-3">
+                                {textbookSections.map((section) => (
+                                    <details key={section.id} id={section.id} className="group rounded-lg border bg-card p-4">
+                                        <summary className="cursor-pointer font-semibold text-lg list-none flex items-center justify-between">
+                                            {section.title}
+                                            <span className="text-muted-foreground transition-transform group-open:rotate-90">▶</span>
+                                        </summary>
+                                        <div className="mt-4 prose prose-lg max-w-none dark:prose-invert prose-p:leading-relaxed">
+                                            <MarkdownRenderer content={section.content} />
+                                        </div>
+                                    </details>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="note-content-line-height prose prose-lg max-w-none dark:prose-invert prose-p:leading-relaxed prose-headings:font-semibold">
+                              <MarkdownRenderer content={note.content} />
+                            </div>
+                        )}
 
                       {note.key_insights && note.key_insights.length > 0 && (
                         <div className="mt-8">
@@ -601,7 +562,7 @@ export default function NotePage() {
       
       {!isChatOpen && (
         <Button
-          onClick={() => dispatch({ type: 'TOGGLE_CHAT_PANEL', payload: true })}
+          onClick={() => setIsChatOpen(true)}
           className="fixed bottom-6 right-6 z-20 h-14 w-14 rounded-full shadow-lg"
           title="AI와 대화하기"
         >
@@ -611,7 +572,7 @@ export default function NotePage() {
 
       <ShareModal
         isOpen={isShareModalOpen}
-        onClose={() => dispatch({ type: 'TOGGLE_SHARE_MODAL', payload: false })}
+        onClose={() => setIsShareModalOpen(false)}
         onConfirm={handleShare}
         onDownload={handleDownload}
         noteTitle={note.title}

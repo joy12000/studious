@@ -24,6 +24,9 @@ export default defineConfig({
       srcDir: 'public',
       filename: 'sw.js',
       registerType: 'autoUpdate',
+      injectManifest: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
+      },
       workbox: {
         skipWaiting: true,
         clientsClaim: true,
