@@ -8,6 +8,7 @@ import SharedNotePage from './pages/SharedNotePage';
 import SchedulePage from './pages/SchedulePage';
 import ReviewPage from './pages/ReviewPage';
 import ChatPage from './pages/ChatPage';
+import AssignmentHelperPage from './pages/AssignmentHelperPage';
 import ShareHandler from './components/ShareHandler';
 import AppLayout from './components/AppLayout';
 import { useNotes } from './lib/useNotes';
@@ -116,6 +117,7 @@ function App() {
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/schedule" element={<SchedulePage />} />
         <Route path="/review" element={<ReviewPage />} />
+        <Route path="/assignment" element={<AssignmentHelperPage />} />
         <Route path="/share" element={<ShareHandler />} />
         <Route path="/shared-note" element={<SharedNotePage />} />
         <Route path="/chat" element={<ChatPage />} />

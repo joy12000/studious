@@ -1,7 +1,7 @@
 import React, { useState, createContext, useContext, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Home, Settings, X, List, ChevronsLeft, ChevronsRight, Notebook, Menu, Calendar, BrainCircuit } from 'lucide-react';
+import { Home, Settings, X, List, ChevronsLeft, ChevronsRight, Notebook, Menu, Calendar, GraduationCap } from 'lucide-react';
 import { useNotes } from '../lib/useNotes';
 
 // 사이드바 상태 공유를 위한 Context
@@ -70,15 +70,14 @@ const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolea
         </Button>
       </div>
 
-      {/* 메인 네비게이션 */}
-      <nav className="flex flex-col space-y-2">
-        <NavLink to="/" icon={<Home className="h-4 w-4" />}>Home</NavLink>
-        <NavLink to="/notes" icon={<List className="h-4 w-4" />}>노트 목록</NavLink>
-        <NavLink to="/schedule" icon={<Calendar className="h-4 w-4" />}>시간표</NavLink>
-        <NavLink to="/review" icon={<BrainCircuit className="h-4 w-4" />}>AI 복습</NavLink>
-        <NavLink to="/settings" icon={<Settings className="h-4 w-4" />}>Settings</NavLink>
-      </nav>
-
+                  {/* 메인 네비게이션 */}
+                  <nav className="flex flex-col space-y-2">
+                      <NavLink to="/" icon={<Home className="h-4 w-4" />}>Home</NavLink>
+                      <NavLink to="/notes" icon={<List className="h-4 w-4" />}>노트 목록</NavLink>
+                      <NavLink to="/schedule" icon={<Calendar className="h-4 w-4" />}>시간표</NavLink>
+                      <NavLink to="/assignment" icon={<GraduationCap className="h-4 w-4" />}>AI 과제</NavLink>
+                      <NavLink to="/settings" icon={<Settings className="h-4 w-4" />}>Settings</NavLink>
+                  </nav>
       <hr className="my-6" />
 
       {/* 최근 노트 목록 */}
