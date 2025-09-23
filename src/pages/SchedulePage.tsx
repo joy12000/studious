@@ -6,6 +6,8 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ScheduleImportButton from '../components/ScheduleImportButton';
 import { ClassPortalModal } from '../components/ClassPortalModal';
 import { format, isSameDay, startOfWeek, endOfWeek, eachDayOfInterval, isToday, getDay, addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '../lib/db';
 import { ko } from 'date-fns/locale';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useNavigate } from 'react-router-dom';
@@ -30,7 +32,7 @@ const WeeklyEventCard = ({ event, subjects, notes, onClick }: { event: ScheduleE
     <div
       onClick={onClick}
       className="absolute w-[calc(100%-4px)] left-0.5 p-2 rounded-lg text-white transition-all shadow-md hover:shadow-lg hover:z-10 cursor-pointer overflow-hidden"
-      style={{ top, height, backgroundColor: subject?.color || '#6b7280' }}
+      style={{ top, height: `calc(${height} - 2px)`, backgroundColor: subject?.color || '#6b7280' }}
     >
       <p className="font-bold text-xs truncate">{subject?.name || '과목 없음'}</p>
       <p className="text-[10px] opacity-80">{event.startTime} - {event.endTime}</p>
@@ -97,6 +99,7 @@ const WeeklyCalendarView = ({ onEventClick }: { onEventClick: (event: ScheduleEv
 // --- MonthlyCalendarView (수업 표시 기능 복구) ---
 const MonthlyCalendarView = () => {
     const { notes, allSubjects, schedule } = useNotes();
+    const settings = useLiveQuery(() => db.settings.get('default'));
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const navigate = useNavigate();
 
@@ -121,6 +124,11 @@ const MonthlyCalendarView = () => {
         const dayOfWeekMap: { [key: string]: number } = { '일': 0, '월': 1, '화': 2, '수': 3, '목': 4, '금': 5, '토': 6 };
 
         daysInGrid.forEach(day => {
+            // 학기 시작일 이전의 날짜는 건너뛰기
+            if (settings?.semesterStartDate && format(day, 'yyyy-MM-dd') < settings.semesterStartDate) {
+                return;
+            }
+
             const dayIndex = getDay(day);
             const dayOfWeekStr = Object.keys(dayOfWeekMap).find(key => dayOfWeekMap[key] === dayIndex);
             if(dayOfWeekStr) {
@@ -132,7 +140,7 @@ const MonthlyCalendarView = () => {
             }
         });
         return grouped;
-    }, [schedule, daysInGrid]);
+    }, [schedule, daysInGrid, settings]);
 
     const DayCell = ({ day }: { day: Date }) => {
         const dateStr = format(day, 'yyyy-MM-dd');
@@ -241,7 +249,7 @@ export default function SchedulePage() {
 
         <ClassPortalModal 
             isOpen={isPortalOpen}
-            onClose={() => setIsPortalModal(false)}
+            onClose={() => setIsPortalOpen(false)}
             title={portalTitle}
             notes={portalNotes}
             subjects={allSubjects}
