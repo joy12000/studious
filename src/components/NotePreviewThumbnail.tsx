@@ -7,7 +7,7 @@ interface NotePreviewThumbnailProps {
 }
 
 const NotePreviewThumbnail: React.FC<NotePreviewThumbnailProps> = ({ title, content }) => {
-  const bgColor = generatePastelColorFromText(title);
+  const { backgroundColor, color: textColor } = generatePastelColorFromText(title);
 
   // Remove markdown for a cleaner preview
   const cleanContent = content
@@ -20,11 +20,11 @@ const NotePreviewThumbnail: React.FC<NotePreviewThumbnailProps> = ({ title, cont
 
   return (
     <div 
-      className="w-full h-full p-4 flex flex-col justify-center items-center text-white text-center overflow-hidden"
-      style={{ backgroundColor: bgColor }}
+      className="w-full h-full p-4 flex flex-col justify-center items-center text-center overflow-hidden"
+      style={{ backgroundColor: backgroundColor, color: textColor }}
     >
       <h3 className="font-bold text-base leading-tight line-clamp-2 mb-2 shadow-sm">{title || '제목 없음'}</h3>
-      <p className="text-[0.6rem] line-clamp-6 opacity-90">{cleanContent}</p>
+      <p className="text-[0.6rem] line-clamp-6 opacity-90" style={{ color: textColor }}>{cleanContent}</p>
     </div>
   );
 };
