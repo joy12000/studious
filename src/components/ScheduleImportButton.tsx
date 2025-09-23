@@ -1,6 +1,6 @@
 
 import React, { useRef, useState } from 'react';
-import { Upload } from 'lucide-react';
+import { Upload, Calendar } from 'lucide-react';
 import { useNotes } from '../lib/useNotes';
 import { Button } from './ui/button';
 
