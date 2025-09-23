@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { useNotes } from '../lib/useNotes';
 import { ScheduleEvent, Subject, Note } from '../lib/types';
 import { Button } from '@/components/ui/button';
@@ -217,6 +217,10 @@ export default function SchedulePage() {
   const [contextSubject, setContextSubject] = useState<Subject | undefined>();
   const [contextDate, setContextDate] = useState<Date | undefined>(); // ✨ [추가] 날짜 컨텍스트 상태
 
+  const handleClosePortal = useCallback(() => {
+    setIsPortalOpen(false);
+  }, []);
+
 
   const handleEventClick = (event: ScheduleEvent) => {
     const subject = allSubjects.find(s => s.id === event.subjectId);
@@ -249,7 +253,7 @@ export default function SchedulePage() {
 
         <ClassPortalModal 
             isOpen={isPortalOpen}
-            onClose={() => setIsPortalOpen(false)}
+            onClose={handleClosePortal}
             title={portalTitle}
             notes={portalNotes}
             subjects={allSubjects}
