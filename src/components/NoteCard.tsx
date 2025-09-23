@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { marked } from 'marked';
 import type { Note } from '../lib/types';
 import { generatePastelColorFromText } from '../lib/utils';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import NotePreviewThumbnail from './NotePreviewThumbnail';
 
@@ -17,7 +17,7 @@ interface NoteCardProps {
 const NoteTypeIcon = ({ type }: { type: Note['noteType'] }) => {
     const iconMap = {
         general: <Youtube className="h-3 w-3" />,
-        review: <BrainCircuit className="h-3 w-3" />,
+        review: <Notebook className="h-3 w-3" />,
         textbook: <BrainCircuit className="h-3 w-3" />,
         assignment: <FileText className="h-3 w-3" />,
     };
@@ -48,7 +48,6 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
     window.open(note.sourceUrl, '_blank', 'noopener,noreferrer');
   };
 
-  // --- List View (기존과 유사하게 유지) ---
   if (view === 'list') {
     return (
       <Card className="w-full transition-all hover:shadow-md relative">
@@ -68,7 +67,7 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
             {thumbnailUrl ? (
                 <img src={thumbnailUrl} alt={note.title} className="h-full w-full object-cover"/>
             ) : (
-                <NotePreviewThumbnail title={note.title} content={note.content} />
+                <NotePreviewThumbnail title={note.title} content={note.content} isTitleOnly={true} />
             )}
           </Link>
         </div>
@@ -89,44 +88,37 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
     );
   }
 
-  // --- Grid View (새로운 디자인) ---
+  // Grid View
   return (
     <Link to={`/note/${note.id}`} className="group block">
       <Card className="w-full flex flex-col overflow-hidden transition-all duration-300 group-hover:shadow-xl group-hover:-translate-y-1 aspect-[4/5]">
-        {/* 썸네일 영역 */}
-        <div className="relative w-full aspect-video bg-muted overflow-hidden">
-            {thumbnailUrl ? (
-                <img src={thumbnailUrl} alt={note.title} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105" />
-            ) : (
-                <NotePreviewThumbnail title={note.title} content={note.content} />
-            )}
+        <div className="relative w-full flex-grow-[2] flex items-center justify-center p-2 text-center overflow-hidden">
+            <NotePreviewThumbnail title={note.title} isTitleOnly={true} />
             {onToggleFavorite && (
               <button
                 onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }}
-                className="absolute top-2 right-2 h-7 w-7 flex items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition-colors hover:bg-black/50"
+                className="absolute top-2 right-2 h-7 w-7 flex items-center justify-center rounded-full bg-black/10 dark:bg-black/30 text-white backdrop-blur-sm transition-colors hover:bg-black/20 dark:hover:bg-black/50"
                 title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
               >
-                <Star className={`h-4 w-4 ${note.favorite ? 'fill-yellow-400' : 'text-white/80'}`} />
+                <Star className={`h-4 w-4 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-white/80'}`} />
               </button>
             )}
         </div>
 
-        {/* 텍스트 영역 */}
-        <div className="p-3 flex-grow flex flex-col overflow-hidden">
-            <h3 className="text-sm font-bold leading-snug line-clamp-2 mb-1">{note.title || '제목 없음'}</h3>
-            {/* 👈 [버그 수정 & 디자인 개선] 스크롤바 방지 및 손글씨 폰트 적용 */}
+        <div className="p-3 flex-grow-[3] flex flex-col overflow-hidden bg-card border-t">
             <div 
-              className="font-handwriting text-xs text-muted-foreground flex-grow overflow-hidden line-clamp-4"
+              className="font-handwriting text-xs text-muted-foreground flex-grow overflow-hidden leading-snug"
               style={{ wordBreak: 'break-all' }}
             >
-              {note.content.replace(/#+\s/g, '').replace(/(\*\*|__)(.*?)\1/g, '$2')}
+              {note.content.replace(/#+\s/g, '').replace(/(\*\*|__)(.*?)\1/g, '$2').split('\n').filter(line => line.trim() !== '').slice(0, 5).join('\n')}
             </div>
             <div className="flex items-center justify-between mt-2 pt-2 border-t">
                 <NoteTypeIcon type={note.noteType} />
-                {note.subjectId && (
+                {/* 👈 [기능 수정] YouTube 노트일 때만 태그 표시 */}
+                {note.sourceType === 'youtube' && note.subjectId && (
                     <div
-                        className="px-1.5 py-0.5 text-[10px] font-semibold rounded-full text-white"
-                        style={{ backgroundColor: generatePastelColorFromText(note.subjectId || '') }}
+                        className="px-1.5 py-0.5 text-[10px] font-bold rounded-full text-white"
+                        style={{ backgroundColor: generatePastelColorFromText(note.subjectId, 0.8) }}
                     >
                         {note.subjectId}
                     </div>

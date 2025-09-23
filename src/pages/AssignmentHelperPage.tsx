@@ -394,7 +394,7 @@ export default function AssignmentHelperPage() {
             case 4:
                 return renderStep4_ReviewAndSubmit();
             default:
-                return <div>Unknown Step</div>;
+                return <div>알 수 없는 단계</div>;
         }
     };
 

@@ -1,8 +1,8 @@
 import React, { useState, createContext, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Home, Settings, X, List, Menu, Calendar, GraduationCap, LayoutDashboard, BrainCircuit, ChevronsLeft, ChevronsRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Home, Settings, X, List, Menu, Calendar, GraduationCap, LayoutDashboard, BrainCircuit } from 'lucide-react';
+import { cn } from "@/lib/utils";
 
 // 사이드바 상태 공유를 위한 Context
 interface SidebarContextType {
@@ -22,9 +22,11 @@ export const useSidebar = () => {
 const NavLink = ({ to, icon, children, isCollapsed }: { to: string, icon: React.ReactNode, children: React.ReactNode, isCollapsed: boolean }) => {
     const location = useLocation();
     const isActive = location.pathname === to;
+    
     const linkClasses = cn(
         "flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground transition-all hover:text-primary",
-        isActive && "bg-muted text-primary"
+        isActive && "bg-muted text-primary",
+        isCollapsed && "justify-center"
     );
 
     return (
@@ -35,12 +37,12 @@ const NavLink = ({ to, icon, children, isCollapsed }: { to: string, icon: React.
     );
 };
 
-const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean, onToggleCollapse: () => void }) => {
+const SidebarContent = ({ isCollapsed }: { isCollapsed: boolean }) => {
     const { setIsSidebarOpen } = useSidebar();
     return (
       <div className="flex h-full max-h-screen flex-col">
-        <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
-          <Link to="/" className="flex items-center gap-2 font-semibold">
+        <div className="flex h-16 items-center border-b px-6 lg:h-[68px]">
+          <Link to="/" className="flex items-center gap-2 font-bold text-lg tracking-tight">
             <GraduationCap className="h-6 w-6" />
             {!isCollapsed && <span className="">Studious</span>}
           </Link>
@@ -48,8 +50,8 @@ const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolea
             <X className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex-1 overflow-auto py-2">
-            <nav className="grid items-start px-4 text-sm font-medium">
+        <div className="flex-1 overflow-auto py-4">
+            <nav className="grid items-start px-2 text-sm font-medium gap-1">
                 <NavLink to="/" icon={<Home className="h-5 w-5" />} isCollapsed={isCollapsed}>Home</NavLink>
                 <NavLink to="/dashboard" icon={<LayoutDashboard className="h-5 w-5" />} isCollapsed={isCollapsed}>대시보드</NavLink>
                 <NavLink to="/review-deck" icon={<BrainCircuit className="h-5 w-5" />} isCollapsed={isCollapsed}>오늘의 복습</NavLink>
@@ -59,23 +61,16 @@ const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolea
                 <NavLink to="/settings" icon={<Settings className="h-5 w-5" />} isCollapsed={isCollapsed}>Settings</NavLink>
             </nav>
         </div>
-        <div className="mt-auto border-t p-4">
-            <Button variant="ghost" onClick={onToggleCollapse} className="w-full hidden md:flex items-center justify-center gap-2">
-                {isCollapsed ? <ChevronsRight className="h-5 w-5" /> : <ChevronsLeft className="h-5 w-5" />}
-                {!isCollapsed && <span>사이드바 접기</span>}
-            </Button>
-        </div>
       </div>
     );
 };
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true); // 기본 상태를 '접힘'으로 변경
 
-  const desktopSidebarWidth = isCollapsed ? "md:grid-cols-[56px_1fr]" : "md:grid-cols-[180px_1fr] lg:grid-cols-[220px_1fr]";
-  const desktopMainContentPadding = isCollapsed ? "md:pl-[56px]" : "md:pl-[180px] lg:pl-[220px]";
-  const desktopAsideWidth = isCollapsed ? "md:w-[56px]" : "md:w-[180px] lg:w-[220px]";
+  const desktopAsideWidth = isCollapsed ? "md:w-[88px]" : "md:w-[280px]";
+  const desktopMainContentMargin = isCollapsed ? "md:ml-[88px]" : "md:ml-[280px]";
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, setIsSidebarOpen }}>
@@ -89,25 +84,29 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             )}
 
             {/* Sidebar */}
-            <aside className={`fixed inset-y-0 left-0 z-40 bg-background border-r transition-all duration-300 ease-in-out 
+            <aside 
+                className={`fixed inset-y-0 left-0 z-40 bg-background border-r transition-all duration-300 ease-in-out 
                 ${isSidebarOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full'}
-                md:translate-x-0 md:w-auto ${desktopAsideWidth}`}>
-                <SidebarContent isCollapsed={isCollapsed} onToggleCollapse={() => setIsCollapsed(!isCollapsed)} />
+                md:translate-x-0 ${desktopAsideWidth}`}
+                onMouseEnter={() => setIsCollapsed(false)}
+                onMouseLeave={() => setIsCollapsed(true)}
+            >
+                <SidebarContent isCollapsed={isCollapsed} />
             </aside>
 
             {/* Main Content */}
-            <div className={`flex flex-col transition-all duration-300 ease-in-out ${desktopMainContentPadding}`}>
+            <div className={`flex flex-col transition-all duration-300 ease-in-out ${desktopMainContentMargin}`}>
                 {/* Mobile Header */}
                 <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6 md:hidden">
                     <Button variant="outline" size="icon" className="shrink-0" onClick={() => setIsSidebarOpen(true)}>
                         <Menu className="h-5 w-5" />
                         <span className="sr-only">Toggle navigation menu</span>
                     </Button>
-                    <div className="font-semibold">Studious</div>
+                    <Link to="/" className="text-lg font-semibold">Studious</Link>
                 </header>
 
                 {/* Page Content */}
-                <main className="flex flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6">
+                <main className="flex-1 flex flex-col p-4 sm:p-6">
                     {children}
                 </main>
             </div>
