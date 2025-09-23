@@ -1,7 +1,7 @@
 import React, { useState, createContext, useContext, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Home, Settings, X, List, ChevronsLeft, ChevronsRight, Notebook, Menu, Calendar, GraduationCap } from 'lucide-react';
+import { Home, Settings, X, List, ChevronsLeft, ChevronsRight, Notebook, Menu, Calendar, GraduationCap, LayoutDashboard, BrainCircuit } from 'lucide-react'; // 🧠, 📈 아이콘 임포트
 import { useNotes } from '../lib/useNotes';
 
 // 사이드바 상태 공유를 위한 Context
@@ -73,6 +73,8 @@ const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolea
                   {/* 메인 네비게이션 */}
                   <nav className="flex flex-col space-y-2">
                       <NavLink to="/" icon={<Home className="h-4 w-4" />}>Home</NavLink>
+                      <NavLink to="/dashboard" icon={<LayoutDashboard className="h-4 w-4" />}>대시보드</NavLink> {/* 📈 대시보드 링크 추가 */}
+                      <NavLink to="/review-deck" icon={<BrainCircuit className="h-4 w-4" />}>오늘의 복습</NavLink> {/* 🧠 복습 덱 링크 추가 */}
                       <NavLink to="/notes" icon={<List className="h-4 w-4" />}>노트 목록</NavLink>
                       <NavLink to="/schedule" icon={<Calendar className="h-4 w-4" />}>시간표</NavLink>
                       <NavLink to="/assignment" icon={<GraduationCap className="h-4 w-4" />}>AI 과제</NavLink>

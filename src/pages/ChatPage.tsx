@@ -17,6 +17,7 @@ const models = [
     { id: 'google/gemma-3-27b-it:free', name: '💡 Google의 AI모델' },
     { id: 'openai/gpt-oss-20b:free', name: '⭐ 그 유명한 GPT' },
     { id: 'meta-llama/llama-4-maverick:free', name: '🦙 인스타회사 메타의 AI' },
+    
 ];
 
 interface Message {
@@ -206,7 +207,7 @@ export default function ChatPage() {
       
       // 2. 생성된 내용을 받아 노트에 저장
       setLoadingMessage('생성된 참고서를 노트에 저장하는 중...');
-      const noteTitle = `${selectedSubject.name} - ${weekInfo} 참고서`;
+      const noteTitle = `${selectedSubject.name} - ${weekInfo} AI참고서`;
       
       // 💡 [추가] 노트 날짜를 "YYYY-MM-DD" 형식으로 변환
       const noteDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
@@ -224,10 +225,10 @@ export default function ChatPage() {
       navigate(`/note/${newNote.id}`);
 
     } catch(error) {
-        alert(`ㅻ媛 諛듬: ${error instanceof Error ? error.message : '   ㅻ'}`);
+        alert(`오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
         setIsLoading(false); // 오류 발생 시 로딩 해제
     }
-    // 항상 로딩 상태 해제
+    
   };
 
   const currentModelName = models.find(m => m.id === selectedModel)?.name || '모델 선택';

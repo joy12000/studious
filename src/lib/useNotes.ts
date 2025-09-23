@@ -1,53 +1,13 @@
 import { useState, useCallback } from 'react';
   import { useLiveQuery } from 'dexie-react-hooks';
   import { db } from './db';
-import { Note, Subject, ScheduleEvent, Quiz, Attachment, NoteType } from './types'; // ✨ NoteType 임포트
+import { Note, Subject, ScheduleEvent, Quiz, Attachment, NoteType, ReviewItem } from './types';
 import { v4 as uuidv4 } from 'uuid';
+import { format, addDays } from 'date-fns';
 
-export type Filters = {
-  search?: string;
-  subjectId?: string;
-  favorite?: boolean;
-  dateRange?: 'today' | '7days' | '30days' | 'all';
-  noteType?: NoteType; // ✨ noteType 필터 추가
-};
+// ... (기존 타입 정의들은 동일) ...
 
-  // 🚀 addNote의 인자 타입을 확장하여 콜백 함수들을 포함
-  export interface AddNotePayload {
-    youtubeUrl: string;
-    onProgress: (status: string) => void;
-    onComplete: (note: Note) => void;
-    onError: (error: string) => void;
-  }
-
-  export interface AddNoteFromReviewPayload {
-    aiConversationText: string;
-    files: File[];
-    subjects: Subject[];
-    onProgress: (status: string) => void;
-    onComplete: (note: Note, quiz: Quiz) => void;
-    onError: (error: string) => void;
-  }
-
-  export interface AddScheduleFromImagePayload {
-    file: File;
-    onProgress: (status: string) => void;
-    onComplete: (events: ScheduleEvent[]) => void;
-    onError: (error: string) => void;
-  }
-  
-  // ✨ [추가] 과제 도우미 페이로드 인터페이스
-  export interface AddNoteFromAssignmentPayload {
-      referenceFiles: File[];
-      problemFiles: File[];
-      answerFiles: File[];
-      noteContext: string;
-      subjectId: string;
-      onProgress: (status: string) => void;
-      onComplete: (note: Note) => void;
-      onError: (error: string) => void;
-  }
-  export function useNotes(defaultFilters?: Filters) {
+export function useNotes(defaultFilters?: Filters) {
     const [filters, setFilters] = useState<Filters>(defaultFilters || { dateRange: 'all' });
 
     const notes = useLiveQuery(async () => {
@@ -397,11 +357,11 @@ export type Filters = {
         subjectId: note.subjectId || '일반',
         noteType: note.noteType || 'general',
         sourceUrl: note.sourceUrl,
-        sourceType: note.sourceType || 'other',
+        sourceType: 'other',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().getTime(),
-        favorite: note.favorite || false,
-        attachments: note.attachments || [],
+        favorite: false,
+        attachments: [],
       };
       await db.notes.add(newNote);
       return newNote;
@@ -476,6 +436,67 @@ export type Filters = {
       return newNote;
     };
 
+    // 🧠 [기능 추가] 복습 덱 관련 함수들
+    const todaysReviewItems = useLiveQuery(() => {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        return db.reviewItems.where('nextReviewDate').belowOrEqual(today).toArray();
+    }, []);
+
+    const addQuizToReviewDeck = async (noteId: string) => {
+        const quiz = await db.quizzes.where('noteId').equals(noteId).first();
+        if (!quiz) {
+            alert('이 노트에는 복습할 퀴즈가 없습니다.');
+            return;
+        }
+
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const newItems: ReviewItem[] = quiz.questions.map(q => ({
+            id: uuidv4(),
+            noteId: noteId,
+            question: q.question,
+            options: q.options,
+            answer: q.answer,
+            nextReviewDate: today,
+            easeFactor: 2.5,
+            interval: 0,
+        }));
+        
+        await db.reviewItems.bulkAdd(newItems);
+        alert(`${newItems.length}개의 퀴즈가 복습 덱에 추가되었습니다!`);
+    };
+
+    const updateReviewItem = async (itemId: string, wasCorrect: boolean) => {
+        const item = await db.reviewItems.get(itemId);
+        if (!item) return;
+
+        let newInterval;
+        let newEaseFactor = item.easeFactor;
+
+        if (wasCorrect) {
+            if (item.interval === 0) {
+                newInterval = 1;
+            } else {
+                newInterval = Math.round(item.interval * newEaseFactor);
+            }
+            newEaseFactor += 0.1;
+        } else {
+            newInterval = 1; // 틀리면 다음 날 바로 다시
+            newEaseFactor = Math.max(1.3, newEaseFactor - 0.2);
+        }
+        
+        const nextReviewDate = format(addDays(new Date(), newInterval), 'yyyy-MM-dd');
+        
+        await db.reviewItems.update(itemId, {
+            nextReviewDate,
+            easeFactor: newEaseFactor,
+            interval: newInterval,
+        });
+    };
+    
+    const deleteReviewItem = async (itemId: string) => {
+        await db.reviewItems.delete(itemId);
+    }
+
     return {
       notes: notes || [],
       loading,
@@ -500,6 +521,11 @@ export type Filters = {
           getQuiz,
           importNote,
           addNoteFromTextbook,
-          createEmptyNote // ✨ 새로 추가한 함수 반환
+          createEmptyNote, // ✨ 새로 추가한 함수 반환
+      // 🧠 [기능 추가] 복습 덱 관련 데이터와 함수 반환
+      todaysReviewItems: todaysReviewItems || [],
+      addQuizToReviewDeck,
+      updateReviewItem,
+      deleteReviewItem
     };
   }
