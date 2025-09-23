@@ -26,19 +26,6 @@ class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
-            # API 키 폴백 기능 구현
-            api_keys = [
-                os.environ.get('GEMINI_API_KEY_PRIMARY'),
-                os.environ.get('GEMINI_API_KEY_SECONDARY'),
-                os.environ.get('GEMINI_API_KEY') # 기존 키 호환
-            ]
-            valid_keys = [key for key in api_keys if key]
-
-            if not valid_keys:
-                return self.handle_error(ValueError("설정된 Gemini API 키가 없습니다."), "API 키 설정 오류", 500)
-
-            last_error = None
-
             # --- 1. 데이터 파싱 ---
             form = cgi.FieldStorage(
                 fp=self.rfile,
@@ -52,6 +39,13 @@ class handler(BaseHTTPRequestHandler):
             answer_files = form.getlist('answer_files')
             subject_id = form.getvalue('subjectId', None)
 
+            # --- 2. API 키 설정 ---
+            api_key = os.environ.get('GEMINI_API_KEY')
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY is not set.")
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-1.5-pro-latest')
+
             # --- 3. 프롬프트 및 요청 데이터 구성 ---
             has_answer = bool(answer_files)
             
@@ -60,7 +54,7 @@ class handler(BaseHTTPRequestHandler):
                 # 역할
                 너는 최고의 대학 교수이자 튜터(Tutor)다. 학생이 제출한 과제물을 채점하고, 상세하고 친절한 피드백을 제공해야 한다.
 
-                # 제공된 자료
+                # 제공된 자료 (이후에 첨부됨)
                 - 참고 자료: (첨부된 파일 및 텍스트)
                 - 문제: (첨부된 이미지)
                 - 학생 답안: (첨부된 이미지)
@@ -87,7 +81,7 @@ class handler(BaseHTTPRequestHandler):
                 # 역할
                 너는 최고의 대학 교수이자 튜터(Tutor)다. 학생이 질문한 문제를 상세하고 이해하기 쉽게 풀어줘야 한다.
 
-                # 제공된 자료
+                # 제공된 자료 (이후에 첨부됨)
                 - 참고 자료: (첨부된 파일 및 텍스트)
                 - 문제: (첨부된 이미지)
 
@@ -113,45 +107,43 @@ class handler(BaseHTTPRequestHandler):
                 if isinstance(content, bytes):
                     file_type = getattr(file_storage, 'type', 'application/octet-stream')
                     if file_type == 'application/pdf':
-                        return convert_from_bytes(content)
+                        try:
+                            return convert_from_bytes(content)
+                        except Exception as pdf_err:
+                            print(f"PDF 처리 오류: {pdf_err}")
+                            return []
                     elif 'image' in file_type:
                         return [Image.open(io.BytesIO(content))]
                 return []
 
-            request_contents = [prompt_template, f"\n--- 기존 노트 내용 ---\n{note_context}\n"]
+            # ✨ [핵심 수정] 실제 파일 데이터를 request_contents 리스트에 추가
+            request_contents = [prompt_template]
+            
+            if note_context:
+                request_contents.append(f"\n--- 기존 노트 내용 ---\n{note_context}\n")
 
-            for f in reference_files: request_contents.extend(process_file(f))
-            request_contents.append("\n--- 문제 ---\n")
+            if reference_files:
+                request_contents.append("\n--- 참고 자료 파일 ---\n")
+                for f in reference_files: request_contents.extend(process_file(f))
+
+            request_contents.append("\n--- 문제 파일 ---\n")
             for f in problem_files: request_contents.extend(process_file(f))
+            
             if has_answer:
-                request_contents.append("\n--- 학생 답안 ---\n")
+                request_contents.append("\n--- 학생 답안 파일 ---\n")
                 for f in answer_files: request_contents.extend(process_file(f))
 
             # --- 4. AI 모델 호출 ---
-            for i, api_key in enumerate(valid_keys):
-                try:
-                    print(f"INFO: Generating assignment helper response with gemini-1.5-pro-latest using API key #{i + 1}...")
-                    genai.configure(api_key=api_key)
-                    model = genai.GenerativeModel('gemini-1.5-pro-latest')
-                    
-                    response = model.generate_content(request_contents)
-                    
-                    # --- 5. 결과 반환 ---
-                    cleaned_text = response.text.strip().replace('```json', '').replace('```', '')
-                    json_response = json.loads(cleaned_text)
+            response = model.generate_content(request_contents)
+            
+            # --- 5. 결과 반환 ---
+            cleaned_text = response.text.strip().replace('```json', '').replace('```', '')
+            json_response = json.loads(cleaned_text)
 
-                    self.send_response(200)
-                    self.send_header('Content-type', 'application/json; charset=utf-8')
-                    self.end_headers()
-                    self.wfile.write(json.dumps(json_response).encode('utf-8'))
-                    return # 성공 시 함수 종료
-
-                except Exception as e:
-                    last_error = e
-                    print(f"WARN: API key #{i + 1} failed. Fallback to next key. Error: {e}")
-                    continue
-
-            raise ConnectionError("모든 Gemini API 키로 요청에 실패했습니다.") from last_error
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json; charset=utf-8')
+            self.end_headers()
+            self.wfile.write(json.dumps(json_response).encode('utf-8'))
 
         except Exception as e:
             self.handle_error(e)

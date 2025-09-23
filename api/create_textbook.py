@@ -153,6 +153,10 @@ class handler(BaseHTTPRequestHandler):
                     
                     response = model.generate_content(request_contents)
                     
+                    print(f"DEBUG: Type of response.text: {type(response.text)}")
+                    print(f"DEBUG: Snippet of response.text: {response.text[:200]}") # 처음 200자 출력
+                    print(f"DEBUG: Encoding check (should be utf-8): {response.text.encode('utf-8')[:200]}")
+
                     json_response = {"textbook": response.text}
 
                     self.send_response(200)
