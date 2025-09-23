@@ -41,14 +41,14 @@ const createInitialMessage = (): Message => ({
 interface ChatUIProps {
   noteContext: string;
   onClose: () => void;
+  onSaveConversation: (conversation: Message[]) => void; // New prop
 }
 
-export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose }) => {
+export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, onSaveConversation }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { addNoteFromChat } = useNotes();
   const navigate = useNavigate();
   
   const [selectedModel, setSelectedModel] = useState(models[0].id);
@@ -70,22 +70,6 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose }) => {
   };
 
   const handleCopy = (text: string) => navigator.clipboard.writeText(text);
-
-  const handleSaveToNote = async () => {
-    // 사용자가 메시지를 입력하지 않은 초기 상태에서는 저장하지 않음
-    if (messages.length <= 1) return;
-    const title = prompt("노트의 제목을 입력하세요:", "AI 채팅 기록");
-    if (title) {
-      try {
-        const newNote = await addNoteFromChat(messages, title);
-        alert("채팅 기록이 노트로 저장되었습니다!");
-        navigate(`/note/${newNote.id}`);
-      } catch (error) {
-        alert("노트 저장에 실패했습니다.");
-        console.error(error);
-      }
-    }
-  };
 
   const sendNewMessage = (text: string) => {
       setInputValue(text);
@@ -173,13 +157,12 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose }) => {
         </Popover>
 
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" onClick={handleSaveToNote} disabled={messages.length <= 1} title="채팅 저장">
+          <Button variant="ghost" size="icon" onClick={() => onSaveConversation(messages)} disabled={messages.length <= 1} title="현재 노트에 대화 저장">
             <Save className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="icon" onClick={handleNewChat} title="새 대화">
             <RefreshCw className="h-4 w-4" />
           </Button>
-          {/* ✨ [개선] 닫기 버튼 추가 */}
           <Button variant="ghost" size="icon" onClick={onClose} title="닫기">
             <X className="h-5 w-5" />
           </Button>
@@ -229,7 +212,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose }) => {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder={isLoading ? "답변을 생성 중입니다..." : "메시지를 입력하세요..."}
-            className="w-full px-4 py-2 border rounded-full focus:ring-2 focus:ring-primary focus:border-transparent transition-all"
+            className="w-full px-4 py-2 border rounded-full focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-background text-foreground placeholder:text-muted-foreground"
             disabled={isLoading}
           />
           <Button type="submit" size="icon" className="rounded-full" disabled={isLoading}>

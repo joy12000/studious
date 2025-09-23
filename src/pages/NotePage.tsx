@@ -161,6 +161,33 @@ export default function NotePage() {
     }
   };
 
+  interface Message { // Define Message interface here
+    id: number;
+    text: string;
+    sender: 'user' | 'bot';
+    followUp?: string[];
+  }
+
+  const handleSaveConversationToNote = async (conversation: Message[]) => {
+    if (!note || !id) return;
+
+    const formattedConversation = conversation
+      .map(msg => `**${msg.sender === 'user' ? '나' : 'AI'}**: \n\n${msg.text}`)
+      .join('\n\n---
+\n');
+
+    const newContent = `${note.content}\n\n---
+\n## AI 챗봇 대화 기록\n\n${formattedConversation}`;
+
+    await updateNote(id, {
+      content: newContent,
+      updatedAt: Date.now(),
+    });
+
+    setNote(prev => prev ? { ...prev, content: newContent, updatedAt: Date.now() } : null);
+    setIsChatOpen(false); // Close chat after saving
+  };
+
   const handleTestUnderstanding = () => {
     if (!note) return;
     const prompt = `다음은 나의 학습 노트 내용이야. 이 내용을 바탕으로 나의 이해도를 테스트할 수 있는 질문 5개를 만들어줘. 질문은 내가 얼마나 깊이 이해했는지 확인할 수 있도록 개념의 연결, 적용, 비판적 사고를 유도하는 질문으로 구성해줘.\n\n--- 학습 노트 ---\n${note.content}`;
@@ -277,7 +304,7 @@ export default function NotePage() {
       <div className="flex h-screen w-full overflow-hidden">
         {/* Chat Panel */}
         <div className={`transition-all duration-300 ease-in-out ${isChatOpen ? 'w-full md:w-2/5' : 'w-0'}`}>
-          {isChatOpen && <ChatUI noteContext={note.content} onClose={() => setIsChatOpen(false)} />}
+          {isChatOpen && <ChatUI noteContext={note.content} onClose={() => setIsChatOpen(false)} onSaveConversation={(conversation) => handleSaveConversationToNote(conversation)} />}
         </div>
         
         {/* Note Panel */}
@@ -406,18 +433,6 @@ export default function NotePage() {
                         </div>
                       )}
                       
-                      {note.subjectId === 'AI 채팅' && (
-                        <div className="mt-8 p-4 bg-blue-50/50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-800">
-                          <details>
-                            <summary className="cursor-pointer font-semibold text-blue-700 dark:text-blue-300">
-                              AI 챗봇 대화 기록 보기
-                            </summary>
-                            <div className="mt-4 prose prose-sm dark:prose-invert">
-                              <MarkdownRenderer content={note.content} />
-                            </div>
-                          </details>
-                        </div>
-                      )}
                       <AttachmentPanel
                         attachments={note.attachments || []}
                         readOnly

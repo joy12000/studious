@@ -271,8 +271,8 @@ export default function HomePage() {
           <div className="mb-6 flex justify-center">
             <div className="p-1 bg-muted rounded-full flex items-center gap-1">
               <Button variant={mode === 'youtube' ? 'default' : 'ghost'} size="sm" className="rounded-full" onClick={() => setMode('youtube')}><Youtube className="h-4 w-4 mr-2"/>AI 영상 요약</Button>
-              <Button variant={mode === 'review' ? 'default' : 'ghost'} size="sm" className="rounded-full" onClick={() => navigate('/chat')}><Bot className="h-4 w-4 mr-2"/>AI 참고서</Button>
-              <Button variant={mode === 'schedule' ? 'default' : 'ghost'} size="sm" className="rounded-full" onClick={() => setMode('schedule')}><Calendar className="h-4 w-4 mr-2"/>AI 시간표</Button>
+              <Button variant={mode === 'review' ? 'default' : 'ghost'} size="sm" className="rounded-full" onClick={() => navigate('/review')}><Bot className="h-4 w-4 mr-2"/>AI 복습</Button>
+
             </div>
           </div>
 
@@ -291,7 +291,7 @@ export default function HomePage() {
             </form>
           )}
 
-          {(mode === 'review' || mode === 'schedule') && (
+          {(mode === 'review') && (
             <div className="max-w-xl mx-auto">
               <Button onClick={handleFileSelect} variant="secondary" size="lg" className="w-full rounded-full shadow-lg">
                 <File className="h-5 w-5 mr-3" />

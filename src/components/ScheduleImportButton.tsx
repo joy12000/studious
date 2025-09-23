@@ -57,11 +57,12 @@ export default function ScheduleImportButton() {
       <Button
         onClick={handleClick}
         disabled={isLoading}
-        variant="outline"
-        size="sm"
+        variant="secondary" 
+        size="lg" 
+        className="w-full rounded-full shadow-lg"
       >
-        <Upload className="mr-2 h-4 w-4" />
-        {isLoading ? '처리 중...' : '이미지에서 가져오기'}
+        <Calendar className="h-5 w-5 mr-3" />
+        {isLoading ? '처리 중...' : '시간표 이미지 선택'}
       </Button>
     </>
   );

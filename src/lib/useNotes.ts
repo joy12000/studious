@@ -198,7 +198,7 @@ export type Filters = {
       const newQuiz: Quiz = {
         id: crypto.randomUUID(),
         noteId: newNote.id,
-        questions: result.quiz.questions, // Access the actual questions array
+          questions: (result.quiz && Array.isArray(result.quiz.questions)) ? result.quiz.questions : [],
       };
 
         await db.notes.add(newNote);
@@ -354,39 +354,6 @@ export type Filters = {
       sender: 'user' | 'bot';
     }
 
-    // ✨ [개선] addNoteFromChat 함수에 files 인자 추가
-    const addNoteFromChat = async (messages: Message[], title?: string, files: File[] = []) => {
-      const content = messages
-        .map(msg => `**${msg.sender === 'user' ? '나' : 'AI'}**: \n\n${msg.text}`)
-        .join('\n\n---\n\n');
-
-      // ✨ [추가] File 객체를 Attachment 타입으로 변환
-      const attachments: Attachment[] = files.map(file => ({
-        id: uuidv4(),
-        type: 'file',
-        name: file.name,
-        mimeType: file.type,
-        data: file,
-      }));
-
-      const newNote: Note = {
-        id: uuidv4(),
-        title: title || `AI 채팅 기록: ${new Date().toLocaleString()}`,
-        content: content,
-        key_insights: [],
-        subjectId: 'AI 채팅',
-        noteType: 'general',
-        sourceType: 'other',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().getTime(),
-        favorite: false,
-        attachments: attachments, // ✨ [개선] 변환된 첨부파일 저장
-      };
-      
-      await db.notes.add(newNote);
-      return newNote;
-    };
-
     // ✨ [추가] AI 참고서를 노트로 저장하는 전용 함수
     const addNoteFromTextbook = async (
       title: string,
@@ -446,7 +413,6 @@ export type Filters = {
           getNote, 
           getQuiz,
           importNote,
-          addNoteFromChat,
           addNoteFromTextbook
     };
   }

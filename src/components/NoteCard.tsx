@@ -48,20 +48,20 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
   if (view === 'list') {
     return (
       <Card className="w-full transition-all hover:shadow-md relative">
-        <div className="flex flex-row items-start gap-4 p-4">
+        <div className="flex flex-row items-start gap-4 p-3">
           <div className="flex-1 min-w-0">
             <Link to={`/note/${note.id}`} className="block">
-              <h2 className="mb-2 line-clamp-2 text-lg font-semibold leading-snug">{note.title || '제목 없음'}</h2>
+              <h2 className="mb-2 line-clamp-2 text-base font-semibold leading-snug">{note.title || '제목 없음'}</h2>
             </Link>
             <Link to={`/note/${note.id}`} className="block">
               <div 
-                className="prose prose-sm dark:prose-invert line-clamp-4 text-sm text-muted-foreground"
+                className="prose prose-sm dark:prose-invert line-clamp-4 text-xs text-muted-foreground"
                 dangerouslySetInnerHTML={{ __html: marked(note.content) as string }}
               />
             </Link>
           </div>
           
-          <Link to={`/note/${note.id}`} className="block flex-shrink-0 w-32 sm:w-40 aspect-video rounded-md overflow-hidden bg-muted">
+          <Link to={`/note/${note.id}`} className="block flex-shrink-0 w-28 sm:w-36 aspect-video rounded-md overflow-hidden bg-muted">
             {note.sourceType === 'youtube' && thumbnailUrl ? (
                 <img src={thumbnailUrl} alt={note.title} className="h-full w-full object-cover"/>
             ) : (
@@ -128,7 +128,7 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
         </div>
       </div>
       <div className="mt-2 px-0.5">
-        <h3 className="text-sm font-medium text-foreground leading-snug line-clamp-2 h-[2.8em] group-hover:text-primary transition-colors" title={note.title}>
+        <h3 className="text-xs font-medium text-foreground leading-snug line-clamp-2 h-[2.8em] group-hover:text-primary transition-colors" title={note.title}>
           {note.title || '제목 없음'}
         </h3>
       </div>

@@ -1,5 +1,3 @@
-// src/components/ClassPortalModal.tsx
-
 import React, { useMemo, useState } from 'react';
 import { Note, Subject } from '../lib/types';
 import { Button } from './ui/button';
@@ -8,7 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card'; // ✨ Card 컴포넌트 임포트
 
 interface Props {
   isOpen: boolean;
@@ -16,14 +13,14 @@ interface Props {
   title: string;
   notes: Note[];
   subjects: Subject[];
-  contextSubject?: Subject;
+  contextSubject?: Subject; // 수업 포털의 경우, 컨텍스트가 되는 과목
 }
 
 const NoteItem = ({ note, subjectName }: { note: Note; subjectName: string }) => {
   const navigate = useNavigate();
   return (
     <div 
-      className="p-3 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+      className="p-3 rounded-lg hover:bg-muted cursor-pointer"
       onClick={() => navigate(`/note/${note.id}`)}
     >
       <div className="flex justify-between items-center mb-1">
@@ -46,10 +43,29 @@ export const ClassPortalModal: React.FC<Props> = ({ isOpen, onClose, title, note
   }, [subjects]);
 
   const filteredAndGroupedNotes = useMemo(() => {
-    // ... (이전과 동일한 필터링 및 그룹화 로직)
+    if (!notes) return []; // Add this check
+    const filtered = notes.filter(note => {
+      if (filter) {
+        return note.noteType === filter;
+      }
+      return note.noteType === 'textbook' || note.noteType === 'review';
+    });
+
+    // 날짜별로 그룹화
+    const grouped = new Map<string, Note[]>();
+    filtered.forEach(note => {
+      const dateStr = format(new Date(note.createdAt), 'yyyy-MM-dd (eee)', { locale: ko });
+      if (!grouped.has(dateStr)) {
+        grouped.set(dateStr, []);
+      }
+      grouped.get(dateStr)!.push(note);
+    });
+    return Array.from(grouped.entries());
+
   }, [notes, filter]);
   
   const handleGoToChat = () => {
+    // contextSubject가 있으면 해당 과목이 선택된 상태로 ChatPage로 이동
     navigate('/chat', { state: { subject: contextSubject } });
   };
 
@@ -57,17 +73,25 @@ export const ClassPortalModal: React.FC<Props> = ({ isOpen, onClose, title, note
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <Card className="w-full max-w-lg h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <CardHeader className="flex-row items-center justify-between">
-          <CardTitle>{title}</CardTitle>
+      <div className="bg-card w-full max-w-lg h-[80vh] rounded-2xl shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <header className="p-4 border-b flex items-center justify-between flex-shrink-0">
+          <h2 className="text-lg font-bold">{title}</h2>
           <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
-        </CardHeader>
+        </header>
 
-        <div className="px-6 pb-4 border-b">
-          <ToggleGroup /* ... (필터 UI 동일) ... */ />
+        <div className="p-4 flex-shrink-0 border-b">
+          <ToggleGroup 
+            type="single" 
+            value={filter} 
+            onValueChange={(value) => setFilter(value as any)}
+            className="w-full justify-start"
+          >
+            <ToggleGroupItem value="textbook" size="sm"><BrainCircuit className="h-4 w-4 mr-1.5"/>AI 참고서</ToggleGroupItem>
+            <ToggleGroupItem value="review" size="sm"><Notebook className="h-4 w-4 mr-1.5"/>복습 노트</ToggleGroupItem>
+          </ToggleGroup>
         </div>
 
-        <CardContent className="flex-1 overflow-y-auto p-2">
+        <main className="flex-1 overflow-y-auto p-2">
           {filteredAndGroupedNotes.length > 0 ? (
             <div className="space-y-4">
               {filteredAndGroupedNotes.map(([dateStr, dateNotes]) => (
@@ -86,14 +110,21 @@ export const ClassPortalModal: React.FC<Props> = ({ isOpen, onClose, title, note
               <p>해당하는 노트가 없습니다.</p>
             </div>
           )}
-        </CardContent>
+        </main>
 
         {contextSubject && (
             <footer className="p-4 border-t grid grid-cols-2 gap-2 flex-shrink-0">
-                {/* ... (푸터 버튼 동일) ... */}
+                <Button variant="outline" onClick={handleGoToChat}>
+                    <BrainCircuit className="h-4 w-4 mr-2" />
+                    AI 참고서 만들기
+                </Button>
+                <Button>
+                    <Plus className="h-4 w-4 mr-2" /> 
+                    새 노트 추가
+                </Button>
             </footer>
         )}
-      </Card>
+      </div>
     </div>
   );
 };
