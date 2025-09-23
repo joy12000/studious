@@ -2,6 +2,9 @@
   "functions": {
     "api/summarize_youtube.py": {
       "maxDuration": 300
+    },
+    "api/create_textbook.py": {
+      "maxDuration": 300
     }
   },
   "rewrites": [
