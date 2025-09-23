@@ -354,6 +354,32 @@ export type Filters = {
       sender: 'user' | 'bot';
     }
 
+    // ✨ [핵심 추가] 제목과 컨텍스트만으로 빈 노트를 빠르게 생성하는 함수
+    const createEmptyNote = async (
+      title: string,
+      subjectId: string,
+      noteDate: Date
+    ): Promise<Note> => {
+      
+      const newNote: Note = {
+        id: uuidv4(),
+        title: title.trim(),
+        content: `# ${title.trim()}\n\n`, // 제목을 노트 내용의 첫 줄로 추가
+        key_insights: [],
+        subjectId: subjectId,
+        noteType: 'general', // 일반 노트로 생성
+        sourceType: 'other',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().getTime(),
+        noteDate: format(noteDate, 'yyyy-MM-dd'),
+        favorite: false,
+        attachments: [],
+      };
+      
+      await db.notes.add(newNote);
+      return newNote;
+    };
+
     // ✨ [추가] AI 참고서를 노트로 저장하는 전용 함수
     const addNoteFromTextbook = async (
       title: string,
@@ -413,6 +439,7 @@ export type Filters = {
           getNote, 
           getQuiz,
           importNote,
-          addNoteFromTextbook
+          addNoteFromTextbook,
+          createEmptyNote // ✨ 새로 추가한 함수 반환
     };
   }

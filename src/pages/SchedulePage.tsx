@@ -177,6 +177,7 @@ export default function SchedulePage() {
   const [portalTitle, setPortalTitle] = useState('');
   const [portalNotes, setPortalNotes] = useState<Note[]>([]);
   const [contextSubject, setContextSubject] = useState<Subject | undefined>();
+  const [contextDate, setContextDate] = useState<Date | undefined>(); // ✨ [추가] 날짜 컨텍스트 상태
 
 
   const handleEventClick = (event: ScheduleEvent) => {
@@ -186,6 +187,8 @@ export default function SchedulePage() {
     setPortalTitle(`${subject.name} 수업 포털`);
     setPortalNotes((notes || []).filter(n => n.subjectId === subject.id));
     setContextSubject(subject);
+    // ✨ [개선] 주간 뷰에서는 오늘 날짜를 기본값으로 설정
+    setContextDate(new Date()); 
     setIsPortalOpen(true);
   };
 
@@ -213,6 +216,7 @@ export default function SchedulePage() {
             notes={portalNotes}
             subjects={allSubjects}
             contextSubject={contextSubject}
+            contextDate={contextDate} // ✨ [개선] 날짜 컨텍스트 전달
         />
     </div>
   );

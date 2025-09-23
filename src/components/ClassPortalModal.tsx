@@ -7,13 +7,17 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { useNotes } from '../lib/useNotes'; // ✨ useNotes 훅 임포트
+
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   notes: Note[];
   subjects: Subject[];
-  contextSubject?: Subject; // 수업 포털의 경우, 컨텍스트가 되는 과목
+  contextSubject?: Subject;
+  contextDate?: Date; // ✨ [추가] '데일리 포털'의 경우, 컨텍스트가 되는 날짜
 }
 
 const NoteItem = ({ note, subjectName }: { note: Note; subjectName: string }) => {
@@ -32,8 +36,9 @@ const NoteItem = ({ note, subjectName }: { note: Note; subjectName: string }) =>
   );
 };
 
-export const ClassPortalModal: React.FC<Props> = ({ isOpen, onClose, title, notes, subjects, contextSubject }) => {
+export const ClassPortalModal: React.FC<Props> = ({ isOpen, onClose, title, notes, subjects, contextSubject, contextDate }) => {
   const navigate = useNavigate();
+  const { createEmptyNote } = useNotes(); // ✨ createEmptyNote 함수 가져오기
   const [filter, setFilter] = useState<'textbook' | 'review' | undefined>();
 
   const subjectsById = useMemo(() => {
@@ -65,8 +70,26 @@ export const ClassPortalModal: React.FC<Props> = ({ isOpen, onClose, title, note
   }, [notes, filter]);
   
   const handleGoToChat = () => {
-    // contextSubject가 있으면 해당 과목이 선택된 상태로 ChatPage로 이동
-    navigate('/chat', { state: { subject: contextSubject } });
+    navigate('/chat', { state: { subject: contextSubject, date: contextDate } });
+  };
+  
+  // ✨ [핵심 수정] 새 노트 추가 핸들러
+  const handleAddNewNote = async () => {
+    if (!contextSubject || !contextDate) {
+        alert("노트를 추가할 과목과 날짜 정보가 필요합니다.");
+        return;
+    }
+    const noteTitle = prompt("새 노트의 제목을 입력하세요:");
+    if (noteTitle) {
+        try {
+            const newNote = await createEmptyNote(noteTitle, contextSubject.id, contextDate);
+            onClose(); // 모달 닫기
+            navigate(`/note/${newNote.id}`); // 생성된 노트 페이지로 이동
+        } catch (error) {
+            console.error("Failed to create new note:", error);
+            alert("노트 생성에 실패했습니다.");
+        }
+    }
   };
 
   if (!isOpen) return null;
