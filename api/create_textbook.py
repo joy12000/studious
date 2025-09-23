@@ -162,7 +162,7 @@ class handler(BaseHTTPRequestHandler):
                     self.send_response(200)
                     self.send_header('Content-type', 'application/json; charset=utf-8')
                     self.end_headers()
-                    self.wfile.write(json.dumps(json_response).encode('utf-8'))
+                    self.wfile.write(json.dumps(json_response, ensure_ascii=False).encode('utf-8'))
                     return # 성공 시 함수 종료
 
                 except Exception as e:
