@@ -35,10 +35,10 @@ interface ExternalLinkItem {
 }
 
 const defaultLinks: ExternalLinkItem[] = [
-  { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/', iconUrl: 'https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64', fallbackIconDataUrl: generateFallbackIconDataUrl('G') },
-  { id: 'perplexity', name: 'Perplexity', url: 'https://www.perplexity.ai/', iconUrl: 'https://www.google.com/s2/favicons?domain=perplexity.ai&sz=64', fallbackIconDataUrl: generateFallbackIconDataUrl('P') },
-  { id: 'chatgpt', name: 'ChatGPT', url: 'https://chat.openai.com/', iconUrl: 'https://www.google.com/s2/favicons?domain=openai.com&sz=64', fallbackIconDataUrl: generateFallbackIconDataUrl('C') },
-  { id: 'mathpix', name: 'Mathpix Snip', url: 'https://snip.mathpix.com/', iconUrl: 'https://www.google.com/s2/favicons?domain=mathpix.com&sz=64', fallbackIconDataUrl: generateFallbackIconDataUrl('M') }
+  { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/', iconUrl: '', fallbackIconDataUrl: generateFallbackIconDataUrl('G') },
+  { id: 'perplexity', name: 'Perplexity', url: 'https://www.perplexity.ai/', iconUrl: '', fallbackIconDataUrl: generateFallbackIconDataUrl('P') },
+  { id: 'chatgpt', name: 'ChatGPT', url: 'https://chat.openai.com/', iconUrl: '', fallbackIconDataUrl: generateFallbackIconDataUrl('C') },
+  { id: 'mathpix', name: 'Mathpix Snip', url: 'https://snip.mathpix.com/', iconUrl: '', fallbackIconDataUrl: generateFallbackIconDataUrl('M') }
 ];
 
 const LINKS_STORAGE_KEY = 'studious-external-links';
@@ -87,7 +87,7 @@ export default function HomePage() {
         id: crypto.randomUUID(),
         name,
         url,
-        iconUrl: `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
+        iconUrl: '', // Directly use empty string to force fallback for user-added links
         fallbackIconDataUrl: generateFallbackIconDataUrl(name)
       };
       saveLinks([...externalLinks, newLink]);
