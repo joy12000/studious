@@ -16,7 +16,7 @@ class AppDB extends Dexie {
     // 🧠 스키마 버전업
     this.version(6).stores({
       notes: 'id, createdAt, noteType, subjectId, favorite, sourceType, attachments',
-      subjects: '&id, name',
+      subjects: '&id, name, color',
       schedule: '&id, date, startTime, endTime, subjectId, dayOfWeek',
       quizzes: '&id, noteId',
       reviewItems: '&id, noteId, nextReviewDate', // 🧠 새 테이블 정의

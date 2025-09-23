@@ -252,8 +252,7 @@ export function useNotes(defaultFilters?: Filters) {
         onComplete(newEvents);
 
       } catch (err) {
-        console.error("Schedule processing failed:", err);
-        onError(message);
+        onError(err instanceof Error ? err.message : "시간표 처리 중 알 수 없는 오류가 발생했습니다.");
       }
     };
     // ✨ [추가] AI 과제 도우미 결과 저장 함수
@@ -333,7 +332,9 @@ export function useNotes(defaultFilters?: Filters) {
     };
 
     const updateSubject = async (id: string, name: string, color?: string) => {
-      await db.subjects.update(id, { name, color });
+      const existingSubject = await db.subjects.get(id);
+      const newColor = color || existingSubject?.color || generatePastelColorFromText(name).backgroundColor;
+      await db.subjects.update(id, { name, color: newColor });
     };
 
     const deleteSubject = async (id: string) => {

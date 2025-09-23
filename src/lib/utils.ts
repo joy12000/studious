@@ -15,12 +15,11 @@ export function generatePastelColorFromText(text: string): { backgroundColor: st
 
   // Generate HSL values
   const hue = hash % 360;
-  const saturation = 70; // Keep saturation constant for a consistent look
-  const lightness = 95; // Light pastel background
+  const saturation = 60; // Slightly less saturated for pastel
+  const lightness = 80; // Not too pale, not too dark
 
   // Determine text color for contrast
-  // With a light background (lightness > 65), dark text is better.
-  const textColor = 'hsl(0, 0%, 20%)'; // A very dark gray
+  const textColor = 'hsl(0, 0%, 30%)'; // Dark gray for readability on light pastel
 
   return {
     backgroundColor: `hsl(${hue}, ${saturation}%, ${lightness}%)`,
