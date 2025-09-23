@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useNotes } from '../lib/useNotes';
 import { ScheduleEvent, Subject, Note } from '../lib/types';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import ScheduleImportButton from '../components/ScheduleImportButton';
 import { ClassPortalModal } from '../components/ClassPortalModal';
 import { format, isSameDay, startOfWeek, endOfWeek, eachDayOfInterval, isToday, getDay, addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
