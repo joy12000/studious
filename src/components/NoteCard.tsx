@@ -89,6 +89,27 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
   }
 
   // Grid View - A4-like vertical format
+  if (note.sourceType === 'youtube' && thumbnailUrl) {
+    return (
+      <Link to={`/note/${note.id}`} className="group block relative aspect-video w-full">
+        <img 
+          src={thumbnailUrl} 
+          alt={note.title} 
+          className="h-full w-full object-cover rounded-lg transition-all duration-300 group-hover:shadow-xl"
+        />
+        {onToggleFavorite && (
+          <button
+            onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }}
+            className="absolute top-2 right-2 h-7 w-7 flex items-center justify-center rounded-full bg-black/30 text-white backdrop-blur-sm transition-colors hover:bg-black/50"
+            title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
+          >
+            <Star className={`h-4 w-4 ${note.favorite ? 'fill-yellow-400' : 'text-white/80'}`} />
+          </button>
+        )}
+      </Link>
+    )
+  }
+
   return (
     <Link to={`/note/${note.id}`} className="group block">
       <Card className="w-full h-full flex flex-col overflow-hidden transition-all duration-300 group-hover:shadow-xl group-hover:-translate-y-1 aspect-[1/1.414]">
@@ -105,20 +126,10 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
           )}
         </CardHeader>
         <CardContent className="p-4 pt-0 flex-grow overflow-hidden">
-          {note.sourceType === 'youtube' && thumbnailUrl ? (
-            <div className="relative w-full aspect-video rounded-md overflow-hidden">
-              <img 
-                src={thumbnailUrl} 
-                alt={note.title} 
-                className="h-full w-full object-cover"
-              />
-            </div>
-          ) : (
             <div 
-              className="prose prose-sm dark:prose-invert text-muted-foreground w-full h-full overflow-y-auto"
+              className="prose prose-xs dark:prose-invert text-muted-foreground w-full h-full overflow-y-auto"
               dangerouslySetInnerHTML={{ __html: marked(note.content) as string }}
             />
-          )}
         </CardContent>
         <div className="flex items-center justify-between p-4 pt-0">
             <NoteTypeIcon type={note.noteType} />

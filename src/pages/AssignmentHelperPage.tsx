@@ -4,7 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { Loader2, UploadCloud, FileText, X, Plus, ExternalLink, BrainCircuit, ChevronsUpDown, BookMarked, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Note } from '../lib/types';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import * as pdfjsLib from 'pdfjs-dist';
 
 // PDF.js 워커 경로 설정
@@ -78,6 +79,8 @@ export default function AssignmentHelperPage() {
     const { notes, allSubjects, addNoteFromAssignment } = useNotes();
     const navigate = useNavigate();
 
+    const [currentStep, setCurrentStep] = useState(1);
+
     const [referenceFiles, setReferenceFiles] = useState<File[]>([]);
     const [problemFiles, setProblemFiles] = useState<File[]>([]);
     const [answerFiles, setAnswerFiles] = useState<File[]>([]);
@@ -86,6 +89,7 @@ export default function AssignmentHelperPage() {
     const [isNotePickerOpen, setIsNotePickerOpen] = useState(false);
     const [selectedExistingNotes, setSelectedExistingNotes] = useState<Note[]>([]);
     const [noteSearchQuery, setNoteSearchQuery] = useState('');
+    const [contextTab, setContextTab] = useState<'files' | 'notes'>('files');
 
     const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
     const [isSubjectPopoverOpen, setIsSubjectPopoverOpen] = useState(false);
@@ -157,48 +161,58 @@ export default function AssignmentHelperPage() {
 
     const isLoading = progressMessage !== null;
 
-    const FileUploadSection = ({ title, files, setFiles, inputId }: { title: string, files: File[], setFiles: React.Dispatch<React.SetStateAction<File[]>>, inputId: string }) => (
-        <div>
-            <h2 className="text-lg font-semibold mb-3">{title}</h2>
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 mb-3 min-h-[6.5rem]">
-                {files.map((file, index) => (
-                    <FilePreview key={index} file={file} onRemove={() => removeFile(index, setFiles)} />
-                ))}
-                <div
-                    className="w-24 h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => document.getElementById(inputId)?.click()}
-                >
-                    <Plus className="h-8 w-8" />
-                </div>
-            </div>
-            <input id={inputId} type="file" multiple onChange={(e) => onFileChange(e, setFiles)} className="hidden" />
-        </div>
+    const renderStep1_SubjectSelect = () => (
+        <Card>
+            <CardHeader>
+                <CardTitle>Step 1: Select Subject</CardTitle>
+                <CardDescription>Select the subject for this assignment.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Popover open={isSubjectPopoverOpen} onOpenChange={setIsSubjectPopoverOpen}>
+                    <PopoverTrigger asChild>
+                        <Button variant="outline" role="combobox" aria-expanded={isSubjectPopoverOpen} className="w-full justify-between">
+                            <div className="flex items-center">
+                                <BookMarked className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                <span className="truncate">{selectedSubject ? selectedSubject.name : "과목 선택"}</span>
+                            </div>
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[--radix-popover-trigger-width)] p-0">
+                        {allSubjects.map((subject) => (
+                        <Button
+                            key={subject.id} variant="ghost" className="w-full justify-start"
+                            onClick={() => {
+                                setSelectedSubject(subject);
+                                setIsSubjectPopoverOpen(false);
+                            }}
+                        >
+                            <Check className={`mr-2 h-4 w-4 ${selectedSubject?.id === subject.id ? 'opacity-100' : 'opacity-0'}`} />
+                            {subject.name}
+                        </Button>
+                        ))}
+                    </PopoverContent>
+                </Popover>
+            </CardContent>
+        </Card>
     );
 
-    return (
-        <>
-            {isLoading && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-                    <div className="flex flex-col items-center gap-4 rounded-lg bg-card p-8 text-card-foreground shadow-xl">
-                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                        <p className="text-lg font-medium">{progressMessage}</p>
-                        <p className="text-sm text-muted-foreground">잠시만 기다려주세요...</p>
-                    </div>
-                </div>
-            )}
-            <div className="min-h-screen w-full flex flex-col items-center bg-background p-4">
-                <div className="w-full max-w-3xl space-y-8">
-                    <div className="text-center">
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground">AI 과제 도우미</h1>
-                        <p className="text-muted-foreground mt-2">참고 자료, 문제, 답안을 올리면 AI가 채점하거나 풀이를 제공해줘요.</p>
-                        <Button variant="outline" size="sm" className="mt-4" onClick={() => window.open('https://eclass3.cau.ac.kr/', '_blank')}>
-                            중앙대학교 e-class 바로가기 <ExternalLink className="ml-2 h-4 w-4"/>
-                        </Button>
-                    </div>
-
-                    {/* 참고 자료 섹션 */}
+    const renderStep2_Context = () => (
+        <Card>
+            <CardHeader>
+                <CardTitle>Step 2: Provide Context (Optional)</CardTitle>
+                <CardDescription>Provide reference materials or select existing notes to give the AI some context.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <ToggleGroup type="single" value={contextTab} onValueChange={(value) => { if (value) setContextTab(value as any); }} className="mb-4">
+                    <ToggleGroupItem value="files">Upload Files</ToggleGroupItem>
+                    <ToggleGroupItem value="notes">Select Notes</ToggleGroupItem>
+                </ToggleGroup>
+                {contextTab === 'files' && (
+                    <FileUploadSection title="" files={referenceFiles} setFiles={setReferenceFiles} inputId="reference-file-upload" />
+                )}
+                {contextTab === 'notes' && (
                     <div>
-                        <h2 className="text-lg font-semibold mb-3">1. 참고 자료 (선택)</h2>
                         <Popover open={isNotePickerOpen} onOpenChange={setIsNotePickerOpen}>
                           <PopoverTrigger asChild>
                             <Button variant="outline" className="w-full mb-4">
@@ -240,50 +254,159 @@ export default function AssignmentHelperPage() {
                                 </ul>
                             </div>
                         )}
-                        <FileUploadSection title="" files={referenceFiles} setFiles={setReferenceFiles} inputId="reference-file-upload" />
                     </div>
+                )}
+            </CardContent>
+        </Card>
+    );
 
-                    {/* 문제 및 답안 섹션 */}
-                    <div className="grid md:grid-cols-2 gap-8">
-                        <FileUploadSection title="2. 과제 문제" files={problemFiles} setFiles={setProblemFiles} inputId="problem-file-upload" />
-                        <FileUploadSection title="3. 내 답안 (선택)" files={answerFiles} setFiles={setAnswerFiles} inputId="answer-file-upload" />
+    const FileUploadSection = ({ title, files, setFiles, inputId }: { title: string, files: File[], setFiles: React.Dispatch<React.SetStateAction<File[]>>, inputId: string }) => (
+        <div>
+            <h2 className="text-lg font-semibold mb-3">{title}</h2>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 mb-3 min-h-[6.5rem]">
+                {files.map((file, index) => (
+                    <FilePreview key={index} file={file} onRemove={() => removeFile(index, setFiles)} />
+                ))}
+                <div
+                    className="w-24 h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => document.getElementById(inputId)?.click()}
+                >
+                    <Plus className="h-8 w-8" />
+                </div>
+            </div>
+            <input id={inputId} type="file" multiple onChange={(e) => onFileChange(e, setFiles)} className="hidden" />
+        </div>
+    );
+
+    const renderStep3_Assignment = () => (
+        <Card>
+            <CardHeader>
+                <CardTitle>Step 3: The Assignment</CardTitle>
+                <CardDescription>Upload the problem file and your answer file (optional).</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <FileUploadSection title="2. 과제 문제" files={problemFiles} setFiles={setProblemFiles} inputId="problem-file-upload" />
+                <FileUploadSection title="3. 내 답안 (선택)" files={answerFiles} setFiles={setAnswerFiles} inputId="answer-file-upload" />
+            </CardContent>
+        </Card>
+    );
+
+    const renderStep4_ReviewAndSubmit = () => (
+        <Card>
+            <CardHeader>
+                <CardTitle>Step 4: Review and Submit</CardTitle>
+                <CardDescription>Review your selections and submit to the AI helper.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <div>
+                    <h3 className="font-semibold">Subject:</h3>
+                    <p>{selectedSubject?.name || 'Not selected'}</p>
+                </div>
+                <div>
+                    <h3 className="font-semibold">Reference Files:</h3>
+                    {referenceFiles.length > 0 ? (
+                        <ul>
+                            {referenceFiles.map((file, index) => (
+                                <li key={index}>{file.name}</li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p>No reference files uploaded.</p>
+                    )}
+                </div>
+                <div>
+                    <h3 className="font-semibold">Problem Files:</h3>
+                    {problemFiles.length > 0 ? (
+                        <ul>
+                            {problemFiles.map((file, index) => (
+                                <li key={index}>{file.name}</li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p>No problem files uploaded.</p>
+                    )}
+                </div>
+                <div>
+                    <h3 className="font-semibold">Answer Files:</h3>
+                    {answerFiles.length > 0 ? (
+                        <ul>
+                            {answerFiles.map((file, index) => (
+                                <li key={index}>{file.name}</li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p>No answer files uploaded.</p>
+                    )}
+                </div>
+                <div>
+                    <h3 className="font-semibold">Selected Notes:</h3>
+                    {selectedExistingNotes.length > 0 ? (
+                        <ul>
+                            {selectedExistingNotes.map((note) => (
+                                <li key={note.id}>{note.title}</li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p>No existing notes selected.</p>
+                    )}
+                </div>
+                {error && <p className="text-destructive text-sm text-center">{error}</p>}
+                <div className="mt-8 text-center">
+                    <Button size="lg" onClick={handleSubmit} disabled={isLoading || problemFiles.length === 0 || !selectedSubject}>
+                        {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <BrainCircuit className="mr-2 h-5 w-5"/>}
+                        {answerFiles.length > 0 ? "AI 채점 요청" : "AI 풀이 생성"}
+                    </Button>
+                </div>
+            </CardContent>
+        </Card>
+    );
+
+    const renderContent = () => {
+        switch (currentStep) {
+            case 1:
+                return renderStep1_SubjectSelect();
+            case 2:
+                return renderStep2_Context();
+            case 3:
+                return renderStep3_Assignment();
+            case 4:
+                return renderStep4_ReviewAndSubmit();
+            default:
+                return <div>Unknown Step</div>;
+        }
+    };
+
+    return (
+        <>
+            {isLoading && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="flex flex-col items-center gap-4 rounded-lg bg-card p-8 text-card-foreground shadow-xl">
+                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                        <p className="text-lg font-medium">{progressMessage}</p>
+                        <p className="text-sm text-muted-foreground">잠시만 기다려주세요...</p>
                     </div>
-
-                    {/* --- Subject Selector --- */}
-                    <div className="w-full max-w-sm mx-auto">
-                        <Popover open={isSubjectPopoverOpen} onOpenChange={setIsSubjectPopoverOpen}>
-                            <PopoverTrigger asChild>
-                                <Button variant="outline" role="combobox" aria-expanded={isSubjectPopoverOpen} className="w-full justify-between">
-                                    <div className="flex items-center">
-                                        <BookMarked className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                                        <span className="truncate">{selectedSubject ? selectedSubject.name : "과목 선택"}</span>
-                                    </div>
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-[--radix-popover-trigger-width)] p-0">
-                                {allSubjects.map((subject) => (
-                                <Button
-                                    key={subject.id} variant="ghost" className="w-full justify-start"
-                                    onClick={() => {
-                                        setSelectedSubject(subject);
-                                        setIsSubjectPopoverOpen(false);
-                                    }}
-                                >
-                                    <Check className={`mr-2 h-4 w-4 ${selectedSubject?.id === subject.id ? 'opacity-100' : 'opacity-0'}`} />
-                                    {subject.name}
-                                </Button>
-                                ))}
-                            </PopoverContent>
-                        </Popover>
-                    </div>
-
-                    {error && <p className="text-destructive text-sm text-center">{error}</p>}
-
-                    <div className="mt-8 text-center">
-                        <Button size="lg" onClick={handleSubmit} disabled={isLoading || problemFiles.length === 0 || !selectedSubject}>
-                            {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <BrainCircuit className="mr-2 h-5 w-5"/>}
-                            {answerFiles.length > 0 ? "AI 채점 요청" : "AI 풀이 생성"}
+                </div>
+            )}
+            <div className="min-h-screen w-full flex flex-col items-center justify-center bg-gray-50 p-4">
+                <div className="w-full max-w-2xl">
+                    {renderContent()}
+                    <div className="flex justify-between mt-8">
+                        <Button variant="outline" onClick={() => setCurrentStep(s => Math.max(1, s - 1))} disabled={currentStep === 1}>
+                            이전
+                        </Button>
+                        <Button onClick={() => {
+                            if (currentStep === 1 && !selectedSubject) {
+                                setError("과목을 선택해주세요.");
+                                return;
+                            }
+                            if (currentStep === 3 && problemFiles.length === 0) {
+                                setError("과제 문제 파일을 업로드해야 합니다.");
+                                return;
+                            }
+                            setError(null);
+                            setCurrentStep(s => Math.min(4, s + 1));
+                        }} disabled={currentStep === 4}>
+                            다음
                         </Button>
                     </div>
                 </div>
