@@ -6,9 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
-
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { useNotes } from '../lib/useNotes'; // ✨ useNotes 훅 임포트
+import { useNotes } from '../lib/useNotes';
 
 interface Props {
   isOpen: boolean;
@@ -17,14 +16,14 @@ interface Props {
   notes: Note[];
   subjects: Subject[];
   contextSubject?: Subject;
-  contextDate?: Date; // ✨ [추가] '데일리 포털'의 경우, 컨텍스트가 되는 날짜
+  contextDate?: Date;
 }
 
 const NoteItem = ({ note, subjectName }: { note: Note; subjectName: string }) => {
   const navigate = useNavigate();
   return (
     <div 
-      className="p-3 rounded-lg hover:bg-muted cursor-pointer"
+      className="p-3 rounded-lg hover:bg-muted cursor-pointer transition-colors"
       onClick={() => navigate(`/note/${note.id}`)}
     >
       <div className="flex justify-between items-center mb-1">
@@ -38,57 +37,43 @@ const NoteItem = ({ note, subjectName }: { note: Note; subjectName: string }) =>
 
 export const ClassPortalModal: React.FC<Props> = ({ isOpen, onClose, title, notes, subjects, contextSubject, contextDate }) => {
   const navigate = useNavigate();
-  const { createEmptyNote } = useNotes(); // ✨ createEmptyNote 함수 가져오기
+  const { createEmptyNote } = useNotes();
   const [filter, setFilter] = useState<'textbook' | 'review' | undefined>();
 
-  const subjectsById = useMemo(() => {
-    const map = new Map<string, Subject>();
-    subjects.forEach(sub => map.set(sub.id, sub));
-    return map;
-  }, [subjects]);
+  const subjectsById = useMemo(() => new Map(subjects.map(sub => [sub.id, sub])), [subjects]);
 
   const filteredAndGroupedNotes = useMemo(() => {
-    if (!notes) return []; // Add this check
-    const filtered = notes.filter(note => {
-      if (filter) {
-        return note.noteType === filter;
-      }
+    const filtered = (notes || []).filter(note => {
+      if (filter) return note.noteType === filter;
       return note.noteType === 'textbook' || note.noteType === 'review';
     });
-
-    // 날짜별로 그룹화
     const grouped = new Map<string, Note[]>();
     filtered.forEach(note => {
-      const dateStr = format(new Date(note.createdAt), 'yyyy-MM-dd (eee)', { locale: ko });
-      if (!grouped.has(dateStr)) {
-        grouped.set(dateStr, []);
-      }
+      const dateStr = format(new Date(note.noteDate || note.createdAt), 'yyyy-MM-dd (eee)', { locale: ko });
+      if (!grouped.has(dateStr)) grouped.set(dateStr, []);
       grouped.get(dateStr)!.push(note);
     });
     return Array.from(grouped.entries());
-
   }, [notes, filter]);
   
   const handleGoToChat = () => {
+    onClose();
     navigate('/chat', { state: { subject: contextSubject, date: contextDate } });
   };
   
-  // ✨ [핵심 수정] 새 노트 추가 핸들러
   const handleAddNewNote = async () => {
-    if (!contextSubject || !contextDate) {
-        alert("노트를 추가할 과목과 날짜 정보가 필요합니다.");
-        return;
-    }
+    if (!contextSubject) return;
     const noteTitle = prompt("새 노트의 제목을 입력하세요:");
     if (noteTitle) {
-        try {
-            const newNote = await createEmptyNote(noteTitle, contextSubject.id, contextDate);
-            onClose(); // 모달 닫기
-            navigate(`/note/${newNote.id}`); // 생성된 노트 페이지로 이동
-        } catch (error) {
-            console.error("Failed to create new note:", error);
-            alert("노트 생성에 실패했습니다.");
-        }
+      try {
+        const dateToUse = contextDate || new Date();
+        const newNote = await createEmptyNote(noteTitle, contextSubject.id, dateToUse);
+        onClose();
+        navigate(`/note/${newNote.id}`);
+      } catch (error) {
+        console.error("Failed to create new note:", error);
+        alert("노트 생성에 실패했습니다.");
+      }
     }
   };
 
@@ -96,58 +81,46 @@ export const ClassPortalModal: React.FC<Props> = ({ isOpen, onClose, title, note
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-card w-full max-w-lg h-[80vh] rounded-2xl shadow-xl flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <header className="p-4 border-b flex items-center justify-between flex-shrink-0">
-          <h2 className="text-lg font-bold">{title}</h2>
+      <Card className="w-full max-w-lg h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+        <CardHeader className="flex-row items-center justify-between">
+          <CardTitle>{title}</CardTitle>
           <Button variant="ghost" size="icon" onClick={onClose}><X className="h-5 w-5" /></Button>
-        </header>
-
-        <div className="p-4 flex-shrink-0 border-b">
-          <ToggleGroup 
-            type="single" 
-            value={filter} 
-            onValueChange={(value) => setFilter(value as any)}
-            className="w-full justify-start"
-          >
+        </CardHeader>
+        <div className="px-6 pb-4 border-b">
+          <ToggleGroup type="single" value={filter} onValueChange={(value) => setFilter(value as any)} className="w-full justify-start">
             <ToggleGroupItem value="textbook" size="sm"><BrainCircuit className="h-4 w-4 mr-1.5"/>AI 참고서</ToggleGroupItem>
             <ToggleGroupItem value="review" size="sm"><Notebook className="h-4 w-4 mr-1.5"/>복습 노트</ToggleGroupItem>
           </ToggleGroup>
         </div>
-
-        <main className="flex-1 overflow-y-auto p-2">
+        <CardContent className="flex-1 overflow-y-auto p-2">
           {filteredAndGroupedNotes.length > 0 ? (
             <div className="space-y-4">
               {filteredAndGroupedNotes.map(([dateStr, dateNotes]) => (
                 <div key={dateStr}>
                   <div className="px-3 py-1 text-xs font-semibold text-muted-foreground sticky top-0 bg-card/80 backdrop-blur-sm">{dateStr}</div>
                   <div className="divide-y divide-border/50">
-                    {dateNotes.map(note => (
-                       <NoteItem key={note.id} note={note} subjectName={subjectsById.get(note.subjectId!)?.name || "알 수 없음"} />
-                    ))}
+                    {dateNotes.map(note => <NoteItem key={note.id} note={note} subjectName={subjectsById.get(note.subjectId!)?.name || "알 수 없음"} />)}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center text-muted-foreground pt-16">
-              <p>해당하는 노트가 없습니다.</p>
-            </div>
+            <div className="text-center text-muted-foreground pt-16"><p>해당하는 노트가 없습니다.</p></div>
           )}
-        </main>
-
-        {contextSubject && (
+        </CardContent>
+        {(contextSubject || contextDate) && (
             <footer className="p-4 border-t grid grid-cols-2 gap-2 flex-shrink-0">
-                <Button variant="outline" onClick={handleGoToChat}>
+                <Button variant="outline" onClick={handleGoToChat} disabled={!contextSubject}>
                     <BrainCircuit className="h-4 w-4 mr-2" />
                     AI 참고서 만들기
                 </Button>
-                <Button>
-                    <Plus className="h-4 w-4 mr-2" /> 
+                <Button onClick={handleAddNewNote} disabled={!contextSubject}>
+                    <Plus className="h-4 w-4 mr-2" />
                     새 노트 추가
                 </Button>
             </footer>
         )}
-      </div>
+      </Card>
     </div>
   );
 };

@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useNotes } from '../lib/useNotes';
 import { ScheduleEvent, Subject, Note } from '../lib/types';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import ScheduleImportButton from '../components/ScheduleImportButton';
 import { ClassPortalModal } from '../components/ClassPortalModal';
 import { format, isSameDay, startOfWeek, endOfWeek, eachDayOfInterval, isToday, getDay, addWeeks, subWeeks, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
@@ -94,9 +94,9 @@ const WeeklyCalendarView = ({ onEventClick }: { onEventClick: (event: ScheduleEv
 };
 
 
-// --- Improved MonthlyCalendarView ---
+// --- MonthlyCalendarView (수업 표시 기능 복구) ---
 const MonthlyCalendarView = () => {
-    const { notes, allSubjects } = useNotes();
+    const { notes, allSubjects, schedule } = useNotes();
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const navigate = useNavigate();
 
@@ -109,24 +109,54 @@ const MonthlyCalendarView = () => {
         return dates;
     }, [notes]);
     
-    const daysInGrid = eachDayOfInterval({
+    const daysInGrid = useMemo(() => eachDayOfInterval({
         start: startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 0 }),
         end: endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 0 })
-    });
-
+    }), [currentMonth]);
     const subjectsById = useMemo(() => new Map(allSubjects.map(s => [s.id, s])), [allSubjects]);
+    
+    // ✨ [핵심 추가] 날짜별 수업 이벤트를 그룹화하는 로직
+    const eventsByDate = useMemo(() => {
+        const grouped = new Map<string, ScheduleEvent[]>();
+        const dayOfWeekMap: { [key: string]: number } = { '일': 0, '월': 1, '화': 2, '수': 3, '목': 4, '금': 5, '토': 6 };
+
+        daysInGrid.forEach(day => {
+            const dayIndex = getDay(day);
+            const dayOfWeekStr = Object.keys(dayOfWeekMap).find(key => dayOfWeekMap[key] === dayIndex);
+            if(dayOfWeekStr) {
+                const dailyEvents = schedule.filter(e => e.dayOfWeek === dayOfWeekStr)
+                                            .sort((a,b) => a.startTime.localeCompare(b.startTime));
+                if (dailyEvents.length > 0) {
+                    grouped.set(format(day, 'yyyy-MM-dd'), dailyEvents);
+                }
+            }
+        });
+        return grouped;
+    }, [schedule, daysInGrid]);
 
     const DayCell = ({ day }: { day: Date }) => {
         const dateStr = format(day, 'yyyy-MM-dd');
         const hasNote = noteDates.has(dateStr);
         const notesForDay = (notes || []).filter(note => (note.noteDate || format(new Date(note.createdAt), 'yyyy-MM-dd')) === dateStr);
+        const eventsForDay = eventsByDate.get(dateStr) || [];
         
         return (
             <Popover>
                 <PopoverTrigger asChild>
-                    <div className="h-28 border-t border-l p-1.5 flex flex-col cursor-pointer hover:bg-muted/50 transition-colors">
+                    <div className="h-32 border-t border-l p-1.5 flex flex-col cursor-pointer hover:bg-muted/50 transition-colors">
                         <span className={`text-xs ${isToday(day) ? 'font-bold text-primary' : ''} ${format(day, 'M') !== format(currentMonth, 'M') ? 'text-muted-foreground' : ''}`}>{format(day, 'd')}</span>
-                        {hasNote && <div className="w-1.5 h-1.5 bg-primary rounded-full self-center mt-1"></div>}
+                        {hasNote && <div className="w-1.5 h-1.5 bg-primary rounded-full self-center my-1"></div>}
+                        {/* ✨ [핵심 추가] 수업 이벤트 렌더링 */}
+                        <div className="flex-1 space-y-1 mt-1 overflow-hidden">
+                            {eventsForDay.slice(0, 2).map(event => {
+                                const subject = subjectsById.get(event.subjectId);
+                                return (
+                                    <div key={event.id} className="text-[10px] p-1 rounded-sm text-white truncate" style={{ backgroundColor: subject?.color || '#6b7280' }}>
+                                        {subject?.name}
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 </PopoverTrigger>
                 <PopoverContent className="w-80 p-0" align="start">
@@ -211,7 +241,7 @@ export default function SchedulePage() {
 
         <ClassPortalModal 
             isOpen={isPortalOpen}
-            onClose={() => setIsPortalOpen(false)}
+            onClose={() => setIsPortalModal(false)}
             title={portalTitle}
             notes={portalNotes}
             subjects={allSubjects}
