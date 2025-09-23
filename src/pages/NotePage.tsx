@@ -9,7 +9,7 @@ import AttachmentPanel from '../components/AttachmentPanel';
 import { exportPlainSingleNote } from '../lib/backup';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import { 
-  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit, Bot, ChevronsUpDown, ClipboardCopy
+  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit, Bot, ChevronsUpDown, ClipboardCopy, List
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 type TextbookSection = {
   title: string;
   content: string;
+  id: string; // ✨ [추가] 섹션별 고유 ID
 };
 
 function parseTextbookContent(markdownText: string): TextbookSection[] {
@@ -32,9 +33,44 @@ function parseTextbookContent(markdownText: string): TextbookSection[] {
     const lines = sectionText.split('\n');
     const title = lines[0].replace(/^[#\s]+/, '').trim(); // 제목 추출
     const content = lines.slice(1).join('\n').trim(); // 나머지 내용
-    return { title, content };
+    // ✨ [개선] 제목을 기반으로 URL 친화적인 ID 생성
+    const id = `section-${title.toLowerCase().replace(/\s+/g, '-')}.replace(/[^\w-]+/g, '') || index}`;
+    return { title, content, id };
   });
 }
+
+// ✨ [핵심 추가] 목차 컴포넌트
+const TableOfContents = ({ sections }: { sections: TextbookSection[] }) => {
+  const handleScrollTo = (id: string) => {
+    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  return (
+    <Card className="mb-8 bg-muted/50">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <List className="h-5 w-5" />
+          목차
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2">
+          {sections.map(section => (
+            <li key={section.id}>
+              <button 
+                onClick={() => handleScrollTo(section.id)}
+                className="text-primary hover:underline text-left"
+              >
+                {section.title}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+};
+
 
 // Helper to format dates robustly
 const formatDate = (dateValue: string | number) => {
@@ -441,23 +477,25 @@ export default function NotePage() {
                     </div>
                   ) : (
                     <div>
-                      {textbookSections.length > 0 ? (
-                        <div className="space-y-3">
-                          {textbookSections.map((section, index) => (
-                            <details key={index} className="group rounded-lg border bg-card p-4 transition-all duration-300 open:bg-primary/5 open:shadow-inner" open={index < 2}>
-                              <summary className="cursor-pointer text-lg font-semibold text-foreground list-none flex items-center justify-between">
-                                {section.title}
-                                <div className="transform transition-transform duration-300 group-open:rotate-180">
-                                  <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />
-                                </div>
-                              </summary>
-                              <div className="mt-4 note-content-line-height prose prose-slate max-w-none dark:prose-invert prose-headings:font-semibold leading-relaxed">
-                                <MarkdownRenderer content={section.content} />
-                              </div>
-                            </details>
-                          ))}
-                        </div>
-                      ) : (
+                                        {/* ✨ [핵심 개선] 목차 렌더링 */}
+                                        {textbookSections.length > 0 && <TableOfContents sections={textbookSections} />}
+
+                                        {textbookSections.length > 0 ? (
+                                            <div className="space-y-3">
+                                                {textbookSections.map((section) => (
+                                                    // ✨ [개선] 각 섹션에 고유 ID 추가
+                                                    <details key={section.id} id={section.id} className="group rounded-lg border bg-card p-4 ...">
+                                                        <summary className="cursor-pointer ...">
+                                                            {section.title}
+                                                            {/* ... */}
+                                                        </summary>
+                                                        <div className="mt-4 ...">
+                                                            <MarkdownRenderer content={section.content} />
+                                                        </div>
+                                                    </details>
+                                                ))}
+                                            </div>
+                                        ) : (
                         <div className="note-content-line-height prose prose-lg max-w-none dark:prose-invert prose-p:leading-relaxed prose-headings:font-semibold">
                           <MarkdownRenderer content={note.content} />
                         </div>
