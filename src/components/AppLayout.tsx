@@ -48,7 +48,13 @@ const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolea
     <div className="flex h-full flex-col">
       <div className="mb-8 flex items-center justify-between">
         <div className={`font-bold text-primary transition-all duration-300 ${isCollapsed ? 'w-full flex justify-center text-2xl' : 'text-2xl'}`}>
-          <Link to="/" onClick={handleLinkClick}>{isCollapsed ? 'S' : 'studious'}</Link>
+          {isCollapsed ? (
+            <div onClick={onToggleCollapse} className="cursor-pointer p-2 -m-2" title="사이드바 펼치기">
+              S
+            </div>
+          ) : (
+            <Link to="/" onClick={handleLinkClick}>studious</Link>
+          )}
         </div>
         
         {/* 펼친 상태의 데스크탑 접기 버튼 (상단) */}
@@ -91,12 +97,6 @@ const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolea
 
       {/* 사이드바 하단 */}
       <div className="mt-auto pt-4">
-        {/* 접힌 상태의 데스크탑 펼치기 버튼 (하단) */}
-        {isCollapsed && (
-          <Button variant="ghost" onClick={onToggleCollapse} className="hidden md:flex w-full justify-center">
-            <ChevronsRight className="h-5 w-5" />
-          </Button>
-        )}
         <p className={`text-xs text-muted-foreground mt-2 text-center w-full transition-opacity ${isCollapsed ? 'opacity-0' : 'opacity-100'}`}>
           
         </p>

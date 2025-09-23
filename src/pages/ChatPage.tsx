@@ -49,6 +49,8 @@ export default function ChatPage() {
               setSelectedDate(location.state.date);
           }
       }
+      // Explicitly set pageState to 'upload' after processing location.state
+      setPageState('upload'); 
   }, [location.state]);
 
   const [messages, setMessages] = useState<Message[]>([]);
