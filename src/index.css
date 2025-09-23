@@ -5,72 +5,70 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
- 
+    --foreground: 224 71.4% 4.1%;
+
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 224 71.4% 4.1%;
  
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 224 71.4% 4.1%;
  
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 220 9.8% 41.2%;
+    --primary-foreground: 210 20% 98%;
  
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 220 9.8% 41.2%;
  
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 43.1%;
  
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 220 14.3% 95.9%;
+    --accent-foreground: 220 9.8% 41.2%;
  
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 210 20% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
- 
-    --radius: 0.5rem;
-
-    /* ⭐ [기능 추가] 퀴즈 정답/오답 색상 변수 */
     --success: 142.1 76.2% 36.3%;
     --success-foreground: 142.1 76.2% 96.3%;
+
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 224 71.4% 4.1%;
+ 
+    --radius: 0.75rem;
   }
  
   .dark {
-    --background: 220 25% 10%;
-    --foreground: 210 20% 95%;
+    --background: 222 47.4% 11.2%;
+    --foreground: 210 20% 98%;
  
-    --card: 220 25% 15%;
-    --card-foreground: 210 20% 95%;
+    --card: 217 32.6% 17.5%;
+    --card-foreground: 210 20% 98%;
  
-    --popover: 220 25% 15%;
-    --popover-foreground: 210 20% 95%;
+    --popover: 222 47.4% 11.2%;
+    --popover-foreground: 210 20% 98%;
  
-    --primary: 210 70% 60%;
-    --primary-foreground: 220 25% 10%;
+    --primary: 210 20% 98%;
+    --primary-foreground: 220.9 39.3% 11%;
  
-    --secondary: 215 20% 25%;
-    --secondary-foreground: 210 20% 95%;
+    --secondary: 215 27.9% 16.9%;
+    --secondary-foreground: 210 20% 98%;
  
-    --muted: 215 20% 25%;
-    --muted-foreground: 215 15% 55%;
+    --muted: 215 27.9% 16.9%;
+    --muted-foreground: 217.9 10.6% 64.9%;
  
-    --accent: 215 20% 25%;
-    --accent-foreground: 210 20% 95%;
+    --accent: 215 27.9% 16.9%;
+    --accent-foreground: 210 20% 98%;
  
-    --destructive: 0 63% 31%;
-    --destructive-foreground: 210 40% 98%;
- 
-    --border: 215 15% 20%;
-    --input: 215 15% 20%;
-    --ring: 210 70% 60%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 20% 98%;
 
-    /* ⭐ [기능 추가] 퀴즈 정답/오답 색상 변수 (다크) */
     --success: 142.1 70.2% 46.3%;
     --success-foreground: 142.1 70.2% 6.3%;
+ 
+    --border: 215 27.9% 16.9%;
+    --input: 215 27.9% 16.9%;
+    --ring: 216 12.2% 83.9%;
   }
 }
  
@@ -79,7 +77,8 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground h-full;
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
   }
   html, #root {
     @apply h-full;
@@ -89,7 +88,7 @@
     line-height: 2.0 !important;
   }
 
-  /* ⭐ [기능 추가] 핵심 용어 툴팁 스타일 */
+  /* 💎 핵심 용어 툴팁 스타일 */
   dfn {
     @apply cursor-help relative border-b border-dashed border-foreground/50;
   }
@@ -101,18 +100,7 @@
   }
 }
 
-/* TipTap Editor Styles */
-@layer components {
-  /* ... (기존 TipTap 스타일) ... */
-}
-
-/* Prose 스타일 */
 .prose p {
   margin-top: 1.25em;
   margin-bottom: 1.25em;
-}
-
-/* ⭐ [기능 추가] 퀴즈 정답 버튼 스타일 */
-.btn-success {
-    @apply bg-success text-success-foreground;
 }

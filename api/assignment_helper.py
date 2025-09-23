@@ -54,12 +54,74 @@ class handler(BaseHTTPRequestHandler):
 
             has_answer = bool(answer_files)
             
+            shared_formatting_rules = """
+            # 🎨 출력 서식 규칙 (★★★★★ 가장 중요)
+            당신이 생성하는 모든 텍스트는 아래 규칙을 **반드시** 따라야 합니다.
+            
+            1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 **반드시** KaTeX 문법으로 감싸야 합니다. (인라인: `# api/assignment_helper.py
+
+from http.server import BaseHTTPRequestHandler
+import json
+import os
+import google.generativeai as genai
+import cgi
+from PIL import Image
+import io
+import traceback
+from pdf2image import convert_from_bytes
+
+class handler(BaseHTTPRequestHandler):
+    def handle_error(self, e, message="오류 발생", status_code=500):
+        print(f"ERROR: {message} - {e}")
+        traceback.print_exc()
+        if not hasattr(self, '_headers_sent') or not self._headers_sent:
+            try:
+                self.send_response(status_code)
+                self.send_header('Content-type', 'application/json; charset=utf-8')
+                self.end_headers()
+                error_details = {"error": message, "details": str(e)}
+                self.wfile.write(json.dumps(error_details).encode('utf-8'))
+            except Exception as write_error:
+                print(f"FATAL: 오류 응답 전송 중 추가 오류 발생: {write_error}")
+
+    def do_POST(self):
+        api_keys = [
+            os.environ.get('GEMINI_API_KEY_PRIMARY'),
+            os.environ.get('GEMINI_API_KEY_SECONDARY'),
+            os.environ.get('GEMINI_API_KEY_TERTIARY'),
+            os.environ.get('GEMINI_API_KEY_QUATERNARY'),
+            os.environ.get('GEMINI_API_KEY')
+        ]
+        valid_keys = [key for key in api_keys if key]
+
+        if not valid_keys:
+            return self.handle_error(ValueError("설정된 Gemini API 키가 없습니다."), "API 키 설정 오류", 500)
+
+        last_error = None
+
+        try:
+            form = cgi.FieldStorage(
+                fp=self.rfile,
+                headers=self.headers,
+                environ={'REQUEST_METHOD': 'POST', 'CONTENT_TYPE': self.headers['Content-Type']}
+            )
+            
+            note_context = form.getvalue('note_context', '')
+            reference_files = form.getlist('reference_files')
+            problem_files = form.getlist('problem_files')
+            answer_files = form.getlist('answer_files')
+            subject_id = form.getvalue('subjectId', None)
+
+, 블록: `$`)
+            2.  **다이어그램 (Mermaid):** 복잡한 시스템, 알고리즘, 상태 변화는 **반드시** Mermaid.js 문법으로 시각화해야 합니다. (```mermaid...```)
+            3.  **코드 (Code Block):** 모든 소스 코드는 **반드시** 언어를 명시한 코드 블록으로 작성해야 합니다. (```python...```)
+            4.  **핵심 용어 (Tooltip):** 중요한 전공 용어는 **반드시** `<dfn title="설명">용어</dfn>` HTML 태그로 감싸 설명을 제공해야 합니다.
+            """
+
             prompt_template_grading = f"""
             # 역할: 최고의 대학 교수 및 튜터
             학생의 과제물을 채점하고 상세한 피드백을 제공합니다.
-
-            # 제공 자료
-            - 참고 자료, 문제, 학생 답안 (첨부됨)
+            {shared_formatting_rules}
 
             # 작업 순서
             1. **채점:** 100점 만점으로 채점하고 단계별 부분 점수를 매깁니다.
@@ -68,16 +130,11 @@ class handler(BaseHTTPRequestHandler):
             4. **모범 풀이:** 이상적인 문제 해결 과정을 단계별로 제시합니다.
             5. **추가 학습 제안:** 관련 키워드나 주제를 제안합니다.
 
-            # 출력 형식 (반드시 준수)
-            - 단일 JSON 객체로만 응답해야 합니다.
-            - `content` 필드는 마크다운 형식입니다.
-            - **수식:** 모두 LaTeX 형식으로 작성합니다. (예: `$$E = mc^2$$`)
-            - **코드:** 반드시 언어를 명시한 코드 블록을 사용합니다. (예: ```python\nprint("hello")\n```)
-            - **핵심 용어:** `<dfn title="용어에 대한 간단한 설명">핵심 용어</dfn>` HTML 태그로 감싸서 툴팁을 제공합니다.
-            
+            # JSON 출력 형식 (반드시 준수)
+            - 단일 JSON 객체로만 응답합니다.
             {{
                 "title": "AI 채점 결과: [문제의 핵심 내용]",
-                "content": "# AI 채점 결과\\n\\n## 총점\\n- .../100\\n\\n## 총평\\n- ...\\n\\n## 상세 피드백\\n- ...\\n\\n## 모범 풀이\\n- ...\\n\\n## 추가 학습 제안\\n- ...",
+                "content": "# AI 채점 결과\n\n## 총점\n- .../100\n\n## 총평\n- ...\n\n## 상세 피드백\n- ...\n\n## 모범 풀이\n- ...\n\n## 추가 학습 제안\n- ...",
                 "subjectId": "{subject_id}"
             }}
             """
@@ -85,28 +142,19 @@ class handler(BaseHTTPRequestHandler):
             prompt_template_solving = f"""
             # 역할: 최고의 대학 교수 및 튜터
             학생의 문제를 상세하고 이해하기 쉽게 풀어줍니다.
-
-            # 제공 자료
-            - 참고 자료, 문제 (첨부됨)
+            {shared_formatting_rules}
 
             # 작업 순서
             1. **문제 분석:** 문제의 핵심 요소를 파악합니다.
             2. **핵심 개념 정리:** 문제 해결에 필요한 이론과 공식을 정리합니다.
-            3. **모범 풀이:** 아래 '시각 자료 및 서식 규칙'을 적극적으로 사용하여 단계별로 상세히 설명합니다.
+            3. **모범 풀이:** 위의 '출력 서식 규칙'을 적극적으로 사용하여 단계별로 상세히 설명합니다.
             4. **결론:** 최종 답안을 명확하게 제시하고 풀이 과정을 요약합니다.
 
-            # 시각 자료 및 서식 규칙 (Mermaid.js, LaTeX, 코드 강조 등)
-            - **Mermaid 다이어그램:** 알고리즘, 시스템 구조, 상태 변화 등 복잡한 관계 설명 시 반드시 Mermaid.js 문법(순서도, 클래스 다이어그램 등)을 사용하여 시각화합니다. 다이어그램 코드는 ```mermaid ... ``` 코드 블록으로 감싸야 합니다.
-            - **수식:** 모두 LaTeX 형식으로 작성합니다. (예: `$$E = mc^2$$`)
-            - **코드:** 반드시 언어를 명시한 코드 블록을 사용합니다. (예: ```python\nprint("hello")\n```)
-            - **핵심 용어:** `<dfn title="용어에 대한 간단한 설명">핵심 용어</dfn>` HTML 태그로 감싸서 툴팁을 제공합니다.
-
-            # 출력 형식 (반드시 준수)
+            # JSON 출력 형식 (반드시 준수)
             - 단일 JSON 객체로만 응답합니다.
-            - `content` 필드는 위의 규칙들을 모두 반영한 마크다운 형식입니다.
             {{
                 "title": "AI 문제 풀이: [문제의 핵심 내용]",
-                "content": "# AI 문제 풀이\\n\\n## 문제 분석\\n- ...\\n\\n## 핵심 개념 정리\\n- ...\\n\\n## 모범 풀이\\n- ...\\n\\n## 결론\\n- ...",
+                "content": "# AI 문제 풀이\n\n## 문제 분석\n- ...\n\n## 핵심 개념 정리\n- ...\n\n## 모범 풀이\n- ...\n\n## 결론\n- ...",
                 "subjectId": "{subject_id}"
             }}
             """

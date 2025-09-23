@@ -19,6 +19,7 @@ export default function ReviewPage() {
   
   const { isLoading, loadingMessage, startLoading, stopLoading, setMessage } = useLoading();
   const [files, setFiles] = useState<File[]>([]);
+  const [error, setError] = useState<string | null>(null);
   
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);

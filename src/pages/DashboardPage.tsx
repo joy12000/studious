@@ -1,5 +1,4 @@
-// src/pages/DashboardPage.tsx
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useNotes } from '../lib/useNotes';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Bar } from 'react-chartjs-2';
@@ -10,6 +9,18 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 export default function DashboardPage() {
     const { notes, allSubjects } = useNotes();
+    const [theme, setTheme] = useState(localStorage.getItem('pref-theme') || 'light');
+
+    // 테마 변경 감지 (옵션)
+    useEffect(() => {
+        const observer = new MutationObserver(() => {
+            const newTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+            setTheme(newTheme);
+        });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        return () => observer.disconnect();
+    }, []);
+
 
     const stats = useMemo(() => {
         const noteCount = notes.length;
@@ -26,28 +37,46 @@ export default function DashboardPage() {
         return { noteCount, textbookCount, reviewCount, assignmentCount, notesBySubject };
     }, [notes, allSubjects]);
 
-    const chartData = {
+    const chartData = useMemo(() => ({
         labels: stats.notesBySubject.map(s => s.name),
         datasets: [
             {
                 label: '노트 수',
                 data: stats.notesBySubject.map(s => s.count),
-                backgroundColor: 'hsl(var(--primary))',
+                backgroundColor: theme === 'dark' ? 'hsl(210 70% 60%)' : 'hsl(222.2 47.4% 11.2%)',
                 borderRadius: 4,
             },
         ],
-    };
+    }), [stats.notesBySubject, theme]);
 
-    const chartOptions = {
-        responsive: true,
-        plugins: {
-            legend: { display: false },
-            title: { display: true, text: '과목별 노트 수' },
-        },
-        scales: {
-            y: { ticks: { stepSize: 1 } }
-        }
-    };
+    const chartOptions = useMemo(() => {
+        const textColor = theme === 'dark' ? 'hsl(210 20% 95%)' : 'hsl(222.2 84% 4.9%)';
+        const gridColor = theme === 'dark' ? 'hsl(215 15% 20%)' : 'hsl(214.3 31.8% 91.4%)';
+
+        return {
+            maintainAspectRatio: false, // 👈 [버그 수정] 컨테이너 크기에 맞추도록 설정
+            responsive: true,
+            plugins: {
+                legend: { display: false },
+                title: { display: true, text: '과목별 노트 수', color: textColor, font: { size: 16 } },
+                tooltip: {
+                    backgroundColor: theme === 'dark' ? 'hsl(220 25% 15%)' : 'hsl(0 0% 100%)',
+                    titleColor: textColor,
+                    bodyColor: textColor,
+                }
+            },
+            scales: {
+                y: {
+                    ticks: { color: textColor, stepSize: 1 },
+                    grid: { color: gridColor }
+                },
+                x: {
+                    ticks: { color: textColor },
+                    grid: { color: 'transparent' }
+                }
+            }
+        };
+    }, [theme]);
 
     return (
         <div className="p-4 sm:p-8">
@@ -82,11 +111,14 @@ export default function DashboardPage() {
             
             <Card>
                 <CardContent className="pt-6">
-                    {stats.notesBySubject.length > 0 ? (
-                        <Bar options={chartOptions} data={chartData} />
-                    ) : (
-                        <p className="text-center text-muted-foreground">아직 과목별로 생성된 노트가 없습니다.</p>
-                    )}
+                    {/* 👈 [버그 수정] 차트를 고정된 높이의 div로 감싸서 크기 문제 해결 */}
+                    <div className="relative h-[400px]">
+                        {stats.notesBySubject.length > 0 ? (
+                            <Bar options={chartOptions} data={chartData} />
+                        ) : (
+                            <p className="text-center text-muted-foreground pt-16">아직 과목별로 생성된 노트가 없습니다.</p>
+                        )}
+                    </div>
                 </CardContent>
             </Card>
         </div>

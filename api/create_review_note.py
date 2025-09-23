@@ -33,17 +33,48 @@ class handler(BaseHTTPRequestHandler):
             # 역할: 학습 전문가
             주어진 대화 내용, 학습 자료, 과목 목록을 종합하여 복습 노트와 퀴즈를 생성합니다.
 
-            # 제공 자료
-            - AI 대화 내용: {ai_conversation_text}
-            - 과목 목록 (JSON): {subjects_list}
-            - 학습 자료 파일 (첨부됨)
+            # 🎨 출력 서식 규칙 (★★★★★ 가장 중요)
+            `summary`, `key_insights` 필드의 내용은 아래 규칙을 **반드시** 따라야 합니다.
+            
+            1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 KaTeX 문법으로 감싸야 합니다. (인라인: `from http.server import BaseHTTPRequestHandler
+import json
+import os
+import google.generativeai as genai
+import cgi
+from PIL import Image
+import io
+import traceback
+from pdf2image import convert_from_bytes
 
-            # 출력 규칙 (★★★★★ 반드시 완벽하게 준수)
+class handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        try:
+            form = cgi.FieldStorage(
+                fp=self.rfile,
+                headers=self.headers,
+                environ={'REQUEST_METHOD': 'POST', 'CONTENT_TYPE': self.headers['Content-Type']}
+            )
+
+            ai_conversation_text = form.getvalue('aiConversationText', '')
+            learning_material_files = form.getlist('files')
+            subjects_list_str = form.getvalue('subjects', '[]')
+            subjects_list = json.loads(subjects_list_str)
+
+            api_key = os.environ.get('GEMINI_API_KEY')
+            if not api_key:
+                raise ValueError("GEMINI_API_KEY environment variable not set.")
+
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel('gemini-1.5-pro-latest')
+
+, 블록: `$`)
+            2.  **다이어그램 (Mermaid):** 복잡한 개념 설명 시 Mermaid.js 문법으로 시각화해야 합니다. (```mermaid...```)
+            3.  **코드 (Code Block):** 모든 소스 코드는 언어를 명시한 코드 블록으로 작성해야 합니다. (```python...```)
+            4.  **핵심 용어 (Tooltip):** 중요한 전공 용어는 `<dfn title="설명">용어</dfn>` HTML 태그로 감싸 설명을 제공해야 합니다.
+
+            # 📝 JSON 출력 규칙 (★★★★★ 반드시 준수)
             1.  **전체 형식:** 다른 설명 없이, 아래 명시된 키를 가진 단일 JSON 객체로만 응답해야 합니다.
-            2.  **`summary`, `key_insights`:** 내용은 마크다운 형식으로 작성합니다.
-                -   **코드:** ` ```python ... ``` ` 처럼 언어를 명시해야 합니다.
-                -   **핵심 용어:** `<dfn title="설명">용어</dfn>` 태그를 사용합니다.
-            3.  **`quiz` 객체:**
+            2.  **`quiz` 객체:**
                 -   `questions` 배열은 3개의 객관식 질문 객체를 포함해야 합니다.
                 -   각 질문 객체는 `question`(string), `options`(string 배열), `answer`(string) 키를 가져야 합니다.
                 -   **매우 중요:** `answer` 값은 반드시 `options` 배열에 포함된 문자열 중 하나와 정확히 일치해야 합니다.
@@ -55,21 +86,9 @@ class handler(BaseHTTPRequestHandler):
                 "key_insights": ["핵심 개념 또는 통찰 1", "핵심 개념 또는 통찰 2"],
                 "quiz": {{
                     "questions": [
-                        {{
-                            "question": "첫 번째 질문 내용",
-                            "options": ["선택지 A", "선택지 B", "선택지 C", "선택지 D"],
-                            "answer": "선택지 B"
-                        }},
-                        {{
-                            "question": "두 번째 질문 내용",
-                            "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
-                            "answer": "Option 1"
-                        }},
-                        {{
-                            "question": "세 번째 질문 내용",
-                            "options": ["1", "2", "3", "4"],
-                            "answer": "3"
-                        }}
+                        {{"question": "첫 번째 질문 내용", "options": ["A", "B", "C", "D"], "answer": "B"}},
+                        {{"question": "두 번째 질문 내용", "options": ["1", "2", "3", "4"], "answer": "1"}},
+                        {{"question": "세 번째 질문 내용", "options": ["참", "거짓"], "answer": "참"}}
                     ]
                 }},
                 "subjectId": "주어진 과목 목록에서 가장 관련 있는 과목의 id"

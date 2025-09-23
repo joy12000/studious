@@ -1,8 +1,7 @@
-import React, { useState, createContext, useContext, useMemo } from 'react';
+import React, { useState, createContext, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Home, Settings, X, List, ChevronsLeft, ChevronsRight, Notebook, Menu, Calendar, GraduationCap, LayoutDashboard, BrainCircuit } from 'lucide-react'; // 🧠, 📈 아이콘 임포트
-import { useNotes } from '../lib/useNotes';
+import { Home, Settings, X, List, Menu, Calendar, GraduationCap, LayoutDashboard, BrainCircuit, ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 // 사이드바 상태 공유를 위한 Context
 interface SidebarContextType {
@@ -19,137 +18,78 @@ export const useSidebar = () => {
   return context;
 };
 
-const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean, onToggleCollapse: () => void }) => {
-  const { notes } = useNotes();
-  const { setIsSidebarOpen } = useSidebar();
-  const location = useLocation();
-
-  const handleLinkClick = () => {
-    if (window.innerWidth < 768) { // 모바일 화면에서만 링크 클릭 시 사이드바 닫기
-      setIsSidebarOpen(false);
-    }
-  };
-
-  const recentNotes = useMemo(() => notes, [notes]);
-
-  const NavLink = ({ to, icon, children }: { to: string, icon: React.ReactNode, children: React.ReactNode }) => {
+const NavLink = ({ to, icon, children, isCollapsed }: { to: string, icon: React.ReactNode, children: React.ReactNode, isCollapsed: boolean }) => {
+    const location = useLocation();
     const isActive = location.pathname === to;
     return (
-      <Button asChild variant={isActive ? "secondary" : "ghost"} className="justify-start" onClick={handleLinkClick}>
-        <Link to={to} className="flex items-center w-full">
+      <Button asChild variant={isActive ? "secondary" : "ghost"} className="w-full justify-start">
+        <Link to={to} title={isCollapsed ? String(children) : undefined}>
           {icon}
-          {!isCollapsed && <span className="ml-2 truncate min-w-0">{children}</span>}
+          {!isCollapsed && <span className="ml-3 truncate">{children}</span>}
         </Link>
       </Button>
     );
-  };
+};
 
-  return (
-    <div className="flex h-full flex-col">
-      <div className="mb-8 flex items-center justify-between">
-        <div className={`font-bold text-primary transition-all duration-300 ${isCollapsed ? 'w-full flex justify-center text-2xl' : 'text-2xl'}`}>
-          {isCollapsed ? (
-            <div onClick={onToggleCollapse} className="cursor-pointer p-2 -m-2" title="사이드바 펼치기">
-              S
-            </div>
-          ) : (
-            <Link to="/" onClick={handleLinkClick}>studious</Link>
-          )}
-        </div>
-        
-        {/* 펼친 상태의 데스크탑 접기 버튼 (상단) */}
-        {!isCollapsed && (
-          <Button variant="ghost" onClick={onToggleCollapse} className="hidden md:flex items-center px-2 py-1 h-auto">
-            <ChevronsLeft className="h-5 w-5" />
+const SidebarContent = ({ isCollapsed, onToggleCollapse }: { isCollapsed: boolean, onToggleCollapse: () => void }) => {
+    const { setIsSidebarOpen } = useSidebar();
+    return (
+      <div className="flex h-full max-h-screen flex-col gap-2">
+        <div className="flex h-14 items-center border-b px-4 lg:h-[60px] lg:px-6">
+          <Link to="/" className="flex items-center gap-2 font-semibold">
+            <GraduationCap className="h-6 w-6" />
+            {!isCollapsed && <span className="">Studious</span>}
+          </Link>
+          <Button variant="ghost" size="icon" className="ml-auto md:hidden" onClick={() => setIsSidebarOpen(false)}>
+            <X className="h-4 w-4" />
           </Button>
-        )}
-
-        {/* 모바일 닫기 버튼 */}
-        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setIsSidebarOpen(false)}>
-          <X className="h-6 w-6" />
-        </Button>
+        </div>
+        <div className="flex-1 overflow-auto py-2">
+            <nav className="grid items-start px-4 text-sm font-medium">
+                <NavLink to="/" icon={<Home className="h-4 w-4" />} isCollapsed={isCollapsed}>Home</NavLink>
+                <NavLink to="/dashboard" icon={<LayoutDashboard className="h-4 w-4" />} isCollapsed={isCollapsed}>대시보드</NavLink>
+                <NavLink to="/review-deck" icon={<BrainCircuit className="h-4 w-4" />} isCollapsed={isCollapsed}>오늘의 복습</NavLink>
+                <NavLink to="/notes" icon={<List className="h-4 w-4" />} isCollapsed={isCollapsed}>노트 목록</NavLink>
+                <NavLink to="/schedule" icon={<Calendar className="h-4 w-4" />} isCollapsed={isCollapsed}>시간표</NavLink>
+                <NavLink to="/assignment" icon={<GraduationCap className="h-4 w-4" />} isCollapsed={isCollapsed}>AI 과제</NavLink>
+                <NavLink to="/settings" icon={<Settings className="h-4 w-4" />} isCollapsed={isCollapsed}>Settings</NavLink>
+            </nav>
+        </div>
+        <div className="mt-auto border-t p-4">
+            <Button variant="ghost" size="icon" onClick={onToggleCollapse} className="w-full hidden md:flex justify-center">
+                {isCollapsed ? <ChevronsRight className="h-5 w-5" /> : <ChevronsLeft className="h-5 w-5" />}
+            </Button>
+        </div>
       </div>
-
-                  {/* 메인 네비게이션 */}
-                  <nav className="flex flex-col space-y-2">
-                      <NavLink to="/" icon={<Home className="h-4 w-4" />}>Home</NavLink>
-                      <NavLink to="/dashboard" icon={<LayoutDashboard className="h-4 w-4" />}>대시보드</NavLink> {/* 📈 대시보드 링크 추가 */}
-                      <NavLink to="/review-deck" icon={<BrainCircuit className="h-4 w-4" />}>오늘의 복습</NavLink> {/* 🧠 복습 덱 링크 추가 */}
-                      <NavLink to="/notes" icon={<List className="h-4 w-4" />}>노트 목록</NavLink>
-                      <NavLink to="/schedule" icon={<Calendar className="h-4 w-4" />}>시간표</NavLink>
-                      <NavLink to="/assignment" icon={<GraduationCap className="h-4 w-4" />}>AI 과제</NavLink>
-                      <NavLink to="/settings" icon={<Settings className="h-4 w-4" />}>Settings</NavLink>
-                  </nav>
-      <hr className="my-6" />
-
-      {/* 최근 노트 목록 */}
-      <div className="flex-1 overflow-y-auto">
-        <h2 className={`text-sm font-semibold text-muted-foreground mb-3 px-4 transition-opacity ${isCollapsed ? 'opacity-0' : 'opacity-100'}`}>
-          최근 노트
-        </h2>
-        <nav className="flex flex-col space-y-2">
-          {recentNotes.map(note => (
-            <NavLink key={note.id} to={`/note/${note.id}`} icon={<Notebook className="h-4 w-4 flex-shrink-0" />}>
-              {note.title}
-            </NavLink>
-          ))}
-        </nav>
-      </div>
-
-      {/* 사이드바 하단 */}
-      <div className="mt-auto pt-4">
-        <p className={`text-xs text-muted-foreground mt-2 text-center w-full transition-opacity ${isCollapsed ? 'opacity-0' : 'opacity-100'}`}>
-          
-        </p>
-      </div>
-    </div>
-  );
+    );
 };
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(false); // 데스크탑 접기 상태
-  const location = useLocation();
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
-  // 노트 상세 페이지, 노트 목록, 설정 페이지에서는 메뉴 버튼 숨김
-  const isNotePage = location.pathname.startsWith('/note/');
-  const isNoteListPage = location.pathname === '/notes';
-  const isSettingsPage = location.pathname === '/settings';
-
-  const showMenuButton = !(isNotePage || isNoteListPage || isSettingsPage);
+  const desktopSidebarWidth = isCollapsed ? "md:grid-cols-[60px_1fr]" : "md:grid-cols-[220px_1fr] lg:grid-cols-[280px_1fr]";
+  const desktopMainContentPadding = isCollapsed ? "md:pl-[60px]" : "md:pl-[220px] lg:pl-[280px]";
+  const desktopAsideWidth = isCollapsed ? "md:w-[60px]" : "md:w-[220px] lg:w-[280px]";
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, setIsSidebarOpen }}>
-      <div className="relative h-screen md:flex bg-background">
-        {isSidebarOpen && (
-          <div
-            className="fixed inset-0 z-30 bg-black/60 md:hidden"
-            onClick={() => setIsSidebarOpen(false)}
-          />
-        )}
-
-        <aside
-          className={`w-4/5 max-w-sm fixed inset-y-0 left-0 z-40 border-r bg-background/95 backdrop-blur-lg p-4 transform transition-all duration-300 ease-in-out md:relative md:translate-x-0 shadow-xl
-            ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-            ${isCollapsed ? 'md:w-20' : 'md:w-64'}`}
-        >
-          <SidebarContent isCollapsed={isCollapsed} onToggleCollapse={() => setIsCollapsed(!isCollapsed)} />
-        </aside>
-
-        <main className="flex-1 overflow-y-auto relative">
-          {showMenuButton && (
-            <Button
-              onClick={() => setIsSidebarOpen(true)}
-              variant="ghost"
-              size="icon"
-              className="absolute top-3 left-4 z-20 md:hidden" // 모바일에서만 보이도록
-            >
-              <Menu className="h-7 w-7" />
-            </Button>
-          )}
-          {children}
-        </main>
-      </div>
+        <div className={`grid min-h-screen w-full ${desktopSidebarWidth}`}>
+            <aside className={`fixed inset-y-0 left-0 z-10 bg-muted/40 border-r md:block transition-all duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 ${desktopAsideWidth}`}>
+                <SidebarContent isCollapsed={isCollapsed} onToggleCollapse={() => setIsCollapsed(!isCollapsed)} />
+            </aside>
+            <div className={`flex flex-col transition-all duration-300 ease-in-out ${desktopMainContentPadding}`}>
+                <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6 md:hidden">
+                    <Button variant="outline" size="icon" className="shrink-0" onClick={() => setIsSidebarOpen(true)}>
+                        <Menu className="h-5 w-5" />
+                        <span className="sr-only">Toggle navigation menu</span>
+                    </Button>
+                </header>
+                <main className="flex-1 flex-col gap-4 p-4 lg:gap-6 lg:p-6 overflow-auto">
+                    {children}
+                </main>
+            </div>
+        </div>
     </SidebarContext.Provider>
   );
 };
