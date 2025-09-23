@@ -13,11 +13,10 @@ import { useLiveQuery } from 'dexie-react-hooks'; // 💡 dexie-react-hooks 사�
 import { db } from '../lib/db'; // 💡 db 사용
 
 const models = [
-    { id: 'x-ai/grok-4-fast:free', name: '🚀 Grok 4 Fast (최신/가장빠름)' },
-    { id: 'deepseek/deepseek-r1-0528:free', name: '💡 DeepSeek R1 (간단한 질문)' },
-    { id: 'deepseek/deepseek-chat-v3.1', name: '⭐ DeepSeek V3.1 (기본)' },
-    { id: 'meta-llama/llama-4-maverick:free', name: '🦙 Llama 4 (최신)' },
-    { id: 'mistralai/mistral-7b-instruct', name: '🧠 Mistral 7B (가볍고 빠름)' },
+    { id: 'x-ai/grok-4-fast:free', name: '🚀 일론머스크의 AI' },
+    { id: 'google/gemma-3-27b-it:free', name: '💡 Google의 AI모델' },
+    { id: 'openai/gpt-oss-20b:free', name: '⭐ 그 유명한 GPT' },
+    { id: 'meta-llama/llama-4-maverick:free', name: '🦙 인스타회사 메타의 AI' },
 ];
 
 interface Message {
