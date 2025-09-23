@@ -4,9 +4,9 @@ import { Link } from 'react-router-dom';
 import { marked } from 'marked';
 import type { Note } from '../lib/types';
 import { generatePastelColorFromText } from '../lib/utils';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import NotePreviewThumbnail from './NotePreviewThumbnail'; // ✨ [추가] 새로 만든 썸네일 컴포넌트 임포트
+import NotePreviewThumbnail from './NotePreviewThumbnail';
 
 interface NoteCardProps {
   note: Note;
@@ -88,75 +88,50 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
     );
   }
 
-  // Grid View
+  // Grid View - A4-like vertical format
   return (
     <Link to={`/note/${note.id}`} className="group block">
-      <div className={`relative w-full ${note.sourceType === 'youtube' ? 'aspect-video' : 'aspect-video'} overflow-hidden rounded-lg shadow-md transition-all duration-300 group-hover:shadow-xl group-hover:-translate-y-1`}>
-        {note.sourceType === 'youtube' && thumbnailUrl ? (
-          <img 
-            src={thumbnailUrl} 
-            alt={note.title} 
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-          />
-        ) : (
-          <div className="transition-transform duration-300 group-hover:scale-105">
-            <NotePreviewThumbnail title={note.title} content={note.content} />
-          </div>
-        )}
-        
-        {note.sourceType === 'youtube' ? (
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent p-2 flex flex-col justify-between">
-              <div className="flex items-start justify-between">
-                  {note.sourceType === 'youtube' && note.subjectId && (
-                      <div
-                          className="px-2 py-0.5 text-xs font-semibold rounded-full shadow-lg text-white"
-                          style={{ backgroundColor: generatePastelColorFromText(note.subjectId, 0.7) }}
-                      >
-                          {note.subjectId}
-                      </div>
-                  )}
-                  {onToggleFavorite && (
-                      <button
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }}
-                          className="h-7 w-7 flex items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-colors hover:bg-black/60"
-                          title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
-                      >
-                          <Star className={`h-4 w-4 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-white/80'}`} />
-                      </button>
-                  )}
-              </div>
-              <NoteTypeIcon type={note.noteType} />
-          </div>
-        ) : (
-          <div className="absolute inset-0 p-2 flex flex-col justify-between">
-              <div className="flex items-start justify-between">
-                  {note.subjectId && (
-                      <div
-                          className="px-2 py-0.5 text-xs font-semibold rounded-full shadow-lg text-foreground"
-                          style={{ backgroundColor: generatePastelColorFromText(note.subjectId, 0.7) }}
-                      >
-                          {note.subjectId}
-                      </div>
-                  )}
-                  {onToggleFavorite && (
-                      <button
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }}
-                          className="h-7 w-7 flex items-center justify-center rounded-full bg-background/40 text-foreground backdrop-blur-sm transition-colors hover:bg-background/60"
-                          title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
-                      >
-                          <Star className={`h-4 w-4 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
-                      </button>
-                  )}
-              </div>
-              <NoteTypeIcon type={note.noteType} />
-          </div>
-        )}
-      </div>
-      <div className="mt-2 px-0.5">
-        <h3 className="text-xs font-medium text-foreground leading-snug line-clamp-2 h-[2.8em] group-hover:text-primary transition-colors" title={note.title}>
-          {note.title || '제목 없음'}
-        </h3>
-      </div>
+      <Card className="w-full h-full flex flex-col overflow-hidden transition-all duration-300 group-hover:shadow-xl group-hover:-translate-y-1 aspect-[1/1.414]">
+        <CardHeader className="p-4 relative">
+          <CardTitle className="text-base font-semibold leading-snug line-clamp-2 h-[3em]">{note.title || '제목 없음'}</CardTitle>
+          {onToggleFavorite && (
+            <button
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); onToggleFavorite(note.id); }}
+              className="absolute top-3 right-3 h-7 w-7 flex items-center justify-center rounded-full bg-background/40 text-foreground backdrop-blur-sm transition-colors hover:bg-background/60"
+              title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}
+            >
+              <Star className={`h-4 w-4 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+            </button>
+          )}
+        </CardHeader>
+        <CardContent className="p-4 pt-0 flex-grow overflow-hidden">
+          {note.sourceType === 'youtube' && thumbnailUrl ? (
+            <div className="relative w-full aspect-video rounded-md overflow-hidden">
+              <img 
+                src={thumbnailUrl} 
+                alt={note.title} 
+                className="h-full w-full object-cover"
+              />
+            </div>
+          ) : (
+            <div 
+              className="prose prose-sm dark:prose-invert text-muted-foreground w-full h-full overflow-y-auto"
+              dangerouslySetInnerHTML={{ __html: marked(note.content) as string }}
+            />
+          )}
+        </CardContent>
+        <div className="flex items-center justify-between p-4 pt-0">
+            <NoteTypeIcon type={note.noteType} />
+            {note.sourceType === 'youtube' && note.subjectId && (
+                <div
+                    className="px-2 py-0.5 text-xs font-semibold rounded-full shadow-lg text-white"
+                    style={{ backgroundColor: generatePastelColorFromText(note.subjectId, 0.7) }}
+                >
+                    {note.subjectId}
+                </div>
+            )}
+        </div>
+      </Card>
     </Link>
   );
 }

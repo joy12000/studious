@@ -1,12 +1,18 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import { InlineMath, BlockMath } from 'react-katex';
+import mermaid from 'mermaid';
 
-// ✨ 이 설정이 포함되어 있는지 확인해주세요.
 marked.use({
-  // ... (다른 설정들)
-  breaks: true, // 한 줄 띄어쓰기(single newline)를 <br>로 변환
-  gfm: true,    // GitHub Flavored Markdown 활성화 (일반적인 마크다운 호환성)
+  breaks: true,
+  gfm: true,
+});
+
+// --- 📊 [기능 추가] Mermaid 초기화 ---
+mermaid.initialize({
+  startOnLoad: false,
+  theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
+  securityLevel: 'loose',
 });
 
 interface Props {
@@ -14,29 +20,37 @@ interface Props {
 }
 
 const MarkdownRenderer: React.FC<Props> = ({ content }) => {
-  // 1. $$...$$ (블록 수학)으로 텍스트 분리
+  const containerRef = useRef<HTMLSpanElement>(null);
+
+  // --- 📊 [기능 추가] 렌더링 후 Mermaid 다이어그램 변환 ---
+  useEffect(() => {
+    if (containerRef.current) {
+        const mermaidElements = containerRef.current.querySelectorAll('.language-mermaid');
+        if (mermaidElements.length > 0) {
+            mermaid.run({ nodes: mermaidElements as NodeListOf<HTMLElement> });
+        }
+    }
+  }, [content]);
+
+  // KaTeX와 마크다운을 함께 처리하는 로직은 그대로 유지합니다.
   const blockParts = content.split(/(\$\$[\s\S]*?\$\$)/g);
 
   return (
-    <>
+    <span ref={containerRef}>
       {blockParts.map((blockPart, i) => {
-        if (blockPart.startsWith('$$') && blockPart.endsWith('$$')) {
-          // 블록 수학 렌더링
+        if (blockPart.startsWith('$') && blockPart.endsWith('$')) {
           const math = blockPart.slice(2, -2);
           return <BlockMath key={`block-${i}`}>{math}</BlockMath>;
         }
 
-        // 2. $...$ (인라인 수학)으로 나머지 텍스트 분리
         const inlineParts = blockPart.split(/(\$[\s\S]*?\$)/g);
         
         return inlineParts.map((inlinePart, j) => {
-          if (inlinePart.startsWith('$') && inlinePart.endsWith('$')) {
-            // 인라인 수학 렌더링
+          if (inlinePart.startsWith(') && inlinePart.endsWith(')) {
             const math = inlinePart.slice(1, -1);
             return <InlineMath key={`inline-${i}-${j}`}>{math}</InlineMath>;
           }
           
-          // 3. 남은 부분은 Markdown으로 렌더링
           if (inlinePart) {
             return (
               <span
@@ -48,7 +62,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
           return null;
         });
       })}
-    </>
+    </span>
   );
 };
 

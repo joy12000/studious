@@ -8,7 +8,10 @@ class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         api_keys = [
             os.environ.get('OPENROUTER_API_KEY_PRIMARY'),
-            os.environ.get('OPENROUTER_API_KEY_SECONDARY')
+            os.environ.get('OPENROUTER_API_KEY_SECONDARY'),
+            os.environ.get('OPENROUTER_API_KEY_TERTIARY'),
+            os.environ.get('OPENROUTER_API_KEY_QUATERNARY'),
+            os.environ.get('OPENROUTER_API_KEY_QUINARY')
         ]
         valid_keys = [key for key in api_keys if key]
 
@@ -23,15 +26,12 @@ class handler(BaseHTTPRequestHandler):
             post_data = self.rfile.read(content_length)
             body = json.loads(post_data.decode('utf-8'))
             history = body.get('history', [])
-            note_context = body.get('noteContext', '') # Get the note context
-            
-            # ✨ 수정: 프론트엔드에서 보낸 모델 이름을 사용하고, 없으면 기본 모델 사용
+            note_context = body.get('noteContext', '')
             model_identifier = body.get('model', 'google/gemini-1.5-flash')
 
             if not history:
                 raise ValueError("대화 내용이 비어있습니다.")
 
-            # New system prompt construction
             system_prompt_text = """
             당신은 학습을 돕는 유능한 AI 어시스턴트입니다. 
             1. 사용자의 요청에 명확하고 구조적으로 답변해주세요.
@@ -60,7 +60,6 @@ class handler(BaseHTTPRequestHandler):
                         "model": model_identifier,
                         "messages": [system_prompt] + messages,
                     }
-                    # Google 모델에 대해서만 JSON 모드를 활성화합니다.
                     if model_identifier.startswith('google/'):
                         payload["response_format"] = {"type": "json_object"}
 
@@ -80,15 +79,12 @@ class handler(BaseHTTPRequestHandler):
                     api_response_data = response.json()
                     content_str = api_response_data['choices'][0]['message']['content']
                     
-                    # Parse the string content into a Python dict
                     try:
                         parsed_content = json.loads(content_str)
                     except json.JSONDecodeError:
-                        # If the AI didn't return valid JSON, wrap it.
-                        print("WARN: AI response was not valid JSON. Wrapping it.")
+                        print("WARN: AI 응답이 유효한 JSON이 아니므로 래핑합니다.")
                         parsed_content = {"answer": content_str, "followUp": []}
 
-                    # Dump it back to a properly escaped JSON string
                     final_json_output = json.dumps(parsed_content, ensure_ascii=False)
 
                     self.send_response(200)
@@ -99,13 +95,11 @@ class handler(BaseHTTPRequestHandler):
 
                 except requests.exceptions.RequestException as e:
                     last_error = e
-                    # ✨ 개선: 오류 발생 시 OpenRouter가 보낸 상세 메시지 기록
                     if e.response is not None:
                         last_error_text = e.response.text
                     print(f"WARN: API 키 #{i + 1} 사용 실패. 다음 키로 폴백합니다. 오류: {e}")
                     continue
 
-            # 모든 키가 실패했을 때의 오류 메시지에 상세 내용을 포함
             raise ConnectionError(f"모든 OpenRouter API 키로 요청에 실패했습니다. 마지막 오류: {last_error_text}") from last_error
 
         except Exception as e:

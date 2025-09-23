@@ -2,21 +2,15 @@ import { generateFallbackIconDataUrl } from '../lib/utils';
 
 import React, { useState, useEffect } from "react";
 import { useNotes } from "../lib/useNotes";
+import { useLoading } from "../lib/useLoading"; // ✨ useLoading 임포트
+import LoadingOverlay from '../components/LoadingOverlay'; // ✨ LoadingOverlay 임포트
 import { useNavigate, useLocation } from "react-router-dom";
 import { Loader2, Youtube, ArrowRight, File, BrainCircuit, AppWindow, Pencil, Check, Trash2, Plus, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
-const LoadingOverlay = ({ message }: { message: string }) => (
-    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
-        <div className="text-center">
-            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-            <p className="mt-4 text-lg font-semibold">{message}</p>
-            <p className="text-muted-foreground">잠시만 기다려주세요.</p>
-        </div>
-    </div>
-);
+
 
 const HEADLINES = [
   "새로운 지식을 내 것으로",
@@ -48,8 +42,7 @@ export default function HomePage() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [loadingMessage, setLoadingMessage] = useState('');
+  const { isLoading, loadingMessage, startLoading, stopLoading, setMessage } = useLoading();
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [headline, setHeadline] = useState(HEADLINES[0]); // Add headline state
 
@@ -113,21 +106,20 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleProgress = (status: string) => setLoadingMessage(status);
+  const handleProgress = (status: string) => setMessage(status);
   const handleComplete = (note: any) => {
-    setIsLoading(false);
+    stopLoading();
     navigate(`/note/${note.id}`);
   };
   const handleError = (error: string) => {
-    setIsLoading(false);
+    stopLoading();
     alert(`오류가 발생했습니다: ${error}`);
   };
 
   const handleYoutubeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!youtubeUrl) return;
-    setIsLoading(true);
-    setLoadingMessage('YouTube 영상 요약을 시작합니다...');
+    startLoading('YouTube 영상 요약을 시작합니다...');
     await addNote({ youtubeUrl, onProgress: handleProgress, onComplete: handleComplete, onError: handleError });
   };
 
@@ -136,17 +128,16 @@ export default function HomePage() {
     const shareUrl = queryParams.get('share_url');
     if (shareUrl) {
       setYoutubeUrl(shareUrl);
-      setIsLoading(true);
-      setLoadingMessage('공유된 YouTube 영상 요약을 시작합니다...');
+      startLoading('공유된 YouTube 영상 요약을 시작합니다...');
       addNote({ 
         youtubeUrl: shareUrl, 
         onProgress: handleProgress, 
         onComplete: (note) => {
-          setIsLoading(false);
+          stopLoading();
           navigate(`/note/${note.id}`, { replace: true });
         }, 
         onError: (error) => {
-          setIsLoading(false);
+          stopLoading();
           alert(`오류가 발생했습니다: ${error}`);
           navigate('/', { replace: true });
         } 

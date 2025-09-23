@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNotes } from "../lib/useNotes";
+import { useLoading } from "../lib/useLoading"; // ✨ useLoading 임포트
+import LoadingOverlay from '../components/LoadingOverlay'; // ✨ LoadingOverlay 임포트
 import { useNavigate, useLocation } from "react-router-dom";
 import { Loader2, ArrowRight, UploadCloud, FileText, X, ChevronsUpDown, CalendarDays, Plus } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -8,26 +10,15 @@ import { WeekPicker } from '../components/WeekPicker';
 import { format } from 'date-fns';
 import { Note } from '../lib/types';
 
-function LoadingOverlay({ message }: { message: string }) {
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="flex flex-col items-center gap-4 rounded-lg bg-card p-8 text-card-foreground shadow-xl">
-                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                <p className="text-lg font-medium">{message}</p>
-                <p className="text-sm text-muted-foreground">잠시만 기다려주세요...</p>
-            </div>
-        </div>
-    );
-}
+
 
 export default function ReviewPage() {
   const { addNoteFromReview, allSubjects, notes } = useNotes();
   const navigate = useNavigate();
   const location = useLocation();
   
+  const { isLoading, loadingMessage, startLoading, stopLoading, setMessage } = useLoading();
   const [files, setFiles] = useState<File[]>([]);
-  const [progressMessage, setProgressMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -68,7 +59,7 @@ export default function ReviewPage() {
       return;
     }
     setError(null);
-    setProgressMessage("복습 노트를 생성하는 중...");
+    startLoading("복습 노트를 생성하는 중...");
 
     const noteDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
 
@@ -89,14 +80,13 @@ export default function ReviewPage() {
     await addNoteFromReview({
       files: combinedFiles,
       subjects: allSubjects || [],
-      onProgress: setProgressMessage,
-      onComplete: (newNote, newQuiz) => {
-        setProgressMessage(null);
-        navigate(`/note/${newNote.id}`);
+      onProgress: setMessage,
+                onComplete: (newNote, newQuiz) => {
+                  stopLoading();        navigate(`/note/${newNote.id}`);
       },
       onError: (err) => {
         setError(err);
-        setProgressMessage(null);
+        stopLoading();
       },
       noteDate: noteDateStr,
       aiConversationText: combinedContent.trim(),
@@ -113,11 +103,11 @@ export default function ReviewPage() {
     setFiles(prev => prev.filter((_, i) => i !== index));
   };
   
-  const isLoading = progressMessage !== null;
+
 
   return (
     <>
-      {isLoading && <LoadingOverlay message={progressMessage as string} />}
+      {isLoading && <LoadingOverlay message={loadingMessage as string} />}
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4">
         <div className="w-full max-w-2xl">
           <div className="text-center mb-8">

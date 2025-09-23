@@ -1,41 +1,94 @@
-// src/pages/AssignmentHelperPage.tsx
-import React, { useState, useMemo } from "react";
-import { useNotes } from "../lib/useNotes";
+import React, { useState, useMemo, useEffect } from "react";
+import { useNotes, Subject } from "../lib/useNotes";
 import { useNavigate } from "react-router-dom";
-import { Loader2, ArrowRight, UploadCloud, FileText, X, Plus, ExternalLink, BrainCircuit } from "lucide-react";
+import { Loader2, UploadCloud, FileText, X, Plus, ExternalLink, BrainCircuit, ChevronsUpDown, BookMarked, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Note } from '../lib/types';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import *t as pdfjsLib from 'pdfjs-dist';
 
-// 로딩 오버레이 컴포넌트 (ReviewPage와 동일)
-function LoadingOverlay({ message }: { message: string }) {
+// PDF.js 워커 경로 설정
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.mjs`;
+
+// --- 🖼️ [기능 추가] 파일 미리보기 컴포넌트 ---
+const FilePreview = ({ file, onRemove }: { file: File; onRemove: () => void; }) => {
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+    useEffect(() => {
+        let objectUrl: string | null = null;
+        const generatePreview = async () => {
+            if (file.type.startsWith('image/')) {
+                objectUrl = URL.createObjectURL(file);
+                setPreviewUrl(objectUrl);
+            } else if (file.type === 'application/pdf') {
+                try {
+                    const fileReader = new FileReader();
+                    fileReader.onload = async (event) => {
+                        if (!event.target?.result) return;
+                        const typedArray = new Uint8Array(event.target.result as ArrayBuffer);
+                        const loadingTask = pdfjsLib.getDocument(typedArray);
+                        const pdf = await loadingTask.promise;
+                        const page = await pdf.getPage(1);
+                        const viewport = page.getViewport({ scale: 0.5 });
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+                        if (context) {
+                            await page.render({ canvasContext: context, viewport: viewport }).promise;
+                            setPreviewUrl(canvas.toDataURL());
+                        }
+                    };
+                    fileReader.readAsArrayBuffer(file);
+                } catch (error) {
+                    console.error("PDF 썸네일 생성 실패:", error);
+                    setPreviewUrl(null); // 실패 시 아이콘 표시
+                }
+            }
+        };
+
+        generatePreview();
+
+        return () => {
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
+        };
+    }, [file]);
+
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-            <div className="flex flex-col items-center gap-4 rounded-lg bg-card p-8 text-card-foreground shadow-xl">
-                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                <p className="text-lg font-medium">{message}</p>
-                <p className="text-sm text-muted-foreground">잠시만 기다려주세요...</p>
+        <div className="relative w-24 h-24 rounded-lg border bg-muted flex items-center justify-center overflow-hidden group">
+            {previewUrl ? (
+                <img src={previewUrl} alt={file.name} className="w-full h-full object-cover" />
+            ) : (
+                <FileText className="w-8 h-8 text-muted-foreground" />
+            )}
+            <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center text-white p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                <p className="text-xs text-center break-words line-clamp-2">{file.name}</p>
             </div>
+            <Button variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100" onClick={onRemove}>
+                <X className="h-4 w-4" />
+            </Button>
         </div>
     );
-}
+};
+
 
 export default function AssignmentHelperPage() {
-    const { notes } = useNotes();
+    const { notes, allSubjects, addNoteFromAssignment } = useNotes();
     const navigate = useNavigate();
 
-    // 섹션별 파일 상태 관리
     const [referenceFiles, setReferenceFiles] = useState<File[]>([]);
     const [problemFiles, setProblemFiles] = useState<File[]>([]);
     const [answerFiles, setAnswerFiles] = useState<File[]>([]);
-
     const [progressMessage, setProgressMessage] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
-
-    // 기존 노트 선택 관련 상태
     const [isNotePickerOpen, setIsNotePickerOpen] = useState(false);
     const [selectedExistingNotes, setSelectedExistingNotes] = useState<Note[]>([]);
     const [noteSearchQuery, setNoteSearchQuery] = useState('');
+
+    const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+    const [isSubjectPopoverOpen, setIsSubjectPopoverOpen] = useState(false);
 
     const filteredNotes = (notes || []).filter(note =>
         note.title.toLowerCase().includes(noteSearchQuery.toLowerCase()) ||
@@ -53,20 +106,17 @@ export default function AssignmentHelperPage() {
     const handleRemoveSelectedNote = (noteId: string) => {
         setSelectedExistingNotes(prev => prev.filter(n => n.id !== noteId));
     };
-    
-    // 파일 변경 핸들러
+
     const onFileChange = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<File[]>>) => {
         if (e.target.files) {
             setter(prev => [...prev, ...Array.from(e.target.files!)]);
         }
     };
-    
-    // 파일 삭제 핸들러
+
     const removeFile = (index: number, setter: React.Dispatch<React.SetStateAction<File[]>>) => {
         setter(prev => prev.filter((_, i) => i !== index));
     };
 
-    // ✨ [핵심 수정] handleSubmit 함수가 addNoteFromAssignment를 호출하도록 변경
     const handleSubmit = async () => {
         if (problemFiles.length === 0) {
             setError("과제 문제 파일을 반드시 업로드해야 합니다.");
@@ -76,14 +126,14 @@ export default function AssignmentHelperPage() {
             setError("과제를 제출할 과목을 선택해주세요.");
             return;
         }
-
         if (answerFiles.length === 0) {
             if (!window.confirm("답안 파일이 없습니다. AI가 문제에 대한 모범 풀이를 생성하도록 할까요?")) {
                 return;
             }
         }
         setError(null);
-        
+        setProgressMessage('AI가 노트를 분석하고 생성하는 중입니다...');
+
         const noteContext = selectedExistingNotes.map(n => `[기존 노트: ${n.title}]\n${n.content}`).join('\n\n');
 
         await addNoteFromAssignment({
@@ -104,39 +154,38 @@ export default function AssignmentHelperPage() {
             }
         });
     };
-    
+
     const isLoading = progressMessage !== null;
 
-    // 공통 파일 업로드 UI 컴포넌트
     const FileUploadSection = ({ title, files, setFiles, inputId }: { title: string, files: File[], setFiles: React.Dispatch<React.SetStateAction<File[]>>, inputId: string }) => (
         <div>
             <h2 className="text-lg font-semibold mb-3">{title}</h2>
-            <div
-                className="w-full min-h-36 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors p-4"
-                onClick={() => document.getElementById(inputId)?.click()}
-            >
-                <UploadCloud className="h-10 w-10 mb-2" />
-                <p className="font-semibold text-sm">파일을 드래그하거나 클릭해서 업로드</p>
-                <input id={inputId} type="file" multiple onChange={(e) => onFileChange(e, setFiles)} className="hidden" />
-            </div>
-            {files.length > 0 && (
-                <div className="mt-4 text-left">
-                    <ul className="space-y-2">
-                        {files.map((file, index) => (
-                            <li key={index} className="flex items-center justify-between bg-muted/50 p-2 rounded-lg text-sm">
-                                <div className="flex items-center gap-2 min-w-0"><FileText className="h-4 w-4 flex-shrink-0" /><span className="truncate">{file.name}</span></div>
-                                <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => removeFile(index, setFiles)}><X className="h-4 w-4" /></Button>
-                            </li>
-                        ))}
-                    </ul>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2 mb-3 min-h-[6.5rem]">
+                {files.map((file, index) => (
+                    <FilePreview key={index} file={file} onRemove={() => removeFile(index, setFiles)} />
+                ))}
+                <div
+                    className="w-24 h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => document.getElementById(inputId)?.click()}
+                >
+                    <Plus className="h-8 w-8" />
                 </div>
-            )}
+            </div>
+            <input id={inputId} type="file" multiple onChange={(e) => onFileChange(e, setFiles)} className="hidden" />
         </div>
     );
 
     return (
         <>
-            {isLoading && <LoadingOverlay message={progressMessage as string} />}
+            {isLoading && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+                    <div className="flex flex-col items-center gap-4 rounded-lg bg-card p-8 text-card-foreground shadow-xl">
+                        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                        <p className="text-lg font-medium">{progressMessage}</p>
+                        <p className="text-sm text-muted-foreground">잠시만 기다려주세요...</p>
+                    </div>
+                </div>
+            )}
             <div className="min-h-screen w-full flex flex-col items-center bg-background p-4">
                 <div className="w-full max-w-3xl space-y-8">
                     <div className="text-center">
@@ -199,11 +248,40 @@ export default function AssignmentHelperPage() {
                         <FileUploadSection title="2. 과제 문제" files={problemFiles} setFiles={setProblemFiles} inputId="problem-file-upload" />
                         <FileUploadSection title="3. 내 답안 (선택)" files={answerFiles} setFiles={setAnswerFiles} inputId="answer-file-upload" />
                     </div>
-                    
+
+                    {/* --- Subject Selector --- */}
+                    <div className="w-full max-w-sm mx-auto">
+                        <Popover open={isSubjectPopoverOpen} onOpenChange={setIsSubjectPopoverOpen}>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" role="combobox" aria-expanded={isSubjectPopoverOpen} className="w-full justify-between">
+                                    <div className="flex items-center">
+                                        <BookMarked className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                        <span className="truncate">{selectedSubject ? selectedSubject.name : "과목 선택"}</span>
+                                    </div>
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[--radix-popover-trigger-width)] p-0">
+                                {allSubjects.map((subject) => (
+                                <Button
+                                    key={subject.id} variant="ghost" className="w-full justify-start"
+                                    onClick={() => {
+                                        setSelectedSubject(subject);
+                                        setIsSubjectPopoverOpen(false);
+                                    }}
+                                >
+                                    <Check className={`mr-2 h-4 w-4 ${selectedSubject?.id === subject.id ? 'opacity-100' : 'opacity-0'}`} />
+                                    {subject.name}
+                                </Button>
+                                ))}
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+
                     {error && <p className="text-destructive text-sm text-center">{error}</p>}
 
                     <div className="mt-8 text-center">
-                        <Button size="lg" onClick={handleSubmit} disabled={isLoading || problemFiles.length === 0}>
+                        <Button size="lg" onClick={handleSubmit} disabled={isLoading || problemFiles.length === 0 || !selectedSubject}>
                             {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <BrainCircuit className="mr-2 h-5 w-5"/>}
                             {answerFiles.length > 0 ? "AI 채점 요청" : "AI 풀이 생성"}
                         </Button>

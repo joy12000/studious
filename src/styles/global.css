@@ -1,6 +1,0 @@
-/*
-  DEPRECATED: This file is no longer in use.
-  Theming is now handled by the CSS variables defined in `src/index.css` according to the shadcn/ui convention.
-  Global styles and component styles have been migrated to Tailwind utility classes or are defined directly in `src/index.css`.
-  This file is kept for historical reference and will be removed in the future.
-*/

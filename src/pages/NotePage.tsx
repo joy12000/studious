@@ -15,6 +15,81 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ChatUI, Message } from '../components/ChatUI'; // ✨ Message 타입 임포트
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"; // ✨ Popover 임포트
+import { useReducer } from 'react'; // useReducer 임포트
+import LoadingOverlay from '../components/LoadingOverlay'; // ✨ LoadingOverlay 임포트
+
+// useReducer를 위한 상태 및 액션 타입 정의
+interface NotePageState {
+  note: Note | null;
+  quiz: Quiz | null;
+  loading: boolean;
+  editing: boolean;
+  editContent: string;
+  editTitle: string;
+  editAttachments: Attachment[];
+  isShareModalOpen: boolean;
+  isChatOpen: boolean;
+  initialChatMessage?: string;
+}
+
+type NotePageAction =
+  | { type: 'SET_NOTE_DATA'; payload: { note: Note | null; quiz?: Quiz | null } }
+  | { type: 'SET_LOADING'; payload: boolean }
+  | { type: 'SET_EDITING'; payload: boolean }
+  | { type: 'SET_EDIT_CONTENT'; payload: string }
+  | { type: 'SET_EDIT_TITLE'; payload: string }
+  | { type: 'SET_EDIT_ATTACHMENTS'; payload: Attachment[] }
+  | { type: 'TOGGLE_SHARE_MODAL'; payload?: boolean }
+  | { type: 'TOGGLE_CHAT_PANEL'; payload?: boolean; initialMessage?: string }
+  | { type: 'UPDATE_NOTE_FIELD'; payload: Partial<Note> }
+  | { type: 'RESET_EDIT_STATE' };
+
+// useReducer 함수
+function notePageReducer(state: NotePageState, action: NotePageAction): NotePageState {
+  switch (action.type) {
+    case 'SET_NOTE_DATA':
+      return {
+        ...state,
+        note: action.payload.note,
+        quiz: action.payload.quiz !== undefined ? action.payload.quiz : state.quiz,
+        editContent: action.payload.note?.content || '',
+        editTitle: action.payload.note?.title || '',
+        editAttachments: action.payload.note?.attachments || [],
+        loading: false,
+      };
+    case 'SET_LOADING':
+      return { ...state, loading: action.payload };
+    case 'SET_EDITING':
+      return { ...state, editing: action.payload };
+    case 'SET_EDIT_CONTENT':
+      return { ...state, editContent: action.payload };
+    case 'SET_EDIT_TITLE':
+      return { ...state, editTitle: action.payload };
+    case 'SET_EDIT_ATTACHMENTS':
+      return { ...state, editAttachments: action.payload };
+    case 'TOGGLE_SHARE_MODAL':
+      return { ...state, isShareModalOpen: action.payload !== undefined ? action.payload : !state.isShareModalOpen };
+    case 'TOGGLE_CHAT_PANEL':
+      return { 
+        ...state, 
+        isChatOpen: action.payload !== undefined ? action.payload : !state.isChatOpen,
+        initialChatMessage: action.payload?.initialMessage,
+      };
+    case 'UPDATE_NOTE_FIELD':
+      if (!state.note) return state;
+      return { ...state, note: { ...state.note, ...action.payload } };
+    case 'RESET_EDIT_STATE':
+      return {
+        ...state,
+        editContent: state.note?.content || '',
+        editTitle: state.note?.title || '',
+        editAttachments: state.note?.attachments || [],
+        editing: false,
+      };
+    default:
+      return state;
+  }
+}
 
 // ✨ AI 참고서 내용을 섹션별로 파싱하는 함수
 type TextbookSection = {
@@ -118,16 +193,21 @@ export default function NotePage() {
   const navigate = useNavigate();
   const { getNote, updateNote, deleteNote, getQuiz } = useNotes();
   
-  const [note, setNote] = useState<Note | null>(null);
-  const [quiz, setQuiz] = useState<Quiz | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [editContent, setEditContent] = useState('');
-  const [editTitle, setEditTitle] = useState('');
-  const [editAttachments, setEditAttachments] = useState<Attachment[]>([]);
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [initialChatMessage, setInitialChatMessage] = useState<string | undefined>();
+  const initialState: NotePageState = {
+    note: null,
+    quiz: null,
+    loading: true,
+    editing: false,
+    editContent: '',
+    editTitle: '',
+    editAttachments: [],
+    isShareModalOpen: false,
+    isChatOpen: false,
+    initialChatMessage: undefined,
+  };
+
+  const [state, dispatch] = useReducer(notePageReducer, initialState);
+  const { note, quiz, loading, editing, editContent, editTitle, editAttachments, isShareModalOpen, isChatOpen, initialChatMessage } = state;
   
   // ✨ [추가] ChatUI의 대화 내역을 저장하기 위한 Ref
   const chatMessagesRef = useRef<Message[]>();
@@ -135,33 +215,26 @@ export default function NotePage() {
   useEffect(() => {
     if (!id) return;
 
-    const loadNoteAndQuiz = async () => {
-      setLoading(true);
-      try {
-        const foundNote = await getNote(id);
-        if (foundNote) {
-          setNote(foundNote);
-          setEditContent(foundNote.content);
-          setEditTitle(foundNote.title);
-          setEditAttachments(foundNote.attachments || []);
-
-          if (foundNote.noteType === 'review') {
-            const foundQuiz = await getQuiz(foundNote.id);
-            if (foundQuiz) {
-              setQuiz(foundQuiz);
-            }
-          }
-        } else {
-          navigate('/');
-        }
-      } catch (error) {
-        console.error('Error loading note and quiz:', error);
-        navigate('/');
-      } finally {
-        setLoading(false);
-      }
-    };
-
+            const loadNoteAndQuiz = async () => {
+              dispatch({ type: 'SET_LOADING', payload: true });
+              try {
+                const foundNote = await getNote(id);
+                let foundQuiz: Quiz | null = null;
+                if (foundNote) {
+                  if (foundNote.noteType === 'review') {
+                    foundQuiz = await getQuiz(foundNote.id);
+                  }
+                  dispatch({ type: 'SET_NOTE_DATA', payload: { note: foundNote, quiz: foundQuiz } });
+                } else {
+                  navigate('/');
+                }
+              } catch (error) {
+                console.error('Error loading note and quiz:', error);
+                navigate('/');
+              } finally {
+                dispatch({ type: 'SET_LOADING', payload: false });
+              }
+            };
     loadNoteAndQuiz();
   }, [id, navigate, getNote, getQuiz]);
   
@@ -183,22 +256,18 @@ export default function NotePage() {
       updatedAt: Date.now(),
     });
     
-    setNote(prev => prev ? { ...prev, title: editTitle.trim(), content: editContent.trim(), attachments: editAttachments, updatedAt: Date.now() } : null);
-    setEditing(false);
+    dispatch({ type: 'UPDATE_NOTE_FIELD', payload: { title: editTitle.trim(), content: editContent.trim(), attachments: editAttachments, updatedAt: Date.now() } });
+    dispatch({ type: 'SET_EDITING', payload: false });
   };
 
   const handleCancelEdit = () => {
-    setEditContent(note?.content || '');
-    setEditTitle(note?.title || '');
-    setEditAttachments(note?.attachments || []);
-    setEditing(false);
+    dispatch({ type: 'RESET_EDIT_STATE' });
   };
 
   const handleToggleFavorite = () => {
     if (!note) return;
     const newFavState = !note.favorite;
-    updateNote(note.id, { favorite: newFavState });
-    setNote(prev => prev ? { ...prev, favorite: newFavState } : null);
+    dispatch({ type: 'UPDATE_NOTE_FIELD', payload: { favorite: newFavState } });
   };
 
   const handleDelete = async () => {
@@ -273,9 +342,7 @@ export default function NotePage() {
       }
     } catch (error) {
       console.error("Share failed", error);
-      alert('공유에 실패했습니다.');
-    }
-    setIsShareModalOpen(false);
+    dispatch({ type: 'TOGGLE_SHARE_MODAL', payload: false });
   };
 
   const handleDownload = async () => {
@@ -288,7 +355,7 @@ export default function NotePage() {
       console.error("Download failed", error);
       alert('다운로드에 실패했습니다.');
     }
-    setIsShareModalOpen(false);
+    dispatch({ type: 'TOGGLE_SHARE_MODAL', payload: false });
   };
 
   const openSource = (e?: React.MouseEvent) => {
@@ -326,14 +393,7 @@ export default function NotePage() {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">노트를 불러오는 중...</p>
-        </div>
-      </div>
-    );
+    return <LoadingOverlay message="노트를 불러오는 중..." />;
   }
 
   if (!note) {
@@ -354,7 +414,7 @@ export default function NotePage() {
         <div className={`transition-all duration-300 ease-in-out ${isChatOpen ? 'w-full md:w-2/5' : 'w-0'}`}>
           {isChatOpen &&             <ChatUI 
               noteContext={note.content} 
-              onClose={() => setIsChatOpen(false)} 
+              onClose={() => dispatch({ type: 'TOGGLE_CHAT_PANEL', payload: false })} 
               initialMessage={initialChatMessage} 
               messagesRef={chatMessagesRef} // ✨ Ref 전달
             />}
@@ -540,7 +600,7 @@ export default function NotePage() {
       
       {!isChatOpen && (
         <Button
-          onClick={() => setIsChatOpen(true)}
+          onClick={() => dispatch({ type: 'TOGGLE_CHAT_PANEL', payload: true })}
           className="fixed bottom-6 right-6 z-20 h-14 w-14 rounded-full shadow-lg"
           title="AI와 대화하기"
         >
@@ -550,7 +610,7 @@ export default function NotePage() {
 
       <ShareModal
         isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
+        onClose={() => dispatch({ type: 'TOGGLE_SHARE_MODAL', payload: false })}
         onConfirm={handleShare}
         onDownload={handleDownload}
         noteTitle={note.title}
