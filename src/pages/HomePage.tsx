@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useNotes } from "../lib/useNotes";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Loader2, Youtube, ArrowRight, File, BrainCircuit } from "lucide-react";
+import { Loader2, Youtube, ArrowRight, File, BrainCircuit, AppWindow, Pencil, Check, Trash2, Plus, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 const LoadingOverlay = ({ message }: { message: string }) => (
@@ -15,6 +16,31 @@ const LoadingOverlay = ({ message }: { message: string }) => (
     </div>
 );
 
+const HEADLINES = [
+  "새로운 지식을 내 것으로",
+  "복잡한 정보를 명확하게",
+  "학습의 모든 과정을 한 곳에서",
+  "AI와 함께 더 깊이있는 학습을",
+  "당신의 두 번째 뇌가 되어줄게요"
+];
+
+interface ExternalLinkItem {
+  id: string;
+  name: string;
+  url: string;
+  iconUrl: string;
+  fallbackIconDataUrl: string;
+}
+
+const defaultLinks: ExternalLinkItem[] = [
+  { id: 'gemini', name: 'Gemini', url: 'https://gemini.google.com/', iconUrl: 'https://www.google.com/s2/favicons?domain=gemini.google.com&sz=64', fallbackIconDataUrl: generateFallbackIconDataUrl('G') },
+  { id: 'perplexity', name: 'Perplexity', url: 'https://www.perplexity.ai/', iconUrl: 'https://www.google.com/s2/favicons?domain=perplexity.ai&sz=64', fallbackIconDataUrl: generateFallbackIconDataUrl('P') },
+  { id: 'chatgpt', name: 'ChatGPT', url: 'https://chat.openai.com/', iconUrl: 'https://www.google.com/s2/favicons?domain=openai.com&sz=64', fallbackIconDataUrl: generateFallbackIconDataUrl('C') },
+  { id: 'mathpix', name: 'Mathpix Snip', url: 'https://snip.mathpix.com/', iconUrl: 'https://www.google.com/s2/favicons?domain=mathpix.com&sz=64', fallbackIconDataUrl: generateFallbackIconDataUrl('M') }
+];
+
+const LINKS_STORAGE_KEY = 'studious-external-links';
+
 export default function HomePage() {
   const { addNote } = useNotes();
   const navigate = useNavigate();
@@ -23,6 +49,67 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [youtubeUrl, setYoutubeUrl] = useState('');
+  const [headline, setHeadline] = useState(HEADLINES[0]); // Add headline state
+
+  const [externalLinks, setExternalLinks] = useState<ExternalLinkItem[]>([]); // Add externalLinks state
+  const [isEditLinks, setIsEditLinks] = useState(false); // Add isEditLinks state
+
+  useEffect(() => { // useEffect for loading links from localStorage
+    try {
+      const storedLinks = localStorage.getItem(LINKS_STORAGE_KEY);
+      if (storedLinks) {
+        setExternalLinks(JSON.parse(storedLinks));
+      } else {
+        setExternalLinks(defaultLinks);
+      }
+    } catch (error) {
+      console.error("Failed to load links from localStorage", error);
+      setExternalLinks(defaultLinks);
+    }
+  }, []);
+
+  const saveLinks = (links: ExternalLinkItem[]) => { // saveLinks function
+    setExternalLinks(links);
+    localStorage.setItem(LINKS_STORAGE_KEY, JSON.stringify(links));
+  };
+
+  const handleAddLink = () => { // handleAddLink function
+    const name = prompt("추가할 사이트의 이름을 입력하세요:");
+    if (!name) return;
+    const url = prompt(`'${name}'의 전체 주소(URL)를 입력하세요 (https:// 포함):`);
+    if (!url) return;
+
+    try {
+      const domain = new URL(url).hostname;
+      const newLink: ExternalLinkItem = {
+        id: crypto.randomUUID(),
+        name,
+        url,
+        iconUrl: `https://www.google.com/s2/favicons?domain=${domain}&sz=64`,
+        fallbackIconDataUrl: generateFallbackIconDataUrl(name)
+      };
+      saveLinks([...externalLinks, newLink]);
+    } catch (error) {
+      alert("유효하지 않은 URL 형식입니다. 'https://'를 포함하여 다시 시도해주세요.");
+    }
+  };
+
+  const handleDeleteLink = (id: string) => { // handleDeleteLink function
+    if (confirm("이 바로가기를 삭제하시겠습니까?")) {
+      saveLinks(externalLinks.filter(link => link.id !== id));
+    }
+  };
+
+  useEffect(() => { // useEffect for headline rotation
+    const interval = setInterval(() => {
+      setHeadline(prev => {
+        const currentIndex = HEADLINES.indexOf(prev);
+        const nextIndex = (currentIndex + 1) % HEADLINES.length;
+        return HEADLINES[nextIndex];
+      });
+    }, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleProgress = (status: string) => setLoadingMessage(status);
   const handleComplete = (note: any) => {
@@ -70,6 +157,57 @@ export default function HomePage() {
     <>
       {isLoading && <LoadingOverlay message={loadingMessage} />}
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4 sm:p-8">
+        <div className="absolute top-4 right-4 z-10">
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" aria-label="외부 도구 바로가기">
+                <AppWindow className="h-5 w-5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-60" align="end">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center mb-1">
+                    <h4 className="font-medium text-sm px-2">바로가기</h4>
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setIsEditLinks(!isEditLinks)}>
+                        {isEditLinks ? <Check className="h-4 w-4" /> : <Pencil className="h-4 w-4" />}
+                    </Button>
+                </div>
+                <div className="grid grid-cols-1">
+                  {externalLinks.map(link => (
+                    <div key={link.id} className="flex items-center gap-3 p-2 rounded-md hover:bg-muted group">
+                      <img 
+                        src={link.iconUrl} 
+                        alt={`${link.name} icon`} 
+                        className="h-4 w-4" 
+                        onError={(e) => { 
+                          (e.target as HTMLImageElement).src = link.fallbackIconDataUrl; 
+                        }}
+                      />
+                      <a href={link.url} target="_blank" rel="noopener noreferrer" className="flex-1 text-sm truncate">{link.name}</a>
+                      {isEditLinks && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDeleteLink(link.id)}>
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                      )}
+                      {!isEditLinks && (
+                          <a href={link.url} target="_blank" rel="noopener noreferrer" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                            <ExternalLink className="h-3 w-3 text-muted-foreground" />
+                          </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {isEditLinks && (
+                    <Button variant="outline" size="sm" className="w-full mt-2" onClick={handleAddLink}>
+                        <Plus className="h-4 w-4 mr-2" />
+                        새 링크 추가
+                    </Button>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
+        </div>
+
         <div className="w-full max-w-4xl text-center">
           <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground">
             학습의 시작점, Studious

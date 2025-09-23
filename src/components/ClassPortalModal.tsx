@@ -1,13 +1,12 @@
 import React, { useMemo, useState } from 'react';
 import { Note, Subject } from '../lib/types';
 import { Button } from './ui/button';
-import { X, BrainCircuit, Notebook, Plus } from 'lucide-react';
+import { X, BrainCircuit, Notebook, File as FileIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { useNotes } from '../lib/useNotes';
 
 interface Props {
   isOpen: boolean;
@@ -37,44 +36,37 @@ const NoteItem = ({ note, subjectName }: { note: Note; subjectName: string }) =>
 
 export const ClassPortalModal: React.FC<Props> = ({ isOpen, onClose, title, notes, subjects, contextSubject, contextDate }) => {
   const navigate = useNavigate();
-  const { createEmptyNote } = useNotes();
   const [filter, setFilter] = useState<'textbook' | 'review' | undefined>();
 
   const subjectsById = useMemo(() => new Map(subjects.map(sub => [sub.id, sub])), [subjects]);
 
-  const filteredAndGroupedNotes = useMemo(() => {
-    const filtered = (notes || []).filter(note => {
-      if (filter) return note.noteType === filter;
-      return note.noteType === 'textbook' || note.noteType === 'review';
-    });
-    const grouped = new Map<string, Note[]>();
-    filtered.forEach(note => {
-      const dateStr = format(new Date(note.noteDate || note.createdAt), 'yyyy-MM-dd (eee)', { locale: ko });
-      if (!grouped.has(dateStr)) grouped.set(dateStr, []);
-      grouped.get(dateStr)!.push(note);
-    });
-    return Array.from(grouped.entries());
-  }, [notes, filter]);
+    const filteredAndGroupedNotes = useMemo(() => {
+        const filtered = (notes || []).filter(note => {
+            if (filter) return note.noteType === filter;
+            // Default to showing both textbook and review notes
+            return note.noteType === 'textbook' || note.noteType === 'review';
+        });
+
+        const grouped = new Map<string, Note[]>();
+        filtered.forEach(note => {
+            const dateStr = format(new Date(note.noteDate || note.createdAt), 'yyyy-MM-dd (eee)', { locale: ko });
+            if (!grouped.has(dateStr)) {
+                grouped.set(dateStr, []);
+            }
+            grouped.get(dateStr)!.push(note);
+        });
+        return Array.from(grouped.entries());
+    }, [notes, filter]);
+
   
   const handleGoToChat = () => {
     onClose();
     navigate('/chat', { state: { subject: contextSubject, date: contextDate } });
   };
   
-  const handleAddNewNote = async () => {
-    if (!contextSubject) return;
-    const noteTitle = prompt("새 노트의 제목을 입력하세요:");
-    if (noteTitle) {
-      try {
-        const dateToUse = contextDate || new Date();
-        const newNote = await createEmptyNote(noteTitle, contextSubject.id, dateToUse);
-        onClose();
-        navigate(`/note/${newNote.id}`);
-      } catch (error) {
-        console.error("Failed to create new note:", error);
-        alert("노트 생성에 실패했습니다.");
-      }
-    }
+  const handleGoToReview = () => {
+    onClose();
+    navigate('/review', { state: { date: contextDate } });
   };
 
   if (!isOpen) return null;
@@ -108,18 +100,16 @@ export const ClassPortalModal: React.FC<Props> = ({ isOpen, onClose, title, note
             <div className="text-center text-muted-foreground pt-16"><p>해당하는 노트가 없습니다.</p></div>
           )}
         </CardContent>
-        {(contextSubject || contextDate) && (
-            <footer className="p-4 border-t grid grid-cols-2 gap-2 flex-shrink-0">
-                <Button variant="outline" onClick={handleGoToChat} disabled={!contextSubject}>
-                    <BrainCircuit className="h-4 w-4 mr-2" />
-                    AI 참고서 만들기
-                </Button>
-                <Button onClick={handleAddNewNote} disabled={!contextSubject}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    새 노트 추가
-                </Button>
-            </footer>
-        )}
+        <footer className="p-4 border-t grid grid-cols-2 gap-2 flex-shrink-0">
+            <Button variant="outline" onClick={handleGoToChat} disabled={!contextSubject}>
+                <BrainCircuit className="h-4 w-4 mr-2" />
+                AI 참고서 만들기
+            </Button>
+            <Button onClick={handleGoToReview}>
+                <FileIcon className="h-4 w-4 mr-2" />
+                AI 복습 노트 만들기
+            </Button>
+        </footer>
       </Card>
     </div>
   );
