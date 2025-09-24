@@ -38,29 +38,19 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
               securityLevel: 'loose',
             });
 
-            mermaidElements.forEach((element, index) => {
-              const mermaidCode = element.textContent || '';
-              const id = `mermaid-diagram-${Date.now()}-${index}`;
-              try {
-                mermaid.render(id, mermaidCode, (svgCode) => {
-                  if (element.parentElement) {
-                    element.parentElement.innerHTML = svgCode;
-                  }
-                });
-              } catch (error) {
+            // mermaid.run()은 Promise를 반환하므로 .catch()로 오류 처리
+            mermaid.run({ nodes: mermaidElements as NodeListOf<HTMLElement> })
+              .catch(error => {
                 console.error('Mermaid 렌더링 오류:', error);
-                if (element.parentElement) {
-                  const errorMessage = document.createElement('div');
-                  errorMessage.innerHTML = `
+                if (containerRef.current) {
+                  containerRef.current.innerHTML = `
                     <div class="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
                       <p class="font-bold">다이어그램 렌더링 오류</p>
                       <pre class="mt-2 text-xs whitespace-pre-wrap">${(error as Error).message}</pre>
                     </div>
                   `;
-                  element.parentElement.replaceWith(errorMessage);
                 }
-              }
-            });
+              });
           } catch (e) {
             console.error('Mermaid 라이브러리 로드 실패:', e);
           }
