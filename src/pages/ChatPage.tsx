@@ -42,7 +42,8 @@ export default function ChatPage() {
       return;
     }
     setIsLoading(true);
-    setLoadingMessage('AI가 자료를 분석해 참고서를 만들고 있어요...');
+    setLoadingMessage('파일을 서버로 업로드하는 중입니다...');
+
     const formData = new FormData();
     uploadedFiles.forEach(file => formData.append('files', file));
     const weekInfo = selectedDate 
@@ -51,6 +52,12 @@ export default function ChatPage() {
     formData.append('subject', selectedSubject.name);
     formData.append('week', weekInfo);
     formData.append('materialTypes', uploadedFiles.map(f => f.type).join(', ') || '[파일]');
+
+    // Simulate progress update
+    setTimeout(() => {
+        setLoadingMessage('PDF 변환 및 AI 분석 중... 잠시만 기다려주세요.');
+    }, 1500); // 1.5초 후 메시지 변경
+
     try {
       const response = await fetch('/api/create_textbook', { method: 'POST', body: formData });
       if (!response.ok) {
