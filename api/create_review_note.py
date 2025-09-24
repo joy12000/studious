@@ -1,51 +1,47 @@
 from http.server import BaseHTTPRequestHandler
-  import json
-  import os
-  import google.generativeai as genai
-  import requests
-  import io
-  from PIL import Image
-  import traceback
-  import shutil # This import is no longer needed as we are not using
-  local temp files
+import json
+import os
+import google.generativeai as genai
+import requests
+import io
+from PIL import Image
+import traceback
+import shutil
 
-  class handler(BaseHTTPRequestHandler):
+class handler(BaseHTTPRequestHandler):
 
-      def do_POST(self):
-          api_keys = [
-              os.environ.get('GEMINI_API_KEY_PRIMARY'),
-              os.environ.get('GEMINI_API_KEY_SECONDARY'),
-              os.environ.get('GEMINI_API_KEY_TERTIARY'),
-              os.environ.get('GEMINI_API_KEY_QUATERNARY'),
-              os.environ.get('GEMINI_API_KEY')
-          ]
-          valid_keys = [key for key in api_keys if key]
+    def do_POST(self):
+        api_keys = [
+            os.environ.get('GEMINI_API_KEY_PRIMARY'),
+            os.environ.get('GEMINI_API_KEY_SECONDARY'),
+            os.environ.get('GEMINI_API_KEY_TERTIARY'),
+            os.environ.get('GEMINI_API_KEY_QUATERNARY'),
+            os.environ.get('GEMINI_API_KEY')
+        ]
+        valid_keys = [key for key in api_keys if key]
 
-          if not valid_keys:
-              return self.handle_error(ValueError("설정된 Gemini API
-  키가 없습니다."), "API 키 설정 오류", 500)
+        if not valid_keys:
+            return self.handle_error(ValueError("설정된 Gemini API 키가 없습니다."), "API 키 설정 오류", 500)
 
-          last_error = None
-          blob_urls_to_delete = [] # To store URLs for cleanup
+        last_error = None
+        blob_urls_to_delete = [] # To store URLs for cleanup
 
-          try:
-              content_length = int(self.headers['Content-Length'])
-              post_data = self.rfile.read(content_length)
-              data = json.loads(post_data)
+        try:
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data)
 
-              blob_urls = data.get('blobUrls', [])
-              if not blob_urls or not isinstance(blob_urls, list):
-                  return self.handle_error(ValueError("유효하지 않은
-  blobUrls 입니다."), status_code=400)
+            blob_urls = data.get('blobUrls', [])
+            if not blob_urls or not isinstance(blob_urls, list):
+                return self.handle_error(ValueError("유효하지 않은 blobUrls 입니다."), status_code=400)
 
-              blob_urls_to_delete.extend(blob_urls) # Add to cleanup
-  list
+            blob_urls_to_delete.extend(blob_urls) # Add to cleanup list
 
-              subject_name = data.get('subject', '[과목명]')
-              week_info = data.get('week', '[N주차/18주차]')
-              material_types = data.get('materialTypes', '[PPT/PDF/텍스트 등]')
+            subject_name = data.get('subject', '[과목명]')
+            week_info = data.get('week', '[N주차/18주차]')
+            material_types = data.get('materialTypes', '[PPT/PDF/텍스트 등]')
 
-              prompt = f"""
+            prompt = f"""
               당신은 인지과학과 교육심리학 전문가입니다. 첨부된 강의 자료를 분석하여, 학생이 스스로 깊이 있게 학습할 수 있는 최고의 복습 노트를 제작해야 합니다.
 
               # 📖 노트 정보
@@ -87,101 +83,84 @@ from http.server import BaseHTTPRequestHandler
               결과물은 다른 설명 없이, 위 규칙들을 모두 준수한 복습 노트 본문(마크다운)만 생성해야 합니다.
               """
 
-              request_contents = [prompt]
-              text_materials = []
+            request_contents = [prompt]
+            text_materials = []
 
-              for url in blob_urls:
-                  try:
-                      response = requests.get(url, stream=True)
-                      response.raise_for_status()
-                      file_content = response.content
-                      content_type =
-  response.headers.get('content-type', 'application/octet-stream')
+            for url in blob_urls:
+                try:
+                    response = requests.get(url, stream=True)
+                    response.raise_for_status()
+                    file_content = response.content
+                    content_type = response.headers.get('content-type', 'application/octet-stream')
 
-                      if 'image/' in content_type:
+                    if 'image/' in content_type:
+                        request_contents.append(Image.open(io.BytesIO(file_content)))
+                    else:
+                        text_materials.append(file_content.decode('utf-8', errors='ignore'))
+                except Exception as e:
+                    print(f"WARN: Blob URL에서 파일 다운로드 또는 처리 실패 ('{url}'): {e}")
 
-  request_contents.append(Image.open(io.BytesIO(file_content)))
-                      else:
+            if text_materials:
+                request_contents.append("\n--- 학습 자료 (텍스트) ---\n" + "\n\n".join(text_materials))
 
-  text_materials.append(file_content.decode('utf-8', errors='ignore'))
-                  except Exception as e:
-                      print(f"WARN: Blob URL에서 파일 다운로드 또는 처리       
-   실패 ('{url}'): {e}")
+            for i, api_key in enumerate(valid_keys):
+                try:
+                    print(f"INFO: API 키 #{i + 1} (으)로 참고서 생성 시도...")
+                    genai.configure(api_key=api_key)
+                    model = genai.GenerativeModel('gemini-2.5-flash')
 
-              if text_materials:
-                  request_contents.append("\n--- 학습 자료 (텍스트)
-  ---\n" + "\n\n".join(text_materials))
+                    response = model.generate_content(request_contents)
 
-              for i, api_key in enumerate(valid_keys):
-                  try:
-                      print(f"INFO: API 키 #{i + 1} (으)로 참고서 생성
-  시도...")
-                      genai.configure(api_key=api_key)
-                      model =
-  genai.GenerativeModel('gemini-2.0-flash')
+                    # The model is expected to return a JSON string.
+                    # We need to parse it to extract the data.
+                    generated_data = json.loads(response.text)
 
-                      response = model.generate_content(request_contents)
+                    json_response = {
+                        "title": generated_data.get("title", f"{subject_name} - {week_info} 복습노트"),
+                        "content": generated_data.get("summary", ""),
+                        "key_insights": generated_data.get("key_insights", []),
+                        "quiz": generated_data.get("quiz", {}),
+                        "subjectId": data.get("subjectId")
+                    }
 
-                      # The model is expected to return a JSON string.
-                      # We need to parse it to extract the data.
-                      generated_data = json.loads(response.text)
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json; charset=utf-8')
+                    self.end_headers()
+                    self.wfile.write(json.dumps(json_response, ensure_ascii=False).encode('utf-8'))
+                    return
 
-                      json_response = {
-                          "title": generated_data.get("title", f"{subject_name} - {week_info} 복습노트"),
-                          "content": generated_data.get("summary", ""),
-                          "key_insights": generated_data.get("key_insights", []),
-                          "quiz": generated_data.get("quiz", {}),
-                          "subjectId": data.get("subjectId")
-                      }
+                except Exception as e:
+                    last_error = e
+                    print(f"WARN: API 키 #{i + 1} 사용 실패. 다음 키로 폴백합니다. 오류: {e}")
+                    continue
 
-                      self.send_response(200)
-                      self.send_header('Content-type', 'application/json; charset=utf-8')
-                      self.end_headers()
-                      self.wfile.write(json.dumps(json_response, ensure_ascii=False).encode('utf-8'))
-                      return
+            raise ConnectionError("모든 Gemini API 키로 요청에 실패했습니다.") from last_error
 
-                  except Exception as e:
-                      last_error = e
-                      print(f"WARN: API 키 #{i + 1} 사용 실패. 다음 키로       
-   폴백합니다. 오류: {e}")
-                      continue
+        except Exception as e:
+            self.handle_error(e, "참고서 생성 중 오류 발생")
+        finally:
+            # Clean up Vercel Blobs
+            blob_read_write_token = os.environ.get('BLOB_READ_WRITE_TOKEN')
+            if blob_read_write_token:
+                for url in blob_urls_to_delete:
+                    try:
+                        delete_response = requests.delete(url, headers={'Authorization': f'Bearer {blob_read_write_token}'})
+                        delete_response.raise_for_status()
+                        print(f"INFO: Blob 삭제 완료: {url}")
+                    except Exception as delete_error:
+                        print(f"ERROR: Blob 삭제 실패 ('{url}'): {delete_error}")
+            else:
+                print("WARN: BLOB_READ_WRITE_TOKEN이 설정되지 않아 Blob을 삭제할 수 없습니다.")
 
-              raise ConnectionError("모든 Gemini API 키로 요청에
-  실패했습니다.") from last_error
-
-          except Exception as e:
-              self.handle_error(e, "참고서 생성 중 오류 발생")
-          finally:
-              # Clean up Vercel Blobs
-              blob_read_write_token =
-  os.environ.get('BLOB_READ_WRITE_TOKEN')
-              if blob_read_write_token:
-                  for url in blob_urls_to_delete:
-                      try:
-                          delete_response = requests.delete(url,
-  headers={'Authorization': f'Bearer {blob_read_write_token}'})
-                          delete_response.raise_for_status()
-                          print(f"INFO: Blob 삭제 완료: {url}")
-                      except Exception as delete_error:
-                          print(f"ERROR: Blob 삭제 실패 ('{url}'):
-  {delete_error}")
-              else:
-                  print("WARN: BLOB_READ_WRITE_TOKEN이 설정되지 않아
-  Blob을 삭제할 수 없습니다.")
-
-      def handle_error(self, e, message="오류 발생", status_code=500):
-          print(f"ERROR: {message} - {e}")
-          traceback.print_exc()
-          if not hasattr(self, '_headers_sent') or not
-  self._headers_sent:
-              try:
-                  self.send_response(status_code)
-                  self.send_header('Content-type', 'application/json;
-  charset=utf-8')
-                  self.end_headers()
-                  error_details = {"error": message, "details": str(e)}\       
-
-  self.wfile.write(json.dumps(error_details).encode('utf-8'))
-              except Exception as write_error:\
-                  print(f"FATAL: 오류 응답 전송 중 추가 오류 발생:
-  {write_error}")
+    def handle_error(self, e, message="오류 발생", status_code=500):
+        print(f"ERROR: {message} - {e}")
+        traceback.print_exc()
+        if not hasattr(self, '_headers_sent') or not self._headers_sent:
+            try:
+                self.send_response(status_code)
+                self.send_header('Content-type', 'application/json; charset=utf-8')
+                self.end_headers()
+                error_details = {"error": message, "details": str(e)}
+                self.wfile.write(json.dumps(error_details).encode('utf-8'))
+            except Exception as write_error:
+                print(f"FATAL: 오류 응답 전송 중 추가 오류 발생: {write_error}")
