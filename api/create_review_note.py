@@ -95,7 +95,7 @@ class handler(BaseHTTPRequestHandler):
               4.  **핵심 용어 (Tooltip):** 중요한 전공 용어는 반드시 <dfn title="용어에 대한 간단한 설명">핵심 용어</dfn> HTML 태그로 감싸 설명을 제공해야 합니다.
                   -   예시: <dfn title="매질 없이 열이 직접 전달되는 현상">복사</dfn>
 
-              5.  **회로도 (JSON):** 전자 회로는 반드시 schem-it 라이브러리 형식의 JSON으로 코드 블록 안에 작성해야 합니다.
+              5.  **회로도 (JSON):** 전자 회로는 반드시 jointjs 라이브러리 형식의 JSON으로 코드 블록 안에 작성해야 합니다.
                   elements: 회로 소자 배열. 각 소자는 type, name, 연결점(to, from), label 등을 가집니다.
                   예시 (RC 회로):
                   ```circuit
