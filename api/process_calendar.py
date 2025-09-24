@@ -10,9 +10,7 @@ import json
 # Vercel은 이 Flask 앱을 자동으로 서버리스 함수로 변환합니다.
 app = Flask(__name__)
 
-# 이 라우트는 /api/process_calendar로 접근 가능하게 됩니다.
-# Vercel의 파일 기반 라우팅에 따라, 이 파일 자체가 /api/process_calendar 엔드포인트가 됩니다.
-@app.route('/', methods=['POST'])
+@app.route('/api/process_calendar', methods=['POST'])
 def process_calendar_handler():
     print("--- FLASK SCHEDULE PROCESSING START ---")
     # --- Gemini API 키 설정 ---
