@@ -61,22 +61,25 @@ export function useNotes(defaultFilters?: Filters) {
     const [filters, setFilters] = useState<Filters>(defaultFilters || {});
 
     const notes = useLiveQuery(() => db.notes.toArray(), []);
-    const allSubjects = useLiveQuery(async () => {
-        const subjects = await db.subjects.toArray();
-        const subjectsToUpdate: Subject[] = [];
-        for (const subject of subjects) {
-            if (!subject.color) {
-                const newColor = generatePastelColor();
-                subjectsToUpdate.push({ ...subject, color: newColor });
+    const allSubjects = useLiveQuery(() => db.subjects.toArray(), []);
+
+    useEffect(() => {
+        const assignMissingColors = async () => {
+            if (allSubjects && allSubjects.length > 0) {
+                const subjectsToUpdate: Subject[] = [];
+                for (const subject of allSubjects) {
+                    if (!subject.color) {
+                        const newColor = generatePastelColor();
+                        subjectsToUpdate.push({ ...subject, color: newColor });
+                    }
+                }
+                if (subjectsToUpdate.length > 0) {
+                    await db.subjects.bulkPut(subjectsToUpdate);
+                }
             }
-        }
-        if (subjectsToUpdate.length > 0) {
-            await db.subjects.bulkPut(subjectsToUpdate);
-            // After updating, re-fetch to ensure the live query reflects changes immediately
-            return db.subjects.toArray();
-        }
-        return subjects;
-    }, []);
+        };
+        assignMissingColors();
+    }, [allSubjects]);
     const schedule = useLiveQuery(() => db.schedule.toArray(), []);
     
     const filteredNotes = useLiveQuery(async () => {
