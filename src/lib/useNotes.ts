@@ -152,7 +152,45 @@ export function useNotes(defaultFilters?: Filters) {
     };
     
     const addScheduleFromImage = async (payload: AddScheduleFromImagePayload) => {
-      // Implementation...
+      const { file, onProgress, onComplete, onError } = payload;
+      
+      onProgress?.('시간표 파일을 서버로 전송 중입니다...');
+      
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const response = await fetch('/api/process_calendar', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.details || errorData.error || '시간표 처리 중 알 수 없는 오류가 발생했습니다.');
+        }
+
+        const events: ScheduleEvent[] = await response.json();
+
+        onProgress?.('시간표 정보를 데이터베이스에 저장 중입니다...');
+
+        // Add unique IDs to each event
+        const eventsWithIds = events.map(event => ({
+          ...event,
+          id: uuidv4(),
+        }));
+
+        // Clear existing schedule and add new events
+        await db.schedule.clear();
+        await db.schedule.bulkPut(eventsWithIds);
+
+        onComplete?.(eventsWithIds);
+
+      } catch (err) {
+        console.error("Schedule import failed:", err);
+        const errorMessage = err instanceof Error ? err.message : "시간표를 처리하는 중 오류가 발생했습니다.";
+        onError?.(errorMessage);
+      }
     };
 
     const addNoteFromTextbook = async (title: string, content: string, subjectId: string, files: File[], noteDate?: string): Promise<Note> => {
