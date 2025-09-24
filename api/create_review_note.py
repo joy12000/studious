@@ -131,6 +131,12 @@ class handler(BaseHTTPRequestHandler):
               """
 
             request_contents = [prompt]
+
+            # Add aiConversationText from selected existing notes
+            ai_conversation_text = data.get('aiConversationText', '')
+            if ai_conversation_text:
+                request_contents.append(ai_conversation_text)
+
             text_materials = []
 
             for url in blob_urls:
