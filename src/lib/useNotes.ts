@@ -218,21 +218,33 @@ export function useNotes(defaultFilters?: Filters) {
           throw new Error(errorData.details || errorData.error || '시간표 처리 중 알 수 없는 오류가 발생했습니다.');
         }
 
-        const events: ScheduleEvent[] = await response.json();
+        const eventsFromApi: { subjectName: string, dayOfWeek: string, startTime: string, endTime: string }[] = await response.json();
+
+        onProgress?.('시간표 정보를 처리하고 과목을 동기화하는 중입니다...');
+
+        const eventsForDb: ScheduleEvent[] = await Promise.all(
+          eventsFromApi.map(async (eventFromApi) => {
+            let subject = (allSubjects || []).find(s => s.name === eventFromApi.subjectName);
+            if (!subject) {
+              subject = await addSubject(eventFromApi.subjectName);
+            }
+            
+            return {
+              id: uuidv4(),
+              subjectId: subject.id,
+              dayOfWeek: eventFromApi.dayOfWeek,
+              startTime: eventFromApi.startTime,
+              endTime: eventFromApi.endTime,
+            };
+          })
+        );
 
         onProgress?.('시간표 정보를 데이터베이스에 저장 중입니다...');
-
-        // Add unique IDs to each event
-        const eventsWithIds = events.map(event => ({
-          ...event,
-          id: uuidv4(),
-        }));
-
-        // Clear existing schedule and add new events
+        
         await db.schedule.clear();
-        await db.schedule.bulkPut(eventsWithIds);
+        await db.schedule.bulkPut(eventsForDb);
 
-        onComplete?.(eventsWithIds);
+        onComplete?.(eventsForDb);
 
       } catch (err) {
         console.error("Schedule import failed:", err);
