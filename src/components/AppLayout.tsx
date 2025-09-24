@@ -69,8 +69,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true); // 기본 상태를 '접힘'으로 변경
 
-  const desktopAsideWidth = isCollapsed ? "md:w-[88px]" : "md:w-[280px]";
-  const desktopMainContentMargin = isCollapsed ? "md:ml-[88px]" : "md:ml-[280px]";
+  const desktopAsideWidth = isCollapsed ? "md:w-[64px]" : "md:w-[256px]";
+  const desktopMainContentMargin = isCollapsed ? "md:ml-[64px]" : "md:ml-[256px]";
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, setIsSidebarOpen }}>
@@ -86,7 +86,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             {/* Sidebar */}
             <aside 
                 className={`fixed inset-y-0 left-0 z-40 bg-background border-r transition-all duration-300 ease-in-out 
-                ${isSidebarOpen ? 'translate-x-0 w-[280px]' : '-translate-x-full'}
+                ${isSidebarOpen ? 'translate-x-0 w-[256px]' : '-translate-x-full'}
                 md:translate-x-0 ${desktopAsideWidth}`}
                 onMouseEnter={() => setIsCollapsed(false)}
                 onMouseLeave={() => setIsCollapsed(true)}
