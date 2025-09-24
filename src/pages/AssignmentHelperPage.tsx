@@ -139,43 +139,57 @@ export default function AssignmentHelperPage() {
             }
         }
         setError(null);
-        setProgressMessage('파일을 Vercel Blob에 업로드하는 중...');
+        setProgressMessage('파일 업로드 및 변환 중...');
 
         try {
-            const uploadFile = async (file: File) => {
-                const newBlob = await upload(file.name, file, {
-                    access: 'public',
-                    handleUploadUrl: '/api/upload/route',
-                });
-                return newBlob.url;
-            };
+            const allFiles = [...referenceFiles, ...problemFiles, ...answerFiles];
+            const uploadFormData = new FormData();
+            allFiles.forEach(file => uploadFormData.append('files', file));
 
-            const referenceFileUrls = await Promise.all(referenceFiles.map(uploadFile));
-            setProgressMessage('참고 자료 업로드 완료. 과제 문제 업로드 중...');
-            const problemFileUrls = await Promise.all(problemFiles.map(uploadFile));
-            setProgressMessage('과제 문제 업로드 완료. 답안 파일 업로드 중...');
-            const answerFileUrls = await Promise.all(answerFiles.map(uploadFile));
-            setProgressMessage('모든 파일 업로드 완료. AI 분석 시작...');
+            const uploadResponse = await fetch('/api/upload_and_convert', { 
+                method: 'POST', 
+                body: uploadFormData 
+            });
+
+            if (!uploadResponse.ok) {
+                const errorData = await uploadResponse.json();
+                throw new Error(errorData.error || '파일 업로드 및 변환에 실패했습니다.');
+            }
+
+            const { jobId } = await uploadResponse.json();
+
+            setProgressMessage('AI가 과제를 분석하고 있습니다...');
 
             const noteContext = selectedExistingNotes.map(n => `[기존 노트: ${n.title}]\n${n.content}`).join('\n\n');
-
-            await addNoteFromAssignment({
-                referenceFileUrls,
-                problemFileUrls,
-                answerFileUrls,
+            
+            const assignmentBody = {
+                jobId,
                 noteContext,
                 subjectId: selectedSubject.id,
-                onProgress: setProgressMessage,
-                onComplete: (newNote) => {
-                    setProgressMessage(null);
-                    alert("AI 과제 도우미 작업이 완료되었습니다! 생성된 노트로 이동합니다.");
-                    navigate(`/note/${newNote.id}`);
-                },
-                onError: (err) => {
-                    setProgressMessage(null);
-                    setError(err instanceof Error ? err.message : '파일 업로드 또는 노트 생성 중 오류가 발생했습니다.');
-                }
+                referenceFileCount: referenceFiles.length,
+                problemFileCount: problemFiles.length,
+                answerFileCount: answerFiles.length,
+            };
+
+            const assignmentResponse = await fetch('/api/assignment_helper', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(assignmentBody)
             });
+
+            if (!assignmentResponse.ok) {
+                const errorData = await assignmentResponse.json();
+                throw new Error(errorData.details || '과제 도우미 실행에 실패했습니다.');
+            }
+
+            const result = await assignmentResponse.json();
+
+            await addNoteFromAssignment(result);
+
+            setProgressMessage(null);
+            alert("AI 과제 도우미 작업이 완료되었습니다! 생성된 노트로 이동합니다.");
+            navigate(`/notes`); // Navigate to the notes list to see the new note
+
         } catch (error) {
             setProgressMessage(null);
             setError(error instanceof Error ? error.message : '파일 업로드 또는 노트 생성 중 오류가 발생했습니다.');

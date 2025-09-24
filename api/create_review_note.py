@@ -2,11 +2,10 @@ from http.server import BaseHTTPRequestHandler
 import json
 import os
 import google.generativeai as genai
-import requests
+import tempfile
+import shutil
 from PIL import Image
-import io
 import traceback
-from pdf2image import convert_from_bytes
 
 class handler(BaseHTTPRequestHandler):
     def handle_error(self, e, message="오류 발생", status_code=500):
@@ -36,14 +35,23 @@ class handler(BaseHTTPRequestHandler):
             return self.handle_error(ValueError("설정된 Gemini API 키가 없습니다."), "API 키 설정 오류", 500)
 
         last_error = None
+        job_id = None
+        job_dir = None
         
         try:
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data)
 
+            job_id = data.get('jobId')
+            if not job_id or not isinstance(job_id, str) or '/' in job_id or '..' in job_id:
+                return self.handle_error(ValueError("유효하지 않은 jobId 입니다."), status_code=400)
+
+            job_dir = os.path.join(tempfile.gettempdir(), job_id)
+            if not os.path.isdir(job_dir):
+                return self.handle_error(FileNotFoundError(f"작업 디렉토리를 찾을 수 없습니다: {job_dir}"), status_code=404)
+
             ai_conversation_text = data.get('aiConversationText', '')
-            file_urls = data.get('fileUrls', [])
             subjects_list = data.get('subjects', [])
             note_date = data.get('noteDate')
 
@@ -57,7 +65,7 @@ class handler(BaseHTTPRequestHandler):
             # 🎨 출력 서식 규칙 (★★★★★ 가장 중요)
             `summary`, `key_insights` 필드의 내용은 아래 규칙을 **반드시** 따라야 합니다.
             
-            1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 KaTeX 문법으로 감싸야 합니다. (인라인: `$`, 블록: `$$`)
+            1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 KaTeX 문법으로 감싸야 합니다. (인라인: `, 블록: `$`)
             2.  **다이어그램 (Mermaid):** 복잡한 개념 설명 시 Mermaid.js 문법으로 시각화해야 합니다. (```mermaid...```)
             3.  **코드 (Code Block):** 모든 소스 코드는 언어를 명시한 코드 블록으로 작성해야 합니다. (```python...```)
             4.  **핵심 용어 (Tooltip):** 중요한 전공 용어는 `<dfn title="설명">용어</dfn>` HTML 태그로 감싸 설명을 제공해야 합니다.
@@ -70,7 +78,7 @@ class handler(BaseHTTPRequestHandler):
                 -   **매우 중요:** `answer` 값은 반드시 `options` 배열에 포함된 문자열 중 하나와 정확히 일치해야 합니다.
 
             # 최종 JSON 출력 형식
-            {{
+            {{ 
                 "title": "[핵심 주제] 복습 노트",
                 "summary": "AI가 생성한 마크다운 형식의 상세 요약...",
                 "key_insights": ["핵심 개념 또는 통찰 1", "핵심 개념 또는 통찰 2"],
@@ -85,32 +93,26 @@ class handler(BaseHTTPRequestHandler):
             }}
             """
             
-            def process_url(url):
-                try:
-                    response = requests.get(url, stream=True)
-                    response.raise_for_status() 
-                    content_type = response.headers.get('content-type', '')
-                    file_content = response.content
-
-                    if 'application/pdf' in content_type:
-                        return convert_from_bytes(file_content)
-                    elif 'image' in content_type:
-                        return [Image.open(io.BytesIO(file_content))]
-                    else:
-                        # Try to decode as text as a fallback
-                        return [file_content.decode('utf-8')]
-                except Exception as e:
-                    print(f"Error processing URL {url}: {e}")
-                    return []
-
             request_contents = [prompt_text]
-            
+            text_materials = []
+
             if ai_conversation_text:
                 request_contents.append(f"\n--- AI 대화 내용 ---\n{ai_conversation_text}\n")
 
-            if file_urls:
-                request_contents.append("\n--- 학습 자료 파일 ---\n")
-                for url in file_urls: request_contents.extend(process_url(url))
+            request_contents.append("\n--- 학습 자료 파일 ---\n")
+            for filename in sorted(os.listdir(job_dir)):
+                file_path = os.path.join(job_dir, filename)
+                try:
+                    if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+                        request_contents.append(Image.open(file_path))
+                    else:
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            text_materials.append(f.read())
+                except Exception as file_err:
+                    print(f"WARN: 파일 처리 실패 ('{filename}'): {file_err}")
+
+            if text_materials:
+                request_contents.append("\n--- 추가 텍스트 자료 ---\n" + "\n\n".join(text_materials))
 
             for i, api_key in enumerate(valid_keys):
                 try:
@@ -136,3 +138,10 @@ class handler(BaseHTTPRequestHandler):
 
         except Exception as e:
             self.handle_error(e, "복습 노트 생성 중 오류 발생")
+        finally:
+            if job_dir and os.path.exists(job_dir):
+                try:
+                    shutil.rmtree(job_dir)
+                    print(f"INFO: 임시 디렉토리 삭제 완료: {job_dir}")
+                except Exception as cleanup_error:
+                    print(f"ERROR: 임시 디렉토리 삭제 실패 ('{job_dir}'): {cleanup_error}")

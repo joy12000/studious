@@ -85,19 +85,40 @@ export function useNotes(defaultFilters?: Filters) {
     const addNoteFromReview = async (args: AddNoteFromReviewPayload) => {
       const { aiConversationText, files, subjects, onProgress, onComplete, onError, noteDate } = args;
       try {
+        onProgress?.("파일 업로드 및 변환 중...");
+        const uploadFormData = new FormData();
+        files.forEach(file => uploadFormData.append('files', file));
+
+        const uploadResponse = await fetch('/api/upload_and_convert', { 
+          method: 'POST', 
+          body: uploadFormData 
+        });
+
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json();
+          throw new Error(errorData.error || '파일 업로드 및 변환에 실패했습니다.');
+        }
+
+        const { jobId } = await uploadResponse.json();
+
         onProgress?.("AI 복습 노트를 생성하고 있습니다...");
-        const formData = new FormData();
-        formData.append('aiConversationText', aiConversationText);
-        files.forEach(file => formData.append('files', file));
-        formData.append('subjects', JSON.stringify(subjects));
+
+        const reviewNoteBody = {
+          jobId,
+          aiConversationText,
+          subjects,
+          noteDate
+        };
 
         const response = await fetch('/api/create_review_note', {
           method: 'POST',
-          body: formData,
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reviewNoteBody),
         });
 
         if (!response.ok) {
-          throw new Error('Review note creation failed');
+          const errorData = await response.json();
+          throw new Error(errorData.details || 'Review note creation failed');
         }
 
         const result = await response.json();
@@ -164,8 +185,23 @@ export function useNotes(defaultFilters?: Filters) {
       return newNote;
     };
 
-    const addNoteFromAssignment = async (payload: AddNoteFromAssignmentPayload) => {
-      // Implementation...
+    const addNoteFromAssignment = async (payload: { title: string, content: string, subjectId: string }): Promise<Note> => {
+      const { title, content, subjectId } = payload;
+      const newNote: Note = {
+        id: uuidv4(),
+        title,
+        content,
+        subjectId,
+        noteType: 'assignment',
+        sourceType: 'other',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().getTime(),
+        favorite: false,
+        attachments: [],
+        key_insights: [],
+      };
+      await db.notes.add(newNote);
+      return newNote;
     };
     
     const updateNote = async (id: string, patch: Partial<Note>) => {

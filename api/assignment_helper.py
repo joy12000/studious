@@ -2,11 +2,10 @@ from http.server import BaseHTTPRequestHandler
 import json
 import os
 import google.generativeai as genai
-import requests
+import tempfile
+import shutil
 from PIL import Image
-import io
 import traceback
-from pdf2image import convert_from_bytes
 
 class handler(BaseHTTPRequestHandler):
     def handle_error(self, e, message="오류 발생", status_code=500):
@@ -36,19 +35,31 @@ class handler(BaseHTTPRequestHandler):
             return self.handle_error(ValueError("설정된 Gemini API 키가 없습니다."), "API 키 설정 오류", 500)
 
         last_error = None
+        job_id = None
+        job_dir = None
 
         try:
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data)
 
-            note_context = data.get('note_context', '')
-            reference_file_urls = data.get('reference_file_urls', [])
-            problem_file_urls = data.get('problem_file_urls', [])
-            answer_file_urls = data.get('answer_file_urls', [])
-            subject_id = data.get('subjectId')
+            job_id = data.get('jobId')
+            if not job_id or not isinstance(job_id, str) or '/' in job_id or '..' in job_id:
+                return self.handle_error(ValueError("유효하지 않은 jobId 입니다."), status_code=400)
 
-            has_answer = bool(answer_file_urls)
+            job_dir = os.path.join(tempfile.gettempdir(), job_id)
+            if not os.path.isdir(job_dir):
+                return self.handle_error(FileNotFoundError(f"작업 디렉토리를 찾을 수 없습니다: {job_dir}"), status_code=404)
+
+            note_context = data.get('noteContext', '')
+            subject_id = data.get('subjectId')
+            # We no longer get file counts from URLs, so we need a new way to distinguish them.
+            # The frontend will now provide the counts of each file type.
+            reference_file_count = data.get('referenceFileCount', 0)
+            problem_file_count = data.get('problemFileCount', 0)
+            answer_file_count = data.get('answerFileCount', 0)
+
+            has_answer = answer_file_count > 0
             
             shared_formatting_rules = """
             # 🎨 출력 서식 규칙 (★★★★★ 가장 중요)
@@ -74,7 +85,7 @@ class handler(BaseHTTPRequestHandler):
 
             # JSON 출력 형식 (반드시 준수)
             - 단일 JSON 객체로만 응답합니다.
-            {{
+            {{ 
                 "title": "AI 채점 결과: [문제의 핵심 내용]",
                 "content": "# AI 채점 결과\n\n## 총점\n- .../100\n\n## 총평\n- ...\n\n## 상세 피드백\n- ...\n\n## 모범 풀이\n- ...\n\n## 추가 학습 제안\n- ...",
                 "subjectId": "{subject_id}"
@@ -94,7 +105,7 @@ class handler(BaseHTTPRequestHandler):
 
             # JSON 출력 형식 (반드시 준수)
             - 단일 JSON 객체로만 응답합니다.
-            {{
+            {{ 
                 "title": "AI 문제 풀이: [문제의 핵심 내용]",
                 "content": "# AI 문제 풀이\n\n## 문제 분석\n- ...\n\n## 핵심 개념 정리\n- ...\n\n## 모범 풀이\n- ...\n\n## 결론\n- ...",
                 "subjectId": "{subject_id}"
@@ -103,36 +114,35 @@ class handler(BaseHTTPRequestHandler):
             
             prompt_template = prompt_template_grading if has_answer else prompt_template_solving
 
-            def process_url(url):
-                try:
-                    response = requests.get(url, stream=True)
-                    response.raise_for_status() 
-                    content_type = response.headers.get('content-type', '')
-                    file_content = response.content
-
-                    if 'application/pdf' in content_type:
-                        return convert_from_bytes(file_content)
-                    elif 'image' in content_type:
-                        return [Image.open(io.BytesIO(file_content))]
-                    else:
-                        # Try to decode as text as a fallback
-                        return [file_content.decode('utf-8')]
-                except Exception as e:
-                    print(f"Error processing URL {url}: {e}")
-                    return []
-
             request_contents = [prompt_template]
             
             if note_context:
                 request_contents.append(f"\n--- 기존 노트 내용 ---\n{note_context}\n")
-            if reference_file_urls:
-                request_contents.append("\n--- 참고 자료 파일 ---\n")
-                for url in reference_file_urls: request_contents.extend(process_url(url))
-            request_contents.append("\n--- 문제 파일 ---\n")
-            for url in problem_file_urls: request_contents.extend(process_url(url))
-            if has_answer:
-                request_contents.append("\n--- 학생 답안 파일 ---\n")
-                for url in answer_file_urls: request_contents.extend(process_url(url))
+
+            files = sorted(os.listdir(job_dir))
+            
+            # This logic assumes files were uploaded in order: reference, then problem, then answer
+            ref_files = files[:reference_file_count]
+            prob_files = files[reference_file_count : reference_file_count + problem_file_count]
+            ans_files = files[reference_file_count + problem_file_count:]
+
+            def process_files(file_list, category_name):
+                contents = [f"\n--- {category_name} ---\n"]
+                for filename in file_list:
+                    file_path = os.path.join(job_dir, filename)
+                    try:
+                        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+                            contents.append(Image.open(file_path))
+                        else:
+                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                contents.append(f.read())
+                    except Exception as e:
+                        print(f"Error processing file {filename}: {e}")
+                return contents
+
+            if ref_files: request_contents.extend(process_files(ref_files, "참고 자료 파일"))
+            if prob_files: request_contents.extend(process_files(prob_files, "문제 파일"))
+            if ans_files: request_contents.extend(process_files(ans_files, "학생 답안 파일"))
 
             for i, api_key in enumerate(valid_keys):
                 try:
@@ -158,3 +168,10 @@ class handler(BaseHTTPRequestHandler):
 
         except Exception as e:
             self.handle_error(e)
+        finally:
+            if job_dir and os.path.exists(job_dir):
+                try:
+                    shutil.rmtree(job_dir)
+                    print(f"INFO: 임시 디렉토리 삭제 완료: {job_dir}")
+                except Exception as cleanup_error:
+                    print(f"ERROR: 임시 디렉토리 삭제 실패 ('{job_dir}'): {cleanup_error}")
