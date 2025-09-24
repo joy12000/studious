@@ -160,7 +160,7 @@ ${note.content}`;
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><WeekPicker onDateSelect={(date) => { setSelectedDate(date); setIsCalendarOpen(false); }} /></PopoverContent>
+                        <PopoverContent className="w-auto p-2"><WeekPicker onDateSelect={(date) => { setSelectedDate(date); setIsCalendarOpen(false); }} /></PopoverContent>
                     </Popover>
                     <Popover open={isNotePickerOpen} onOpenChange={setIsNotePickerOpen}>
                         <PopoverTrigger asChild><Button variant="outline" className="flex-1"><Plus className="mr-2 h-4 w-4" />기존 노트 추가</Button></PopoverTrigger>

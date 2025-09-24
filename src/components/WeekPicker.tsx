@@ -62,6 +62,10 @@ export function WeekPicker({ onDateSelect }: WeekPickerProps) {
       styles={{
         day: { height: '2.5rem', width: '2.5rem' },
       }}
+      classNames={{
+        today: 'bg-primary/10 text-primary',
+        day_today: 'bg-primary/10 text-primary',
+      }}
     />
   );
 }
