@@ -32,8 +32,8 @@ export async function convertPdfToImages(
         for (let i = 1; i <= totalPages; i++) {
           onProgress?.({ pageNumber: i, totalPages });
           const page = await pdf.getPage(i);
-          // 선명한 이미지를 위해 스케일을 2.0으로 설정
-          const viewport = page.getViewport({ scale: 2.0 });
+          // 해상도와 파일 크기 균형을 위해 스케일을 1.5로 조정
+          const viewport = page.getViewport({ scale: 1.5 });
 
           const canvas = document.createElement('canvas');
           const context = canvas.getContext('2d');
@@ -47,11 +47,11 @@ export async function convertPdfToImages(
 
           await page.render({ canvasContext: context, viewport }).promise;
 
-          const blob: Blob | null = await new Promise(resolveBlob => canvas.toBlob(resolveBlob, 'image/png'));
+          const blob: Blob | null = await new Promise(resolveBlob => canvas.toBlob(resolveBlob, 'image/jpeg', 0.9));
           
           if (blob) {
-            const imageName = `${pdfFile.name.replace(/\.pdf$/i, '')}-page-${i}.png`;
-            images.push(new File([blob], imageName, { type: 'image/png' }));
+            const imageName = `${pdfFile.name.replace(/\.pdf$/i, '')}-page-${i}.jpeg`;
+            images.push(new File([blob], imageName, { type: 'image/jpeg' }));
           }
         }
         resolve(images);
