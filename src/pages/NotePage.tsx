@@ -399,8 +399,9 @@ export default function NotePage() {
 
   return (
     <>
-      <div className="flex h-full w-full overflow-hidden">
-        <div className={`h-full transition-all duration-300 ease-in-out ${isChatOpen ? 'flex-1' : 'w-0'}`}>
+      <div className="flex h-screen w-full overflow-hidden">
+        {/* ChatUI Panel */}
+        <div className={`h-full transition-all duration-300 ease-in-out flex-shrink-0 ${isChatOpen ? 'w-[450px]' : 'w-0'}`}>
           {isChatOpen && <ChatUI 
               noteContext={note.content} 
               onClose={() => {
@@ -412,7 +413,8 @@ export default function NotePage() {
             />}
         </div>
         
-        <div className={`flex h-full flex-col bg-background transition-all duration-300 ease-in-out ${isChatOpen ? 'w-full md:max-w-3xl' : 'w-full'}`}>
+        {/* Note Content Panel */}
+        <div className={`flex h-full flex-col bg-background flex-1`}>
             <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 p-2 backdrop-blur-lg md:p-4">
               <Button variant="ghost" size="sm" onClick={() => navigate(-1)} aria-label="뒤로 가기"><ArrowLeft className="h-5 w-5" /></Button>
               <div className="flex items-center gap-1">
