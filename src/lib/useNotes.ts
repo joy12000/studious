@@ -80,7 +80,55 @@ export function useNotes(defaultFilters?: Filters) {
     };
 
     const addNote = async (payload: AddNotePayload) => {
-      // Implementation...
+      const { youtubeUrl, onProgress, onComplete, onError } = payload;
+      
+      onProgress?.('YouTube 영상 요약을 시작합니다...');
+
+      try {
+        const response = await fetch('/api/summarize_youtube', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ youtube_url: youtubeUrl }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.details || errorData.error || 'YouTube 요약 중 오류가 발생했습니다.');
+        }
+
+        const result = await response.json();
+        const { title, content, subject, insights } = result;
+
+        // Find or create subject
+        let subjectId = (allSubjects || []).find(s => s.name.toLowerCase() === subject.toLowerCase())?.id;
+        if (!subjectId) {
+            const newSubject = await addSubject(subject);
+            subjectId = newSubject.id;
+        }
+
+        const newNote: Note = {
+          id: uuidv4(),
+          title,
+          content,
+          subjectId,
+          noteType: 'general',
+          sourceType: 'youtube',
+          sourceUrl: youtubeUrl,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().getTime(),
+          favorite: false,
+          attachments: [],
+          key_insights: insights || [],
+        };
+    
+        await db.notes.add(newNote);
+        onComplete?.(newNote);
+
+      } catch (err) {
+        console.error("YouTube summarization failed:", err);
+        const errorMessage = err instanceof Error ? err.message : "YouTube 영상을 처리하는 중 오류가 발생했습니다.";
+        onError?.(errorMessage);
+      }
     };
 
     const addNoteFromReview = async (args: AddNoteFromReviewPayload) => {
