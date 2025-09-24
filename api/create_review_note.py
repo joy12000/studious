@@ -14,20 +14,25 @@ import re # re 모듈 추가
 # ==============================================================================
 
 def extract_first_json(text: str):
-    """Finds and decodes the first valid JSON array block in a string."""
+    """Finds and decodes the first valid JSON object or array block in a string."""
     if not text:
         raise ValueError("Empty response from model.")
 
-    # First, try to find a JSON array within a markdown code block
-    match = re.search(r"```json\s*(\[.*?\])\s*```", text, re.DOTALL)
+    # First, try to find a JSON object or array within a markdown code block
+    match = re.search(r"```json\s*([{\[].*?[}\]])\s*```", text, re.DOTALL)
     if match:
         json_str = match.group(1)
     else:
-        # If not found, try to find the first and last square bracket for an array
-        match = re.search(r"\[.*\]", text, re.DOTALL)
-        if not match:
-            raise ValueError("No JSON array found in the model's response.")
-        json_str = match.group(0)
+        # If not found, try to find the first JSON object or array
+        match_obj = re.search(r"{[\s\S]*?}", text, re.DOTALL)
+        match_arr = re.search(r"[\s\S]*?", text, re.DOTALL)
+
+        if match_obj and (not match_arr or match_obj.start() < match_arr.start()):
+            json_str = match_obj.group(0)
+        elif match_arr:
+            json_str = match_arr.group(0)
+        else:
+            raise ValueError("No JSON object or array found in the model's response.")
 
     try:
         return json.loads(json_str)
@@ -78,7 +83,7 @@ class handler(BaseHTTPRequestHandler):
               당신이 생성하는 모든 텍스트는 아래 규칙을 반드시 따라야 합니다.
 
               1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 반드시 KaTeX 문법으로 감싸야 합니다. 
-                  -   인라인 수식: $로 감쌉니다. 예: $\q''_x = -k \frac{{dT}}{{dx}}$
+                  -   인라인 수식: $로 감쌉니다. 예: $q''_x = -k \frac{{dT}}{{dx}}$
                   -   블록 수식: $$로 감쌉니다. 예: $$T(x) = T_s + \frac{{q'''}}{{2k}}(Lx - x^2)$$
 
               2.  **다이어그램 (Mermaid):** 복잡한 시스템, 알고리즘, 상태 변화는 반드시 Mermaid.js 문법으로 시각화해야 합니다.
@@ -105,7 +110,23 @@ class handler(BaseHTTPRequestHandler):
               -   Notes 영역이 '출력 서식 규칙'을 완벽하게 준수하여 작성되었는가?
               -   단순 정보 나열이 아닌, 깊이 있는 학습을 유도하는 내용인가?
 
-              결과물은 다른 설명 없이, 위 규칙들을 모두 준수한 복습 노트 본문(마크다운)만 생성해야 합니다.
+              결과물은 다른 설명 없이, 다음 JSON 형식으로만 생성해야 합니다.
+              ```json
+              {{
+                "title": "생성된 노트의 제목",
+                "content": "위 규칙들을 모두 준수한 복습 노트 본문(마크다운)",
+                "key_insights": ["핵심 인사이트 1", "핵심 인사이트 2"],
+                "quiz": {{
+                  "questions": [
+                    {{
+                      "question": "질문 1",
+                      "options": ["옵션 1", "옵션 2", "옵션 3", "옵션 4"],
+                      "answer": "정답 옵션"
+                    }}
+                  ]
+                }}
+              }}
+              ```
               """
 
             request_contents = [prompt]
@@ -126,7 +147,7 @@ class handler(BaseHTTPRequestHandler):
                     print(f"WARN: Blob URL에서 파일 다운로드 또는 처리 실패 ('{url}'): {e}")
 
             if text_materials:
-                request_contents.append("\n--- 학습 자료 (텍스트) ---\n" + "\n\n".join(text_materials))
+                request_contents.append("\n--- 학습 자료 (텍스트) ---" + "\n\n".join(text_materials))
 
             for i, api_key in enumerate(valid_keys):
                 try:
@@ -142,7 +163,7 @@ class handler(BaseHTTPRequestHandler):
 
                     json_response = {
                         "title": generated_data.get("title", f"{subject_name} - {week_info} 복습노트"),
-                        "content": generated_data.get("summary", ""),
+                        "content": generated_data.get("content", ""), # Changed from summary to content
                         "key_insights": generated_data.get("key_insights", []),
                         "quiz": generated_data.get("quiz", {}),
                         "subjectId": data.get("subjectId")
