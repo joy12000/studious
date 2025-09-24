@@ -83,7 +83,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
             return (
               <span
                 key={`text-${i}-${j}`}
-                dangerouslySetInnerHTML={{ __html: marked(inlinePart) as string }}
+                dangerouslySetInnerHTML={{ __html: marked.parseInline(inlinePart) as string }}
               />
             );
           }

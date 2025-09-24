@@ -168,20 +168,33 @@ export function useNotes(defaultFilters?: Filters) {
         }
 
         const result = await response.json();
-        const { title, content, key_insights, quiz, subjectId } = result;
+        const { title, content, key_insights, quiz, subjectName: inferredSubjectName } = result; // Get inferredSubjectName
 
-        if (!subjectId || !(subjects.some(s => s.id === subjectId))) {
-            throw new Error(`API가 유효하지 않은 subjectId ('${subjectId}')를 반환했습니다. 사용 가능한 ID: ${subjects.map(s => s.id).join(', ')}`);
+        let subjectId: string | undefined;
+        if (inferredSubjectName) {
+            let subject = (allSubjects || []).find(s => s.name.toLowerCase() === inferredSubjectName.toLowerCase());
+            if (!subject) {
+                const newSubject = await addSubject(inferredSubjectName);
+                subjectId = newSubject.id;
+            } else {
+                subjectId = subject.id;
+            }
+        }
+
+        // If subjectId is still undefined (e.g., no subjectName from API or no matching subject),
+        // we can either throw an error or assign a default subjectId.
+        // For now, let's throw an error if no subjectId is determined.
+        if (!subjectId) {
+            throw new Error(`API에서 유효한 과목명을 추론하지 못했거나, 일치하는 과목을 찾을 수 없습니다.`);
         }
 
         const newNote: Note = {
           id: uuidv4(),
-          title, content: content, key_insights, subjectId,
+          title, content: content, key_insights, subjectId, // Use the determined subjectId
           noteType: 'review', sourceType: 'other',
           createdAt: new Date().toISOString(), updatedAt: new Date().getTime(),
           noteDate, favorite: false, attachments: [],
         };
-
         const newQuiz: Quiz = {
           id: uuidv4(),
           noteId: newNote.id,

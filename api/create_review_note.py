@@ -124,7 +124,8 @@ class handler(BaseHTTPRequestHandler):
                       "answer": "정답 옵션"
                     }}
                   ]
-                }}
+                }},
+                "subjectName": "추론된 과목명 (예: 인지과학 개론)"
               }}
               ```
               """
@@ -166,7 +167,8 @@ class handler(BaseHTTPRequestHandler):
                         "content": generated_data.get("content", ""), # Changed from summary to content
                         "key_insights": generated_data.get("key_insights", []),
                         "quiz": generated_data.get("quiz", {}),
-                        "subjectId": data.get("subjectId")
+                        "subjectId": data.get("subjectId"), # This will still be null
+                        "subjectName": generated_data.get("subjectName", subject_name) # Add subjectName from Gemini
                     }
 
                     self.send_response(200)
