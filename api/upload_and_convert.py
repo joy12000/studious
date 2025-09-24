@@ -24,6 +24,9 @@ class handler(BaseHTTPRequestHandler):
             files = form.getlist('files')
             
             for file_item in files:
+                if not file_item.filename:
+                    continue # Skip if not a file upload
+
                 filename = file_item.filename
                 file_content = file_item.file.read()
                 file_path = os.path.join(job_dir, filename)
