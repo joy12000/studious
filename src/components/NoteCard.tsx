@@ -64,7 +64,7 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
         <div className="flex flex-row items-start gap-4 p-4">
           <div className="flex-1 min-w-0">
             <Link to={`/note/${note.id}`} className="block mb-2">
-              <p className="line-clamp-3 text-xs text-muted-foreground hover:text-primary">
+              <p className="line-clamp-3 text-xs text-muted-foreground hover:text-primary break-words">
                   {cleanContentForPreview(note.content)}
               </p>
             </Link>
@@ -96,7 +96,7 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
 
   // Grid View (New Design)
   return (
-    <Link to={`/note/${note.id}`} className="group block">
+    <Link to={`/note/${note.id}`} className="group block aspect-[210/297]">
       <Card className="w-full h-full flex flex-col overflow-hidden transition-all duration-300 group-hover:shadow-xl group-hover:-translate-y-1">
         {/* Thumbnail Area */}
         <div className="relative w-full aspect-video bg-muted overflow-hidden">
@@ -118,7 +118,7 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
 
         {/* Text & Footer Area */}
         <div className="p-3 flex-grow flex flex-col">
-            <p className="text-xs text-muted-foreground flex-grow overflow-hidden line-clamp-4 h-[4.5em]">
+            <p className="text-xs text-muted-foreground flex-grow overflow-hidden line-clamp-4 h-[4.5em] break-words">
               {cleanContentForPreview(note.content)}
             </p>
             <div className="flex items-center justify-between mt-2 pt-2 border-t">
