@@ -1,5 +1,4 @@
 import { handleUpload } from '@vercel/blob/client';
-import { NextResponse } from 'next/server';
 
 export async function POST(request) {
   console.log('Checking for BLOB_READ_WRITE_TOKEN:');
@@ -22,11 +21,13 @@ export async function POST(request) {
       },
     });
 
-    return NextResponse.json(jsonResponse);
+    return new Response(JSON.stringify(jsonResponse), {
+      headers: { 'Content-Type': 'application/json' },
+    });
   } catch (error) {
-    return NextResponse.json(
-      { error: (error).message },
-      { status: 400 },
-    );
+    return new Response(JSON.stringify({ error: (error).message }), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 400,
+    });
   }
 }
