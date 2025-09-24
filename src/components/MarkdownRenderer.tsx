@@ -61,7 +61,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
     renderMermaidDiagrams();
   }, [content]);
 
-  const blockParts = content.split(/(\$\$[\s\S]*?\$\$)/g);
+  const blockParts = content.split(/(```mermaid[\s\S]*?```|\$\$[\s\S]*?\$\$)/g);
 
   return (
     <span ref={containerRef}>
@@ -69,6 +69,16 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
         if (blockPart.startsWith('$$') && blockPart.endsWith('$$')) {
           const math = blockPart.slice(2, -2);
           return <BlockMath key={`block-${i}`}>{math}</BlockMath>;
+        }
+
+        // 🚀 [추가] Mermaid 코드 블록 처리 로직
+        if (blockPart.startsWith('```mermaid')) {
+          const code = blockPart.slice(10, -3).trim();
+          return (
+            <pre className="mermaid" key={`mermaid-${i}`}>
+              <code className="language-mermaid">{code}</code>
+            </pre>
+          );
         }
 
         const inlineParts = blockPart.split(/(\$[\s\S]*?\$)/g);
