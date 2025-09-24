@@ -5,6 +5,7 @@ import { ArrowUp, Loader2, RefreshCw, Copy, Save, ChevronsUpDown, Check, X } fro
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import MarkdownRenderer from './MarkdownRenderer';
 import { useNotes } from '../lib/useNotes';
+import { useCallback } from 'react'; // useCallback 임포트 추가
 
 const models = [
     { id: 'x-ai/grok-4-fast:free', name: '🚀 일론머스크의 AI' },
@@ -41,16 +42,17 @@ interface ChatUIProps {
   noteContext: string;
   onClose: () => void;
   initialMessage?: string;
-  // ✨ [핵심 추가] 대화 내역을 부모 컴포넌트로 전달하기 위한 Ref prop
   messagesRef?: React.MutableRefObject<Message[] | undefined>;
+  noteId: string; // ✨ [추가] 현재 노트의 ID
 }
 
-export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, initialMessage, messagesRef }) => {
+export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, initialMessage, messagesRef, noteId }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const { updateNote } = useNotes(); // useNotes 훅 사용
 
   // ✨ [핵심 추가] messages 상태가 변경될 때마다 ref를 업데이트합니다.
   useEffect(() => {
@@ -78,6 +80,28 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, initialMes
   };
 
   const handleCopy = (text: string) => navigator.clipboard.writeText(text);
+
+  const handleSaveChat = useCallback(async () => {
+    if (!noteId || messages.length <= 1) return; // 첫 메시지는 제외
+
+    const chatHistoryMarkdown = messages
+      .filter(msg => msg.sender !== 'bot' || msg.text !== createInitialMessage().text) // 초기 메시지 제외
+      .map(msg => {
+        const sender = msg.sender === 'user' ? '🧑‍💻 사용자' : '🤖 AI';
+        return `**${sender}:**\n${msg.text}\n`;
+      })
+      .join('\n---\n\n'); // 메시지 사이에 구분자 추가
+
+    const newContent = `\n\n## 💬 AI 대화 기록\n\n${chatHistoryMarkdown}`;
+
+    try {
+      await updateNote(noteId, { content: (noteContext || '') + newContent });
+      alert('대화 내용이 노트에 성공적으로 저장되었습니다!');
+    } catch (error) {
+      console.error('Failed to save chat to note:', error);
+      alert('대화 내용을 노트에 저장하는 데 실패했습니다.');
+    }
+  }, [noteId, messages, noteContext, updateNote]);
 
   const sendNewMessage = (text: string) => {
       setInputValue(text);
@@ -165,7 +189,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, initialMes
         </Popover>
 
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="icon" disabled={messages.length <= 1} title="현재 노트에 대화 저장">
+          <Button variant="ghost" size="icon" onClick={handleSaveChat} title="현재 노트에 대화 저장">
             <Save className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="icon" onClick={handleNewChat} title="새 대화">

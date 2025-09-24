@@ -402,16 +402,16 @@ export default function NotePage() {
       <div className="flex h-screen w-full overflow-hidden">
         {/* ChatUI Panel */}
         <div className={`h-full transition-all duration-300 ease-in-out flex-shrink-0 ${isChatOpen ? 'w-[430px]' : 'w-0'}`}>
-          {isChatOpen && <ChatUI 
-              noteContext={note.content} 
-              onClose={() => {
-                setIsChatOpen(false);
-                setInitialChatMessage(undefined);
-              }} 
-              initialMessage={initialChatMessage} 
-              messagesRef={chatMessagesRef}
-            />}
-        </div>
+                    {isChatOpen && <ChatUI 
+                        noteContext={note.content} 
+                        onClose={() => {
+                          setIsChatOpen(false);
+                          setInitialChatMessage(undefined);
+                        }} 
+                        initialMessage={initialChatMessage} 
+                        messagesRef={chatMessagesRef}
+                        noteId={note.id}
+                      />}         </div>
         
         {/* Note Content Panel */}
         <div className={`flex h-full flex-col bg-background flex-1`}>
