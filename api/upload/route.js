@@ -12,7 +12,7 @@ export async function POST(request) {
       onBeforeGenerateToken: async (pathname) => {
         // This is where you would add your own authorization logic
         return {
-          allowedContentTypes: ['application/pdf', 'text/plain', 'image/jpeg', 'image/png', 'image/gif'],
+          allowedContentTypes: ['application/pdf', 'text/plain', 'image/jpeg', 'image/png', 'image/gif', 'text/markdown'],
           token: process.env.BLOB_READ_WRITE_TOKEN,
         };
       },
