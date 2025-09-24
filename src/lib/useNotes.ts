@@ -86,23 +86,26 @@ export function useNotes(defaultFilters?: Filters) {
       const { aiConversationText, files, subjects, onProgress, onComplete, onError, noteDate } = args;
       try {
         onProgress?.("파일 업로드 및 변환 중...");
-        const uploadFormData = new FormData();
-        files.forEach(file => uploadFormData.append('files', file));
+        let jobId = null;
 
-        const uploadResponse = await fetch('/api/upload_and_convert', { 
-          method: 'POST', 
-          body: uploadFormData 
-        });
-
-        if (!uploadResponse.ok) {
-          const errorData = await uploadResponse.json();
-          throw new Error(errorData.error || '파일 업로드 및 변환에 실패했습니다.');
+        if (files.length > 0) {
+            const uploadFormData = new FormData();
+            files.forEach(file => uploadFormData.append('files', file));
+    
+            const uploadResponse = await fetch('/api/upload_and_convert', { 
+              method: 'POST', 
+              body: uploadFormData 
+            });
+    
+            if (!uploadResponse.ok) {
+              const errorData = await uploadResponse.json();
+              throw new Error(errorData.error || '파일 업로드 및 변환에 실패했습니다.');
+            }
+            const uploadResult = await uploadResponse.json();
+            jobId = uploadResult.jobId;
         }
 
-        const { jobId } = await uploadResponse.json();
-
         onProgress?.("AI 복습 노트를 생성하고 있습니다...");
-
         const reviewNoteBody = {
           jobId,
           aiConversationText,
@@ -118,7 +121,7 @@ export function useNotes(defaultFilters?: Filters) {
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.details || 'Review note creation failed');
+          throw new Error(errorData.details || errorData.error || 'Review note creation failed');
         }
 
         const result = await response.json();

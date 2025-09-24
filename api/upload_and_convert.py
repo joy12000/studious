@@ -24,8 +24,9 @@ class handler(BaseHTTPRequestHandler):
             files = form.getlist('files')
             
             for file_item in files:
-                if not file_item.filename:
-                    continue # Skip if not a file upload
+                # Robustly check if the item is a file upload
+                if not hasattr(file_item, 'filename') or not file_item.filename:
+                    continue
 
                 filename = file_item.filename
                 file_content = file_item.file.read()
