@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
 import { Note, Subject, ScheduleEvent, Quiz, Attachment, NoteType, ReviewItem } from './types';
 import { v4 as uuidv4 } from 'uuid';
-import { format, addDays, startOfYear, endOfYear } from 'date-fns';
+import { format, addDays, startOfYear, endOfYear, startOfToday, endOfToday } from 'date-fns';
 
 export type Filters = {
   search?: string;
@@ -49,7 +49,7 @@ export interface AddNoteFromAssignmentPayload {
 }
 
 export function useNotes(defaultFilters?: Filters) {
-    const [filters, setFilters] = useState<Filters>(defaultFilters || { dateRange: 'all' });
+    const [filters, setFilters] = useState<Filters>(defaultFilters || {});
 
     const notes = useLiveQuery(() => db.notes.toArray(), []);
     const allSubjects = useLiveQuery(() => db.subjects.toArray(), []);
@@ -104,7 +104,7 @@ export function useNotes(defaultFilters?: Filters) {
         const { title, summary, key_insights, quiz, subjectId } = result;
 
         if (!subjectId || !(subjects.some(s => s.id === subjectId))) {
-            throw new Error('API가 유효하지 않은 subjectId를 반환했습니다.');
+            throw new Error(`API가 유효하지 않은 subjectId ('${subjectId}')를 반환했습니다. 사용 가능한 ID: ${subjects.map(s => s.id).join(', ')}`);
         }
 
         const newNote: Note = {
@@ -137,12 +137,13 @@ export function useNotes(defaultFilters?: Filters) {
     };
 
     const addNoteFromTextbook = async (title: string, content: string, subjectId: string, files: File[], noteDate?: string): Promise<Note> => {
-      const attachments: Attachment[] = files.map(file => ({
+      const attachments: Attachment[] = await Promise.all(files.map(async (file) => ({
         id: uuidv4(),
+        type: 'file',
         name: file.name,
-        type: file.type,
-        size: file.size,
-      }));
+        mimeType: file.type,
+        data: file,
+      })));
     
       const newNote: Note = {
         id: uuidv4(),
@@ -156,6 +157,7 @@ export function useNotes(defaultFilters?: Filters) {
         updatedAt: new Date().getTime(),
         noteDate,
         favorite: false,
+        key_insights: [],
       };
     
       await db.notes.add(newNote);
@@ -179,11 +181,73 @@ export function useNotes(defaultFilters?: Filters) {
       await db.subjects.add(newSubject);
       return newSubject;
     };
+
+    const updateSubject = async (id: string, name: string, color?: string) => {
+      await db.subjects.update(id, { name, color });
+    };
+
+    const deleteSubject = async (id: string) => {
+      await db.subjects.delete(id);
+      // Also consider what to do with notes associated with this subject
+    };
+
+    const importNote = async (noteData: Partial<Note>) => {
+        const newNote: Note = {
+            id: uuidv4(),
+            title: noteData.title || '제목 없음',
+            content: noteData.content || '',
+            noteType: noteData.noteType || 'general',
+            sourceType: noteData.sourceType || 'other',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().getTime(),
+            favorite: false,
+            ...noteData,
+        };
+        await db.notes.add(newNote);
+        return newNote;
+    };
     
     // ... other CRUD functions for subjects, schedule, etc.
 
     const getNote = useCallback(async (id: string): Promise<Note | undefined> => db.notes.get(id), []);
     const getQuiz = useCallback(async (noteId: string): Promise<Quiz | undefined> => db.quizzes.where('noteId').equals(noteId).first(), []);
+
+    const todaysReviewItems = useLiveQuery(async () => {
+        const todayStart = startOfToday().getTime();
+        return db.reviewItems.where('nextReviewDate').belowOrEqual(todayStart).toArray();
+    }, []);
+
+    const addQuizToReviewDeck = async (noteId: string) => {
+        const quiz = await getQuiz(noteId);
+        if (!quiz) return;
+
+        const newItems = quiz.questions.map(q => ({
+            id: uuidv4(),
+            noteId: noteId,
+            question: q.question,
+            options: q.options,
+            answer: q.answer,
+            lastReviewed: null,
+            nextReviewDate: new Date().getTime(),
+            interval: 1,
+        }));
+        await db.reviewItems.bulkAdd(newItems);
+    };
+
+    const updateReviewItem = async (itemId: string, wasCorrect: boolean) => {
+        const item = await db.reviewItems.get(itemId);
+        if (!item) return;
+        const newInterval = wasCorrect ? Math.min(item.interval * 2, 60) : 1;
+        await db.reviewItems.update(itemId, {
+            lastReviewed: new Date().getTime(),
+            nextReviewDate: addDays(new Date(), newInterval).getTime(),
+            interval: newInterval,
+        });
+    };
+
+    const deleteReviewItem = async (itemId: string) => {
+        await db.reviewItems.delete(itemId);
+    };
     
     const activityData = useMemo(() => {
         if (!notes) return [];
@@ -212,13 +276,20 @@ export function useNotes(defaultFilters?: Filters) {
         addNote,
         addNoteFromReview,
         addScheduleFromImage,
-        addNoteFromTextbook, // Added this line
+        addNoteFromTextbook,
         addNoteFromAssignment,
         updateNote,
         deleteNote,
         addSubject,
+        updateSubject,
+        deleteSubject,
         getNote, 
         getQuiz,
+        importNote,
+        todaysReviewItems: todaysReviewItems || [],
+        addQuizToReviewDeck,
+        updateReviewItem,
+        deleteReviewItem,
         activityData,
     };
 }

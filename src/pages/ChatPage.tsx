@@ -42,35 +42,59 @@ export default function ChatPage() {
       return;
     }
     setIsLoading(true);
-    setLoadingMessage('파일을 서버로 업로드하는 중입니다...');
+    setLoadingMessage('파일 업로드 및 변환 중...');
 
-    const formData = new FormData();
-    uploadedFiles.forEach(file => formData.append('files', file));
-    const weekInfo = selectedDate 
-      ? `${getWeekNumber(selectedDate, settings?.semesterStartDate)}주차 (${format(selectedDate, 'M월 d일')})` 
-      : '[N주차]';
-    formData.append('subject', selectedSubject.name);
-    formData.append('week', weekInfo);
-    formData.append('materialTypes', uploadedFiles.map(f => f.type).join(', ') || '[파일]');
-
-    // Simulate progress update
-    setTimeout(() => {
-        setLoadingMessage('PDF 변환 및 AI 분석 중... 잠시만 기다려주세요.');
-    }, 1500); // 1.5초 후 메시지 변경
+    const uploadFormData = new FormData();
+    uploadedFiles.forEach(file => uploadFormData.append('files', file));
 
     try {
-      const response = await fetch('/api/create_textbook', { method: 'POST', body: formData });
-      if (!response.ok) {
-        const errorData = await response.json();
+      // Step 1: Upload and convert files
+      const uploadResponse = await fetch('/api/upload_and_convert', { 
+        method: 'POST', 
+        body: uploadFormData 
+      });
+
+      if (!uploadResponse.ok) {
+        const errorData = await uploadResponse.json();
+        throw new Error(errorData.error || '파일 업로드 및 변환에 실패했습니다.');
+      }
+
+      const { jobId } = await uploadResponse.json();
+
+      // Step 2: Generate textbook from converted files
+      setLoadingMessage('AI가 참고서 내용을 생성하는 중...');
+
+      const weekInfo = selectedDate 
+        ? `${getWeekNumber(selectedDate, settings?.semesterStartDate)}주차 (${format(selectedDate, 'M월 d일')})` 
+        : '[N주차]';
+      
+      const createTextbookBody = {
+        jobId,
+        subject: selectedSubject.name,
+        week: weekInfo,
+        materialTypes: uploadedFiles.map(f => f.type).join(', ') || '[파일]',
+      };
+
+      const textbookResponse = await fetch('/api/create_textbook', { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(createTextbookBody)
+      });
+
+      if (!textbookResponse.ok) {
+        const errorData = await textbookResponse.json();
         throw new Error(errorData.details || '참고서 생성에 실패했습니다.');
       }
-      const data = await response.json();
+
+      const data = await textbookResponse.json();
       setLoadingMessage('생성된 참고서를 노트에 저장하는 중...');
       const noteTitle = `${selectedSubject.name} - ${weekInfo} 참고서`;
       const noteDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
       const newNote = await addNoteFromTextbook(noteTitle, data.textbook, selectedSubject.id, uploadedFiles, noteDateStr);
+      
       alert("AI 참고서가 성공적으로 노트에 저장되었습니다!");
       navigate(`/note/${newNote.id}`);
+
     } catch(error) {
         alert(`오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
     } finally {
