@@ -136,6 +136,32 @@ export function useNotes(defaultFilters?: Filters) {
       // Implementation...
     };
 
+    const addNoteFromTextbook = async (title: string, content: string, subjectId: string, files: File[], noteDate?: string): Promise<Note> => {
+      const attachments: Attachment[] = files.map(file => ({
+        id: uuidv4(),
+        name: file.name,
+        type: file.type,
+        size: file.size,
+      }));
+    
+      const newNote: Note = {
+        id: uuidv4(),
+        title,
+        content,
+        subjectId,
+        attachments,
+        noteType: 'textbook',
+        sourceType: 'other',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().getTime(),
+        noteDate,
+        favorite: false,
+      };
+    
+      await db.notes.add(newNote);
+      return newNote;
+    };
+
     const addNoteFromAssignment = async (payload: AddNoteFromAssignmentPayload) => {
       // Implementation...
     };
@@ -186,6 +212,7 @@ export function useNotes(defaultFilters?: Filters) {
         addNote,
         addNoteFromReview,
         addScheduleFromImage,
+        addNoteFromTextbook, // Added this line
         addNoteFromAssignment,
         updateNote,
         deleteNote,
