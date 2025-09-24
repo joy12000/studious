@@ -6,9 +6,39 @@ import io
 from pdf2image import convert_from_bytes, pdfinfo_from_bytes
 import traceback
 import json
+import re # re 모듈 추가
 
 # Vercel은 이 Flask 앱을 자동으로 서버리스 함수로 변환합니다.
 app = Flask(__name__)
+
+# ==============================================================================
+# HELPER FUNCTIONS
+# ==============================================================================
+
+def extract_first_json(text: str):
+    """Finds and decodes the first valid JSON array block in a string."""
+    if not text:
+        raise ValueError("Empty response from model.")
+
+    # First, try to find a JSON array within a markdown code block
+    match = re.search(r"```json\s*(\[.*?\])\s*```", text, re.DOTALL)
+    if match:
+        json_str = match.group(1)
+    else:
+        # If not found, try to find the first and last square bracket for an array
+        match = re.search(r"\[.*\]", text, re.DOTALL)
+        if not match:
+            raise ValueError("No JSON array found in the model's response.")
+        json_str = match.group(0)
+
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Failed to decode JSON: {e} - Response text was: '{text}'")
+
+# ==============================================================================
+# FLASK ROUTE
+# ==============================================================================
 
 @app.route('/api/process_calendar', methods=['POST'])
 def process_calendar_handler():
@@ -65,15 +95,16 @@ def process_calendar_handler():
         return jsonify({"error": "파일 처리 중 오류가 발생했습니다.", "details": str(e)}), 500
 
     # --- Gemini를 위한 프롬프트 ---
-    prompt = """이 시간표 이미지에서 과목 이름(subjectName), 시작 시간(startTime), 종료 시간(endTime), 요일(dayOfWeek)을 추출하여 JSON 배열 형식으로 만들어줘.
+    prompt = """이 시간표 이미지에서 과목 이름(subjectName), 시작 시간(startTime), 종료 시간(endTime), 요일(dayOfWeek)을 추출하여 JSON 배열 형식으로 만들어라.
 
     추출 규칙:
-    1. **시간 계산:** 시간표의 한 칸은 보통 1시간을 의미합니다. 과목이 차지하는 칸 수를 바탕으로 시작 시간(startTime)과 종료 시간(endTime)을 정확히 계산해야 합니다.
-    2. **중복 및 분리:** 한 요일의 같은 시간대에 여러 과목이 겹쳐 있거나 나란히 있는 경우, 각 과목을 반드시 별개의 JSON 객체로 분리하여 추출해야 합니다.
+    1. **시간 계산:** 시간표의 세로축은 시간을 나타내며, 각 행(row)은 30분의 간격을 의미한다. 과목이 차지하는 셀의 수직 길이를 바탕으로 시작 시간(startTime)과 종료 시간(endTime)을 정확히 계산해야 한다. 예를 들어, 과목이 2개의 행에 걸쳐 있다면 1시간짜리 수업이다.
+    2. **중복 및 분리:** 한 요일의 같은 시간대에 여러 과목이 겹쳐 있거나 나란히 있는 경우, 각 과목을 반드시 별개의 JSON 객체로 분리하여 추출해야 한다.
     3. **출력 형식:**
-       - subjectName: 한글 과목명을 그대로 추출합니다.
-       - startTime, endTime: 'HH:MM' 형식으로 추출합니다.
-       - dayOfWeek: '월','화','수','목','금','토','일' 중 하나로 표기합니다.
+       - subjectName: 한글 과목명을 그대로 추출한다.
+       - startTime, endTime: 'HH:MM' 형식으로 추출한다.
+       - dayOfWeek: '월','화','수','목','금','토','일' 중 하나로 표기한다.
+    4. **응답 형식:** 다른 설명 없이, 순수한 JSON 배열만을 응답으로 제공해야 한다.
     """
 
     # --- Gemini API 호출 루프 ---
@@ -82,25 +113,14 @@ def process_calendar_handler():
         try:
             print(f"INFO: API 키 #{i + 1} (으)로 시간표 처리 시도...")
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
+            model = genai.GenerativeModel(os.getenv("GENAI_MODEL", "gemini-1.5-flash-latest")) # Use GENAI_MODEL env var, fallback to flash
+            
             response = model.generate_content([prompt, img], request_options={'timeout': 180})
             
             raw_text = response.text
             print(f"INFO: Gemini Raw Response for Calendar: {raw_text[:300]}...")
 
-            cleaned_text = raw_text.replace('```json', '').replace('```', '').strip()
-
-            if not cleaned_text or not cleaned_text.startswith('['):
-                try:
-                    if response.prompt_feedback.block_reason:
-                        reason = response.prompt_feedback.block_reason
-                        print(f"WARN: Gemini blocked the request. Reason: {reason}")
-                        raise ValueError(f"AI 모델이 안전상의 이유로 요청을 차단했습니다: {reason}")
-                except (AttributeError, IndexError):
-                    pass
-                raise ValueError(f"AI 모델이 비어있거나 유효하지 않은 응답을 반환했습니다.")
-
-            json_response = json.loads(cleaned_text)
+            json_response = extract_first_json(raw_text)
             print("INFO: Successfully parsed Gemini response.")
             return jsonify(json_response)
 
