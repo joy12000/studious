@@ -14,6 +14,7 @@ export async function POST(request) {
         return {
           allowedContentTypes: ['application/pdf', 'text/plain', 'image/jpeg', 'image/png', 'image/gif', 'text/markdown'],
           token: process.env.BLOB_READ_WRITE_TOKEN,
+          addRandomSuffix: true, // 파일 이름에 랜덤 접미사 추가
         };
       },
       onUploadCompleted: async ({ blob, token }) => {
