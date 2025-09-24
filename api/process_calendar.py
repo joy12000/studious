@@ -82,8 +82,8 @@ def process_calendar_handler():
         try:
             print(f"INFO: API 키 #{i + 1} (으)로 시간표 처리 시도...")
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel('gemini-2.5-flash')
-                        response = model.generate_content([prompt, img], request_options={'timeout': 180})
+            model = genai.GenerativeModel('gemini-1.5-flash-latest')
+            response = model.generate_content([prompt, img], request_options={'timeout': 180})
             
             raw_text = response.text
             print(f"INFO: Gemini Raw Response for Calendar: {raw_text[:300]}...")
