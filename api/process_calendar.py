@@ -113,7 +113,7 @@ def process_calendar_handler():
         try:
             print(f"INFO: API 키 #{i + 1} (으)로 시간표 처리 시도...")
             genai.configure(api_key=api_key)
-            model = genai.GenerativeModel(os.getenv("GENAI_MODEL", "gemini-1.5-flash-latest")) # Use GENAI_MODEL env var, fallback to flash
+            model = genai.GenerativeModel(os.getenv("GENAI_MODEL", "gemini-2.5-flash")) # Use GENAI_MODEL env var, fallback to flash
             
             response = model.generate_content([prompt, img], request_options={'timeout': 180})
             
