@@ -7,6 +7,32 @@ import io
 from PIL import Image
 import traceback
 import shutil
+import re # re 모듈 추가
+
+# ==============================================================================
+# HELPER FUNCTIONS
+# ==============================================================================
+
+def extract_first_json(text: str):
+    """Finds and decodes the first valid JSON array block in a string."""
+    if not text:
+        raise ValueError("Empty response from model.")
+
+    # First, try to find a JSON array within a markdown code block
+    match = re.search(r"```json\s*(\[.*?\])\s*```", text, re.DOTALL)
+    if match:
+        json_str = match.group(1)
+    else:
+        # If not found, try to find the first and last square bracket for an array
+        match = re.search(r"\[.*\]", text, re.DOTALL)
+        if not match:
+            raise ValueError("No JSON array found in the model's response.")
+        json_str = match.group(0)
+
+    try:
+        return json.loads(json_str)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"Failed to decode JSON: {e} - Response text was: '{text}'")
 
 class handler(BaseHTTPRequestHandler):
 
@@ -51,9 +77,9 @@ class handler(BaseHTTPRequestHandler):
               # 🎨 출력 서식 규칙 (★★★★★ 가장 중요)
               당신이 생성하는 모든 텍스트는 아래 규칙을 반드시 따라야 합니다.
 
-              1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 반드시 KaTeX 문법으로 감싸야 합니다.
-                  -   인라인 수식: $로 감쌉니다. 예: $\ q''_x = -k \frac{{dT}}{{dx}} $
-                  -   블록 수식: $$로 감쌉니다. 예: $$ T(x) = T_s + \frac{{q'''}}{{2k}}(Lx - x^2) $$
+              1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 반드시 KaTeX 문법으로 감싸야 합니다. 
+                  -   인라인 수식: $로 감쌉니다. 예: $\q''_x = -k \frac{{dT}}{{dx}}$
+                  -   블록 수식: $$로 감쌉니다. 예: $$T(x) = T_s + \frac{{q'''}}{{2k}}(Lx - x^2)$$
 
               2.  **다이어그램 (Mermaid):** 복잡한 시스템, 알고리즘, 상태 변화는 반드시 Mermaid.js 문법으로 시각화해야 합니다.
                   -   예시: ```mermaid\ngraph TD; A[열원] --> B(표면);\n```
@@ -106,13 +132,13 @@ class handler(BaseHTTPRequestHandler):
                 try:
                     print(f"INFO: API 키 #{i + 1} (으)로 참고서 생성 시도...")
                     genai.configure(api_key=api_key)
-                    model = genai.GenerativeModel('gemini-2.5-pro')
+                    model = genai.GenerativeModel('gemini-2.5-flash')
 
                     response = model.generate_content(request_contents)
 
                     # The model is expected to return a JSON string.
                     # We need to parse it to extract the data.
-                    generated_data = json.loads(response.text)
+                    generated_data = extract_first_json(response.text)
 
                     json_response = {
                         "title": generated_data.get("title", f"{subject_name} - {week_info} 복습노트"),
