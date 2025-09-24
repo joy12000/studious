@@ -3,3 +3,4 @@ google-generativeai
 certifi
 pdf2image
 Pillow
+Flask
