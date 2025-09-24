@@ -401,7 +401,7 @@ export default function NotePage() {
     <>
       <div className="flex h-screen w-full overflow-hidden">
         {/* ChatUI Panel */}
-        <div className={`h-full transition-all duration-300 ease-in-out flex-shrink-0 ${isChatOpen ? 'w-[450px]' : 'w-0'}`}>
+        <div className={`h-full transition-all duration-300 ease-in-out flex-shrink-0 ${isChatOpen ? 'w-[400px]' : 'w-0'}`}>
           {isChatOpen && <ChatUI 
               noteContext={note.content} 
               onClose={() => {
@@ -494,12 +494,12 @@ export default function NotePage() {
                                   <span className="text-muted-foreground transition-transform group-open:rotate-90 ml-2">▶</span>
                                 </div>
                               </summary>
-                              <div className="mt-4 prose prose-lg max-w-none dark:prose-invert"><MarkdownRenderer content={section.content} /></div>
+                              <div className="mt-4 prose prose-lg max-w-none dark:prose-invert break-keep"><MarkdownRenderer content={section.content} /></div>
                             </details>
                           ))}
                         </div>
                       ) : (
-                        <div className="prose prose-lg max-w-none dark:prose-invert"><MarkdownRenderer content={note.content} /></div>
+                        <div className="prose prose-lg max-w-none dark:prose-invert break-keep"><MarkdownRenderer content={note.content} /></div>
                       )}
                       {note.key_insights && note.key_insights.length > 0 && (
                         <div className="mt-8">
@@ -508,7 +508,7 @@ export default function NotePage() {
                             {note.key_insights.map((insight, index) => (
                               <div key={index} className="flex items-start gap-3 p-4 bg-primary/5 border-l-4 border-primary/40 rounded-r-lg">
                                 <div className="text-primary font-bold mt-1">{index + 1}.</div>
-                                <div className="text-card-foreground m-0"><MarkdownRenderer content={insight} /></div>
+                                <div className="text-card-foreground m-0 break-keep"><MarkdownRenderer content={insight} /></div>
                               </div>
                             ))}
                           </div>
