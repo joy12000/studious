@@ -2,9 +2,8 @@
 import React, { useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import { InlineMath, BlockMath } from 'react-katex';
-import mermaid from 'mermaid';
 import hljs from 'highlight.js';
-import 'highlight.js/styles/github-dark.css'; // 다크모드에 잘 어울리는 테마
+import 'highlight.js/styles/github-dark.css';
 
 // Marked.js에 highlight.js 연동 설정
 marked.setOptions({
@@ -27,41 +26,49 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   const containerRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    try {
-      mermaid.initialize({
-        startOnLoad: false,
-        theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
-        securityLevel: 'loose',
-      });
-    } catch (e) {
-      console.error('Mermaid 초기화 실패', e);
-    }
-  }, []);
+    const renderMermaidDiagrams = async () => {
+      if (containerRef.current) {
+        const mermaidElements = containerRef.current.querySelectorAll('code.language-mermaid');
+        if (mermaidElements.length > 0) {
+          try {
+            const mermaid = (await import('mermaid')).default;
+            mermaid.initialize({
+              startOnLoad: false,
+              theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
+              securityLevel: 'loose',
+            });
 
-  useEffect(() => {
-    if (containerRef.current) {
-      // Mermaid 다이어그램 렌더링
-      const mermaidElements = containerRef.current.querySelectorAll('code.language-mermaid');
-      mermaidElements.forEach((element, index) => {
-        const mermaidCode = element.textContent || '';
-        const id = `mermaid-diagram-${Date.now()}-${index}`;
-        try {
-          mermaid.render(id, mermaidCode, (svgCode) => {
-            element.parentElement!.innerHTML = svgCode;
-          });
-        } catch (error) {
-          console.error('Mermaid 렌더링 오류:', error);
-          const errorMessage = document.createElement('div');
-          errorMessage.innerHTML = `
-            <div class="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
-              <p class="font-bold">다이어그램 렌더링 오류</p>
-              <pre class="mt-2 text-xs whitespace-pre-wrap">${(error as Error).message}</pre>
-            </div>
-          `;
-          element.parentElement!.replaceWith(errorMessage);
+            mermaidElements.forEach((element, index) => {
+              const mermaidCode = element.textContent || '';
+              const id = `mermaid-diagram-${Date.now()}-${index}`;
+              try {
+                mermaid.render(id, mermaidCode, (svgCode) => {
+                  if (element.parentElement) {
+                    element.parentElement.innerHTML = svgCode;
+                  }
+                });
+              } catch (error) {
+                console.error('Mermaid 렌더링 오류:', error);
+                if (element.parentElement) {
+                  const errorMessage = document.createElement('div');
+                  errorMessage.innerHTML = `
+                    <div class="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
+                      <p class="font-bold">다이어그램 렌더링 오류</p>
+                      <pre class="mt-2 text-xs whitespace-pre-wrap">${(error as Error).message}</pre>
+                    </div>
+                  `;
+                  element.parentElement.replaceWith(errorMessage);
+                }
+              }
+            });
+          } catch (e) {
+            console.error('Mermaid 라이브러리 로드 실패:', e);
+          }
         }
-      });
-    }
+      }
+    };
+
+    renderMermaidDiagrams();
   }, [content]);
 
   const blockParts = content.split(/(\$\$[\s\S]*?\$\$)/g);
