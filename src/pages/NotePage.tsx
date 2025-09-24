@@ -112,7 +112,7 @@ const QuizComponent = ({ quiz }: { quiz: Quiz }) => {
         </h3>
         {quiz.questions.map((q, i) => (
           <div key={i} className="mb-6 p-4 border rounded-lg">
-            <p className="font-semibold">{i + 1}. {q.question}</p>
+            <p className="font-semibold">{i + 1}. <MarkdownRenderer content={q.question} /></p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
               {q.options.map((opt, j) => (
                 <Button 
