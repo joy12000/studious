@@ -359,7 +359,7 @@ export default function NotePage() {
   return (
     <>
       <div className="flex h-full w-full overflow-hidden">
-        <div className={`transition-all duration-300 ease-in-out ${isChatOpen ? 'w-full md:w-2/5' : 'w-0'}`}>
+        <div className={`h-full transition-all duration-300 ease-in-out ${isChatOpen ? 'w-full md:w-2/5' : 'w-0'}`}>
           {isChatOpen && <ChatUI 
               noteContext={note.content} 
               onClose={() => {
