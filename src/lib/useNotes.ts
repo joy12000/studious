@@ -222,22 +222,25 @@ export function useNotes(defaultFilters?: Filters) {
 
         onProgress?.('시간표 정보를 처리하고 과목을 동기화하는 중입니다...');
 
-        const eventsForDb: ScheduleEvent[] = await Promise.all(
-          eventsFromApi.map(async (eventFromApi) => {
-            let subject = (allSubjects || []).find(s => s.name === eventFromApi.subjectName);
-            if (!subject) {
-              subject = await addSubject(eventFromApi.subjectName);
-            }
-            
-            return {
-              id: uuidv4(),
-              subjectId: subject.id,
-              dayOfWeek: eventFromApi.dayOfWeek,
-              startTime: eventFromApi.startTime,
-              endTime: eventFromApi.endTime,
-            };
-          })
-        );
+        const eventsForDb: ScheduleEvent[] = [];
+        const localSubjects = [...(allSubjects || [])];
+
+        for (const eventFromApi of eventsFromApi) {
+          let subject = localSubjects.find(s => s.name === eventFromApi.subjectName);
+          if (!subject) {
+            const newSubject = await addSubject(eventFromApi.subjectName);
+            localSubjects.push(newSubject);
+            subject = newSubject;
+          }
+          
+          eventsForDb.push({
+            id: uuidv4(),
+            subjectId: subject.id,
+            dayOfWeek: eventFromApi.dayOfWeek,
+            startTime: eventFromApi.startTime,
+            endTime: eventFromApi.endTime,
+          });
+        }
 
         onProgress?.('시간표 정보를 데이터베이스에 저장 중입니다...');
         
