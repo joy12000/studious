@@ -163,22 +163,51 @@ export default function AssignmentHelperPage() {
     
     const isLoading = progressMessage !== null;
 
-    const FileUploadArea = ({ files, setFiles, inputId }: { files: File[], setFiles: React.Dispatch<React.SetStateAction<File[]>>, inputId: string }) => (
-        <>
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
-                {files.map((file, index) => (
-                    <FilePreview key={index} file={file} onRemove={() => removeFile(index, setFiles)} />
-                ))}
-                <div
-                    className="w-24 h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => document.getElementById(inputId)?.click()}
-                >
-                    <UploadCloud className="h-8 w-8" />
+    const FileUploadArea = ({ files, setFiles, inputId }: { files: File[], setFiles: React.Dispatch<React.SetStateAction<File[]>>, inputId: string }) => {
+        const [isDragging, setIsDragging] = useState(false);
+
+        const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragging(true);
+        };
+
+        const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragging(false);
+        };
+
+        const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+            e.preventDefault();
+            e.stopPropagation();
+            setIsDragging(false);
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                onFileChange(e as any, setFiles);
+                e.dataTransfer.clearData();
+            }
+        };
+
+        return (
+            <>
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-3">
+                    {files.map((file, index) => (
+                        <FilePreview key={index} file={file} onRemove={() => removeFile(index, setFiles)} />
+                    ))}
+                    <div
+                        className={`w-24 h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer transition-colors ${isDragging ? 'border-primary bg-primary/10' : 'hover:bg-muted/50'}`}
+                        onClick={() => document.getElementById(inputId)?.click()}
+                        onDragOver={handleDragOver}
+                        onDragLeave={handleDragLeave}
+                        onDrop={handleDrop}
+                    >
+                        <UploadCloud className="h-8 w-8" />
+                    </div>
                 </div>
-            </div>
-            <input id={inputId} type="file" multiple onChange={(e) => onFileChange(e, setFiles)} className="hidden" />
-        </>
-    );
+                <input id={inputId} type="file" multiple onChange={(e) => onFileChange(e, setFiles)} className="hidden" />
+            </>
+        );
+    };
 
     return (
         <>

@@ -1,5 +1,3 @@
-// src/pages/NotePage.tsx
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { Note, Attachment, Quiz, QuizQuestion } from '../lib/types';
@@ -16,7 +14,6 @@ import { Badge } from '@/components/ui/badge';
 import { ChatUI, Message } from '../components/ChatUI';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-
 
 type TextbookSection = {
   title: string;
@@ -80,29 +77,27 @@ const formatDate = (dateValue: string | number) => {
   } catch { return '날짜 오류'; }
 };
 
-// --- ⭐ [기능 수정] 대화형 퀴즈 컴포넌트 ---
 const QuizComponent = ({ quiz }: { quiz: Quiz }) => {
     const [userAnswers, setUserAnswers] = useState<(string | null)[]>(() => Array(quiz.questions.length).fill(null));
     const [submitted, setSubmitted] = useState(false);
 
     const handleOptionClick = (questionIndex: number, option: string) => {
-        if (submitted) return; // 제출 후에는 변경 불가
+        if (submitted) return;
         const newAnswers = [...userAnswers];
         newAnswers[questionIndex] = option;
         setUserAnswers(newAnswers);
     };
 
-    const getButtonVariant = (question: QuizQuestion, questionIndex: number, option: string) => {
+    const getButtonVariant = (question: QuizQuestion, questionIndex: number, option: string): "success" | "destructive" | "secondary" | "outline" => {
         if (!submitted) {
             return userAnswers[questionIndex] === option ? 'secondary' : 'outline';
         }
-        // 제출 후 스타일
         const isCorrect = option === question.answer;
         const isSelected = userAnswers[questionIndex] === option;
 
-        if (isCorrect) return 'success'; // 정답은 항상 녹색
-        if (isSelected && !isCorrect) return 'destructive'; // 내가 선택한 오답은 적색
-        return 'outline'; // 나머지
+        if (isCorrect) return 'success';
+        if (isSelected && !isCorrect) return 'destructive';
+        return 'outline';
     };
     
     const handleSubmit = () => setSubmitted(true);
@@ -138,7 +133,6 @@ const QuizComponent = ({ quiz }: { quiz: Quiz }) => {
     );
 };
 
-
 const externalAiLinks = [
   { name: 'Gemini', url: 'https://gemini.google.com/' },
   { name: 'Perplexity', url: 'https://www.perplexity.ai/' },
@@ -146,9 +140,9 @@ const externalAiLinks = [
 ];
 
 export default function NotePage() {
-  const { id } = useParams();
-  // ... (이하 기존 NotePage 컴포넌트 로직은 이전 답변과 동일) ...
-  const { getNote, updateNote, deleteNote, getQuiz, addQuizToReviewDeck } = useNotes(); // 🧠 addQuizToReviewDeck 임포트
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate(); // 👈 [버그 수정] 누락되었던 useNavigate 훅 호출
+  const { getNote, updateNote, deleteNote, getQuiz, addQuizToReviewDeck } = useNotes();
   
   const [note, setNote] = useState<Note | null>(null);
   const [quiz, setQuiz] = useState<Quiz | null>(null);
@@ -203,13 +197,11 @@ export default function NotePage() {
     return [];
   }, [note]);
 
-  // 🤔 [기능 추가] 섹션별 AI 질문 핸들러
   const handleAskAboutSection = (section: { title: string, content: string }) => {
     const prompt = `아래 내용에 대해 더 쉽게 설명해줘:\n\n--- [섹션: ${section.title}] ---\n${section.content}\n---`;
     setInitialChatMessage(prompt);
     setIsChatOpen(true);
   };
-
 
   const handleSaveEdit = async () => {
     if (!note || !id) return;
@@ -381,13 +373,12 @@ export default function NotePage() {
   return (
     <>
       <div className="flex h-screen w-full overflow-hidden">
-        {/* Chat Panel */}
         <div className={`transition-all duration-300 ease-in-out ${isChatOpen ? 'w-full md:w-2/5' : 'w-0'}`}>
           {isChatOpen && <ChatUI 
-              noteContext={note?.content ?? ''} 
+              noteContext={note.content} 
               onClose={() => {
                 setIsChatOpen(false);
-                setInitialChatMessage(undefined); // 닫을 때 초기 메시지 초기화
+                setInitialChatMessage(undefined);
               }} 
               initialMessage={initialChatMessage} 
               messagesRef={chatMessagesRef}
@@ -400,8 +391,8 @@ export default function NotePage() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="sm" onClick={handleToggleFavorite} title={note?.favorite ? '즐겨찾기 해제' : '즐겨찾기'}>
-                  <Star className={`h-5 w-5 ${note?.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+                <Button variant="ghost" size="sm" onClick={handleToggleFavorite} title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}>
+                  <Star className={`h-5 w-5 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setEditing(v => !v)} title="편집">
                   <Edit className="h-5 w-5" />
@@ -409,7 +400,6 @@ export default function NotePage() {
                 <Button variant="ghost" size="sm" onClick={() => setIsShareModalOpen(true)} title="공유/내보내기">
                   <Share2 className="h-5 w-5" />
                 </Button>
-                
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button variant="ghost" size="sm" title="외부 AI로 내보내기">
@@ -436,7 +426,6 @@ export default function NotePage() {
                     </div>
                   </PopoverContent>
                 </Popover>
-
                 <Button variant="ghost" size="sm" onClick={handleDelete} className="text-destructive hover:text-destructive" title="삭제">
                   <Trash2 className="h-5 w-5" />
                 </Button>
@@ -448,76 +437,52 @@ export default function NotePage() {
                 <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
-                    <span>{formatDate(note?.createdAt)}</span>
+                    <span>{formatDate(note.createdAt)}</span>
                   </div>
-                  
-                  {note?.sourceType === 'youtube' && note?.sourceUrl && (
+                  {note.sourceType === 'youtube' && note.sourceUrl && (
                     <button onClick={openSource} className="flex items-center gap-1.5 text-red-600 hover:text-red-700 transition-colors font-medium">
                       <Youtube className="h-4 w-4" />
                       YouTube에서 열기
                     </button>
                   )}
-
-                  {note?.sourceType !== 'youtube' && note?.sourceUrl && (
-                    <a href={note?.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-primary transition-colors font-medium">
+                  {note.sourceType !== 'youtube' && note.sourceUrl && (
+                    <a href={note.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-primary transition-colors font-medium">
                       <ExternalLink className="h-4 w-4" />
                       원문 보기
                     </a>
                   )}
                 </div>
-
                 <div className="mb-6">
                   {editing ? (
                     <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full text-3xl font-bold text-foreground bg-transparent border rounded-lg px-3 py-2 focus:ring-2 focus:ring-ring focus:border-transparent transition-colors" />
                   ) : (
-                    <h1 className="mb-2 text-3xl font-bold leading-normal tracking-tight text-foreground md:text-4xl break-words">{note?.title}</h1>
+                    <h1 className="mb-2 text-3xl font-bold leading-normal tracking-tight text-foreground md:text-4xl break-words">{note.title}</h1>
                   )}
                 </div>
-
-                {note?.sourceType === 'youtube' && (
+                {note.sourceType === 'youtube' && (
                   <div className="flex flex-wrap gap-2 mb-8">
-                    {note?.subjectId && <Badge variant="secondary">{note?.subjectId}</Badge>}
+                    {note.subjectId && <Badge variant="secondary">{note.subjectId}</Badge>}
                   </div>
                 )}
-
                 <div className="mb-8">
                   {editing ? (
                     <div>
-                      <textarea
-                        value={editContent}
-                        onChange={(e) => setEditContent(e.target.value)}
-                        className="w-full h-64 bg-transparent border rounded-lg p-2 focus:ring-0 resize-y"
-                      />
-                      
-                      <AttachmentPanel
-                        attachments={editAttachments}
-                        onAddLink={() => { /* handleAddLink 구현 필요 */ }}
-                        onAddFile={() => { /* handleAddFile 구현 필요 */ }}
-                        onRemoveAttachment={() => { /* handleRemoveAttachment 구현 필요 */ }}
-                      />
-
+                      <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} className="w-full h-64 bg-transparent border rounded-lg p-2 focus:ring-0 resize-y" />
+                      <AttachmentPanel attachments={editAttachments} onAddLink={() => {}} onAddFile={() => {}} onRemoveAttachment={() => {}} />
                       <div className="flex justify-end gap-3 mt-4">
-                        <Button variant="outline" onClick={handleCancelEdit}>
-                          <X className="h-4 w-4" />
-                          취소
-                        </Button>
-                        <Button onClick={handleSaveEdit}>
-                          <Check className="h-4 w-4" />
-                          저장
-                        </Button>
+                        <Button variant="outline" onClick={handleCancelEdit}><X className="h-4 w-4" />취소</Button>
+                        <Button onClick={handleSaveEdit}><Check className="h-4 w-4" />저장</Button>
                       </div>
                     </div>
                   ) : (
                     <div>
                         {textbookSections.length > 0 && <TableOfContents sections={textbookSections} />}
-
                         {textbookSections.length > 0 ? (
                             <div className="space-y-3">
                                 {textbookSections.map((section) => (
                                     <details key={section.id} id={section.id} className="group rounded-lg border bg-card p-4">
                                         <summary className="cursor-pointer font-semibold text-lg list-none flex items-center justify-between">
                                             <span>{section.title}</span>
-                                            {/* 🤔 [기능 추가] 섹션별 AI 질문 버튼 */}
                                             <div className="flex items-center">
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.preventDefault(); handleAskAboutSection(section); }}>
                                                     <MessageSquarePlus className="h-4 w-4" />
@@ -533,17 +498,14 @@ export default function NotePage() {
                             </div>
                         ) : (
                             <div className="note-content-line-height prose prose-lg max-w-none dark:prose-invert prose-p:leading-relaxed prose-headings:font-semibold">
-                              <MarkdownRenderer content={note?.content} />
+                              <MarkdownRenderer content={note.content} />
                             </div>
                         )}
-
-                      {note?.key_insights && note?.key_insights.length > 0 && (
+                      {note.key_insights && note.key_insights.length > 0 && (
                         <div className="mt-8">
-                          <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
-                            💡 핵심 인사이트
-                          </h3>
+                          <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">💡 핵심 인사이트</h3>
                           <div className="space-y-3">
-                            {note?.key_insights.map((insight, index) => (
+                            {note.key_insights.map((insight, index) => (
                               <div key={index} className="flex items-start gap-3 p-4 bg-primary/5 border-l-4 border-primary/40 rounded-r-lg">
                                 <div className="text-primary font-bold mt-1">{index + 1}.</div>
                                 <div className="text-card-foreground m-0"><MarkdownRenderer content={insight} /></div>
@@ -552,17 +514,10 @@ export default function NotePage() {
                           </div>
                         </div>
                       )}
-                      
-                      <AttachmentPanel
-                        attachments={note?.attachments || []}
-                        readOnly
-                      />
-
-                      {note?.noteType === 'review' && quiz && <QuizComponent quiz={quiz} />}
-
+                      <AttachmentPanel attachments={note.attachments || []} readOnly />
+                      {note.noteType === 'review' && quiz && <QuizComponent quiz={quiz} />}
                       <div className="mt-8 flex flex-col sm:flex-row gap-2">
-                        {/* 🧠 [기능 추가] 복습 덱 추가 버튼 */}
-                        {note?.noteType === 'review' && quiz && (
+                        {note.noteType === 'review' && quiz && (
                             <Button onClick={() => addQuizToReviewDeck(note.id)} variant="secondary" className="w-full">
                                 <BrainCircuit className="mr-2 h-4 w-4" />
                                 이 퀴즈를 복습 덱에 추가
@@ -595,7 +550,7 @@ export default function NotePage() {
         onClose={() => setIsShareModalOpen(false)}
         onConfirm={handleShare}
         onDownload={handleDownload}
-        noteTitle={note?.title}
+        noteTitle={note.title}
       />
     </>
   );

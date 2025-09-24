@@ -18,11 +18,35 @@ export default function ReviewPage() {
   const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* ... */ };
   const removeFile = (index: number) => { /* ... */ };
   
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          onFileChange({ target: { files: e.dataTransfer.files } } as React.ChangeEvent<HTMLInputElement>);
+          e.dataTransfer.clearData();
+      }
+  };
+
   const isLoading = progressMessage !== null;
 
   return (
     <>
-      {isLoading && <LoadingOverlay message={progressMessage as string} />}
+      {isLoading && <LoadingOverlay message={loadingMessage as string} />}
       <div className="min-h-full w-full flex flex-col items-center justify-center p-4">
         <Card className="w-full max-w-2xl">
             <CardHeader className="text-center">
@@ -47,8 +71,11 @@ export default function ReviewPage() {
                     </Popover>
                 </div>
                 <div 
-                    className="w-full min-h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors p-6"
+                    className={`w-full min-h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer transition-colors p-6 ${isDragging ? 'border-primary bg-primary/10' : 'hover:bg-muted/50'}`}
                     onClick={() => document.getElementById('file-upload-review')?.click()}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
                 >
                     <UploadCloud className="h-12 w-12 mb-2" />
                     <p className="font-semibold">파일을 드래그하거나 클릭해서 업로드</p>

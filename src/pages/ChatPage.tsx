@@ -29,6 +29,7 @@ export default function ChatPage() {
     const [isSubjectPopoverOpen, setIsSubjectPopoverOpen] = useState(false);
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
 
     useEffect(() => {
         if (location.state) {
@@ -39,6 +40,28 @@ export default function ChatPage() {
 
     const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) setUploadedFiles(prev => [...prev, ...Array.from(e.target.files!)]); };
     const removeFile = (index: number) => { setUploadedFiles(prev => prev.filter((_, i) => i !== index)); };
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            onFileChange({ target: { files: e.dataTransfer.files } } as React.ChangeEvent<HTMLInputElement>);
+            e.dataTransfer.clearData();
+        }
+    };
 
     const handleGenerateTextbook = async () => {
         if (uploadedFiles.length === 0 || !selectedSubject) {
@@ -118,8 +141,11 @@ export default function ChatPage() {
                         </Popover>
                     </div>
                     <div 
-                      className="w-full min-h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors p-6"
+                      className={`w-full min-h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer transition-colors p-6 ${isDragging ? 'border-primary bg-primary/10' : 'hover:bg-muted/50'}`}
                       onClick={() => fileInputRef.current?.click()}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
                     >
                       <UploadCloud className="h-12 w-12 mb-4" />
                       <p className="font-semibold">파일을 드래그하거나 클릭하여 업로드</p>
