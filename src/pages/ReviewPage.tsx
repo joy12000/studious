@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useNotes } from "../lib/useNotes";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Loader2, ArrowRight, UploadCloud, FileText, X, ChevronsUpDown, CalendarDays, Plus } from "lucide-react";
+import { upload } from '@vercel/blob/client';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { WeekPicker } from '../components/WeekPicker';
@@ -71,38 +72,45 @@ export default function ReviewPage() {
         return;
       }
       setError(null);
-      startLoading("복습 노트를 생성하는 중...");
+      startLoading("파일을 Vercel Blob에 업로드하는 중...");
 
-      const noteDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
+      try {
+          const uploadFile = async (file: File) => {
+              const newBlob = await upload(file.name, file, {
+                  access: 'public',
+                  handleUploadUrl: '/api/upload/route',
+              });
+              return newBlob.url;
+          };
 
-      let combinedContent = "";
-      const combinedFiles: File[] = [...files];
+          const uploadedFileUrls = await Promise.all(files.map(uploadFile));
+          setMessage('모든 파일 업로드 완료. AI 분석 시작...');
 
-      selectedExistingNotes.forEach(note => {
-        combinedContent += `\n\n--- 기존 노트: ${note.title} ---\n${note.content}`;
-        if (note.attachments) {
-          note.attachments.forEach(att => {
-            if (att.type === 'file' && att.data instanceof File) {
-              combinedFiles.push(att.data);
-            }
+          const noteDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
+
+          let combinedConversationText = "";
+          selectedExistingNotes.forEach(note => {
+            combinedConversationText += `\n\n--- 기존 노트: ${note.title} ---\n${note.content}`;
           });
-        }
-      });
 
-      await addNoteFromReview({
-        files: combinedFiles,
-        subjects: allSubjects || [],
-        onProgress: setMessage,
-        onComplete: (newNote, newQuiz) => {
-          stopLoading();        navigate(`/note/${newNote.id}`);
-        },
-        onError: (err) => {
-          setError(err);
+          await addNoteFromReview({
+            fileUrls: uploadedFileUrls,
+            subjects: allSubjects || [],
+            onProgress: setMessage,
+            onComplete: (newNote, newQuiz) => {
+              stopLoading();        navigate(`/note/${newNote.id}`);
+            },
+            onError: (err) => {
+              setError(err);
+              stopLoading();
+            },
+            noteDate: noteDateStr,
+            aiConversationText: combinedConversationText.trim(),
+          });
+      } catch (error) {
           stopLoading();
-        },
-        noteDate: noteDateStr,
-        aiConversationText: combinedContent.trim(),
-      });
+          setError(error instanceof Error ? error.message : '파일 업로드 또는 노트 생성 중 오류가 발생했습니다.');
+      }
     };
 
     const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
