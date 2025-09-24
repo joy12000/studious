@@ -5,6 +5,9 @@
     },
     "api/create_textbook.py": {
       "maxDuration": 300
+    },
+    "api/process_calendar.py": {
+      "maxDuration": 300
     }
   },
   "rewrites": [
