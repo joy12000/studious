@@ -345,9 +345,30 @@ export function useNotes(defaultFilters?: Filters) {
       await db.subjects.update(id, { name, color });
     };
 
+    const updateSubjectAndSchedule = async (subjectId: string, scheduleId: string, newName: string, newStartTime: string, newEndTime: string, newDayOfWeek: string) => {
+      await db.transaction('rw', db.subjects, db.schedule, async () => {
+        await db.subjects.update(subjectId, { name: newName });
+        await db.schedule.update(scheduleId, {
+          startTime: newStartTime,
+          endTime: newEndTime,
+          dayOfWeek: newDayOfWeek,
+        });
+      });
+    };
+
     const deleteSubject = async (id: string) => {
-      await db.subjects.delete(id);
-      // Also consider what to do with notes associated with this subject
+      await db.transaction('rw', db.subjects, db.schedule, db.notes, async () => {
+        // 연결된 시간표 항목 삭제
+        await db.schedule.where('subjectId').equals(id).delete();
+        
+        // 연결된 노트들의 subjectId를 null로 설정
+        const notesToUpdate = await db.notes.where('subjectId').equals(id).toArray();
+        const noteIdsToUpdate = notesToUpdate.map(note => note.id);
+        await db.notes.where('id').anyOf(noteIdsToUpdate).modify({ subjectId: null });
+
+        // 과목 자체 삭제
+        await db.subjects.delete(id);
+      });
     };
 
     const importNote = async (noteData: Partial<Note>) => {
@@ -441,6 +462,7 @@ export function useNotes(defaultFilters?: Filters) {
         deleteNote,
         addSubject,
         updateSubject,
+        updateSubjectAndSchedule, // 추가
         deleteSubject,
         getNote, 
         getQuiz,

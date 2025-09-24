@@ -28,7 +28,7 @@ function TabButton({active, onClick, children}:{active:boolean; onClick:()=>void
 }
 
 const SubjectsPanel = () => {
-  const { allSubjects, addSubject, updateSubject, deleteSubject } = useNotes();
+  const { allSubjects, addSubject, updateSubject, deleteSubject, updateSubjectAndSchedule } = useNotes();
 
   const handleAddSubject = async () => {
     const name = prompt('새 과목 이름을 입력하세요.');
@@ -38,9 +38,34 @@ const SubjectsPanel = () => {
   };
 
   const handleEditSubject = async (subject: Subject) => {
-    const newName = prompt('새 과목 이름을 입력하세요.', subject.name);
-    if (newName && newName !== subject.name) {
-      await updateSubject(subject.id, newName, subject.color);
+    const associatedSchedules = await db.schedule.where('subjectId').equals(subject.id).toArray();
+
+    if (associatedSchedules.length === 1) {
+      const schedule = associatedSchedules[0];
+      const newName = prompt('새 과목 이름을 입력하세요.', subject.name);
+      if (!newName) return;
+
+      const newStartTime = prompt('새 시작 시간을 입력하세요 (HH:MM).', schedule.startTime);
+      if (!newStartTime) return;
+
+      const newEndTime = prompt('새 종료 시간을 입력하세요 (HH:MM).', schedule.endTime);
+      if (!newEndTime) return;
+
+      const newDayOfWeek = prompt('새 요일을 입력하세요 (월, 화, 수, 목, 금, 토, 일).', schedule.dayOfWeek);
+      if (!newDayOfWeek) return;
+
+      await updateSubjectAndSchedule(subject.id, schedule.id, newName, newStartTime, newEndTime, newDayOfWeek);
+
+    } else {
+      const newName = prompt('새 과목 이름을 입력하세요.', subject.name);
+      if (newName && newName !== subject.name) {
+        await updateSubject(subject.id, newName, subject.color);
+      }
+      if (associatedSchedules.length > 1) {
+        alert('이 과목에는 여러 시간표가 연결되어 있습니다. 과목 이름만 변경되었습니다. 상세 시간표 수정은 시간표 페이지에서 진행해주세요.');
+      } else {
+        alert('이 과목은 시간표에 등록되지 않았습니다. 과목 이름만 변경되었습니다.');
+      }
     }
   };
 
