@@ -4,6 +4,7 @@ import { Button } from '../components/ui/button';
 import { Loader2, UploadCloud, FileText, X, BookMarked, CalendarDays, BrainCircuit, ChevronsUpDown, Check } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useNotes, Subject } from '../lib/useNotes';
 import { WeekPicker, getWeekNumber } from '../components/WeekPicker';
 import { format } from 'date-fns';
@@ -138,7 +139,7 @@ export default function ChatPage() {
   return (
     <>
       {isLoading && <LoadingOverlay message={loadingMessage} />}
-      <div className="min-h-full w-full flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center p-4">
         <Card className="w-full max-w-2xl">
             <CardHeader className="text-center">
                 <CardTitle className="text-2xl">AI 참고서 만들기</CardTitle>

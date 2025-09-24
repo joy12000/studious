@@ -144,7 +144,7 @@ ${note.content}`;
   return (
     <>
       {isLoading && <LoadingOverlay message={loadingMessage as string} />}
-      <div className="min-h-full w-full flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen w-full flex flex-col items-center justify-center p-4">
         <Card className="w-full max-w-2xl">
             <CardHeader className="text-center">
                 <CardTitle className="text-2xl">AI 복습 노트</CardTitle>

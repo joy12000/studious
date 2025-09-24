@@ -2,6 +2,8 @@ import { handleUpload } from '@vercel/blob/client';
 import { NextResponse } from 'next/server';
 
 export async function POST(request) {
+  console.log('Checking for BLOB_READ_WRITE_TOKEN:');
+  console.log('Is it present?', !!process.env.BLOB_READ_WRITE_TOKEN);
   const body = await request.json();
 
   try {
