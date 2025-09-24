@@ -301,8 +301,8 @@ export default function NotePage() {
   const handleTestUnderstanding = () => {
     if (!note) return;
     const prompt = `다음은 나의 학습 노트 내용이야. 이 내용을 바탕으로 나의 이해도를 테스트할 수 있는 질문 5개를 만들어줘. 질문은 내가 얼마나 깊이 이해했는지 확인할 수 있도록 개념의 연결, 적용, 비판적 사고를 유도하는 질문으로 구성해줘.\n\n--- 학습 노트 ---\n${note.content}`;
-    const encodedPrompt = encodeURIComponent(prompt);
-    window.open(`https://gemini.google.com/app?q=${encodedPrompt}`, '_blank');
+    setInitialChatMessage(prompt);
+    setIsChatOpen(true);
   };
 
   const triggerDownload = (blob: Blob, name: string) => {
