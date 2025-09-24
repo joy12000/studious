@@ -6,8 +6,10 @@ import ShareModal from '../components/ShareModal';
 import AttachmentPanel from '../components/AttachmentPanel';
 import { exportPlainSingleNote } from '../lib/backup';
 import MarkdownRenderer from '../components/MarkdownRenderer';
+import { convertPdfToImages } from '../lib/pdfUtils';
+import { v4 as uuidv4 } from 'uuid';
 import { 
-  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit, Bot, ChevronsUpDown, ClipboardCopy, List, MessageSquarePlus
+  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit, Bot, ChevronsUpDown, ClipboardCopy, List, MessageSquarePlus, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -154,6 +156,7 @@ export default function NotePage() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [initialChatMessage, setInitialChatMessage] = useState<string | undefined>();
+  const [isConverting, setIsConverting] = useState(false);
   
   const chatMessagesRef = useRef<Message[]>();
 
@@ -189,6 +192,44 @@ export default function NotePage() {
 
     loadNoteAndQuiz();
   }, [id, navigate, getNote, getQuiz]);
+
+  const handleFileSelected = async (files: FileList | null) => {
+    if (!files) return;
+    const newFiles = Array.from(files);
+
+    for (const file of newFiles) {
+      if (file.type === 'application/pdf') {
+        setIsConverting(true);
+        try {
+          const images = await convertPdfToImages(file);
+          const newAttachments: Attachment[] = images.map(imageFile => ({
+            id: uuidv4(),
+            type: 'file',
+            name: imageFile.name,
+            data: imageFile,
+          }));
+          setEditAttachments(prev => [...prev, ...newAttachments]);
+        } catch (error) {
+          console.error("PDF to image conversion failed:", error);
+          alert("PDF를 이미지로 변환하는 데 실패했습니다.");
+        } finally {
+          setIsConverting(false);
+        }
+      } else {
+        const newAttachment: Attachment = {
+          id: uuidv4(),
+          type: 'file',
+          name: file.name,
+          data: file,
+        };
+        setEditAttachments(prev => [...prev, newAttachment]);
+      }
+    }
+  };
+
+  const handleRemoveAttachment = (attachmentId: string) => {
+    setEditAttachments(prev => prev.filter(att => att.id !== attachmentId));
+  };
   
   const textbookSections = useMemo(() => {
     if (note && note.noteType === 'textbook') {
@@ -419,7 +460,17 @@ export default function NotePage() {
                   {editing ? (
                     <div>
                       <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} className="w-full h-64 bg-transparent border rounded-lg p-2 focus:ring-0 resize-y" />
-                      <AttachmentPanel attachments={editAttachments} onAddLink={() => {}} onAddFile={() => {}} onRemoveAttachment={() => {}} />
+                                            {isConverting && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground my-2">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>PDF 파일을 이미지로 변환 중입니다...</span>
+                        </div>
+                      )}
+                      <AttachmentPanel 
+                        attachments={editAttachments} 
+                        onAddFile={handleFileSelected} 
+                        onRemoveAttachment={handleRemoveAttachment} 
+                      />
                       <div className="flex justify-end gap-3 mt-4">
                         <Button variant="outline" onClick={handleCancelEdit}><X className="h-4 w-4" />취소</Button>
                         <Button onClick={handleSaveEdit}><Check className="h-4 w-4" />저장</Button>

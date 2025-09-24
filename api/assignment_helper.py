@@ -6,6 +6,9 @@ import tempfile
 import shutil
 from PIL import Image
 import traceback
+import requests
+import uuid
+from urllib.parse import unquote, urlparse
 
 class handler(BaseHTTPRequestHandler):
     def handle_error(self, e, message="오류 발생", status_code=500):
@@ -35,7 +38,6 @@ class handler(BaseHTTPRequestHandler):
             return self.handle_error(ValueError("설정된 Gemini API 키가 없습니다."), "API 키 설정 오류", 500)
 
         last_error = None
-        job_id = None
         job_dir = None
 
         try:
@@ -43,18 +45,38 @@ class handler(BaseHTTPRequestHandler):
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data)
 
-            job_id = data.get('jobId')
-            if not job_id or not isinstance(job_id, str) or '/' in job_id or '..' in job_id:
-                return self.handle_error(ValueError("유효하지 않은 jobId 입니다."), status_code=400)
+            blob_urls = data.get('blobUrls')
+            if not isinstance(blob_urls, list):
+                return self.handle_error(ValueError("blobUrls가 제공되지 않았거나 형식이 잘못되었습니다."), status_code=400)
 
+            # Create a unique temporary directory for this job
+            job_id = str(uuid.uuid4())
             job_dir = os.path.join(tempfile.gettempdir(), job_id)
-            if not os.path.isdir(job_dir):
-                return self.handle_error(FileNotFoundError(f"작업 디렉토리를 찾을 수 없습니다: {job_dir}"), status_code=404)
+            os.makedirs(job_dir, exist_ok=True)
+
+            # Download files from blob URLs
+            if blob_urls:
+                print(f"INFO: {len(blob_urls)}개의 파일을 Blob에서 다운로드합니다...")
+                for url in blob_urls:
+                    try:
+                        response = requests.get(url, stream=True)
+                        response.raise_for_status()
+                        
+                        path = urlparse(url).path
+                        # Extract the original filename from the blob URL path
+                        # e.g. /assignments/my-file.pdf -> my-file.pdf
+                        filename = unquote(os.path.basename(path))
+                        
+                        file_path = os.path.join(job_dir, filename)
+                        with open(file_path, 'wb') as f:
+                            for chunk in response.iter_content(chunk_size=8192):
+                                f.write(chunk)
+                        print(f"INFO: 다운로드 완료: {filename}")
+                    except requests.exceptions.RequestException as e:
+                        return self.handle_error(e, f"Blob URL에서 파일 다운로드 실패: {url}", 500)
 
             note_context = data.get('noteContext', '')
             subject_id = data.get('subjectId')
-            # We no longer get file counts from URLs, so we need a new way to distinguish them.
-            # The frontend will now provide the counts of each file type.
             reference_file_count = data.get('referenceFileCount', 0)
             problem_file_count = data.get('problemFileCount', 0)
             answer_file_count = data.get('answerFileCount', 0)
@@ -65,7 +87,7 @@ class handler(BaseHTTPRequestHandler):
             # 🎨 출력 서식 규칙 (★★★★★ 가장 중요)
             당신이 생성하는 모든 텍스트는 아래 규칙을 **반드시** 따라야 합니다.
             
-            1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 **반드시** KaTeX 문법으로 감싸야 합니다. (인라인: `$`, 블록: `$$`)
+            1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 **반드시** KaTeX 문법으로 감싸야 합니다. (인라인: `, 블록: `$`)
             2.  **다이어그램 (Mermaid):** 복잡한 시스템, 알고리즘, 상태 변화는 **반드시** Mermaid.js 문법으로 시각화해야 합니다. (```mermaid...```)
             3.  **코드 (Code Block):** 모든 소스 코드는 **반드시** 언어를 명시한 코드 블록으로 작성해야 합니다. (```python...```)
             4.  **핵심 용어 (Tooltip):** 중요한 전공 용어는 **반드시** `<dfn title="설명">용어</dfn>` HTML 태그로 감싸 설명을 제공해야 합니다.
@@ -85,7 +107,7 @@ class handler(BaseHTTPRequestHandler):
 
             # JSON 출력 형식 (반드시 준수)
             - 단일 JSON 객체로만 응답합니다.
-            {{ 
+            {{
                 "title": "AI 채점 결과: [문제의 핵심 내용]",
                 "content": "# AI 채점 결과\n\n## 총점\n- .../100\n\n## 총평\n- ...\n\n## 상세 피드백\n- ...\n\n## 모범 풀이\n- ...\n\n## 추가 학습 제안\n- ...",
                 "subjectId": "{subject_id}"
@@ -105,7 +127,7 @@ class handler(BaseHTTPRequestHandler):
 
             # JSON 출력 형식 (반드시 준수)
             - 단일 JSON 객체로만 응답합니다.
-            {{ 
+            {{
                 "title": "AI 문제 풀이: [문제의 핵심 내용]",
                 "content": "# AI 문제 풀이\n\n## 문제 분석\n- ...\n\n## 핵심 개념 정리\n- ...\n\n## 모범 풀이\n- ...\n\n## 결론\n- ...",
                 "subjectId": "{subject_id}"
@@ -121,13 +143,12 @@ class handler(BaseHTTPRequestHandler):
 
             files = sorted(os.listdir(job_dir))
             
-            # This logic assumes files were uploaded in order: reference, then problem, then answer
             ref_files = files[:reference_file_count]
             prob_files = files[reference_file_count : reference_file_count + problem_file_count]
             ans_files = files[reference_file_count + problem_file_count:]
 
             def process_files(file_list, category_name):
-                contents = [f"\n--- {category_name} ---\n"]
+                contents = [f"\n--- {category_name} ---"]
                 for filename in file_list:
                     file_path = os.path.join(job_dir, filename)
                     try:

@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Note } from '../lib/types';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import * as pdfjsLib from 'pdfjs-dist';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { upload } from '@vercel/blob/client';
+import { v4 as uuidv4 } from 'uuid';
+
+import { convertPdfToImages } from "../lib/pdfUtils";
 
 function LoadingOverlay({ message }: { message: string }) {
     return (
@@ -114,10 +118,30 @@ export default function AssignmentHelperPage() {
         setSelectedExistingNotes(prev => prev.filter(n => n.id !== noteId));
     };
 
-    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<File[]>>) => {
-        if (e.target.files) {
-            setter(prev => [...prev, ...Array.from(e.target.files!)]);
+    const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<File[]>>) => {
+        if (!e.target.files) return;
+        const newFiles = Array.from(e.target.files);
+
+        for (const file of newFiles) {
+            if (file.type === 'application/pdf') {
+                setProgressMessage('PDF를 이미지로 변환 중...');
+                try {
+                    const images = await convertPdfToImages(file, (progress) => {
+                        setProgressMessage(`PDF 변환 중... (${progress.pageNumber}/${progress.totalPages})`);
+                    });
+                    setter(prev => [...prev, ...images]);
+                } catch (err) {
+                    setError('PDF 변환에 실패했습니다.');
+                    console.error(err);
+                } finally {
+                    setProgressMessage(null);
+                }
+            } else {
+                setter(prev => [...prev, file]);
+            }
         }
+        // Reset file input
+        if (e.target) e.target.value = '';
     };
     
     const removeFile = (index: number, setter: React.Dispatch<React.SetStateAction<File[]>>) => {
@@ -139,31 +163,27 @@ export default function AssignmentHelperPage() {
             }
         }
         setError(null);
-        setProgressMessage('파일 업로드 및 변환 중...');
+        setProgressMessage('파일 업로드 중...');
 
         try {
+            // Order is important for the backend to distinguish file types
             const allFiles = [...referenceFiles, ...problemFiles, ...answerFiles];
-            const uploadFormData = new FormData();
-            allFiles.forEach(file => uploadFormData.append('files', file));
-
-            const uploadResponse = await fetch('/api/upload_and_convert', { 
-                method: 'POST', 
-                body: uploadFormData 
-            });
-
-            if (!uploadResponse.ok) {
-                const errorData = await uploadResponse.json();
-                throw new Error(errorData.error || '파일 업로드 및 변환에 실패했습니다.');
-            }
-
-            const { jobId } = await uploadResponse.json();
+            
+            const blobResults = await Promise.all(
+                allFiles.map(file => 
+                  upload(file.name, file, {
+                    access: 'public',
+                    handleUploadUrl: '/api/upload/route',
+                  })
+                )
+            );
 
             setProgressMessage('AI가 과제를 분석하고 있습니다...');
 
-            const noteContext = selectedExistingNotes.map(n => `[기존 노트: ${n.title}]\n${n.content}`).join('\n\n');
-            
+                        const noteContext = selectedExistingNotes.map(n => `[기존 노트: ${n.title}]
+            ${n.content}`).join('\n\n---\n\n');            
             const assignmentBody = {
-                jobId,
+                blobUrls: blobResults.map(b => b.url),
                 noteContext,
                 subjectId: selectedSubject.id,
                 referenceFileCount: referenceFiles.length,
@@ -218,7 +238,8 @@ export default function AssignmentHelperPage() {
             e.stopPropagation();
             setIsDragging(false);
             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                onFileChange(e as any, setFiles);
+                const mockEvent = { target: { files: e.dataTransfer.files } } as unknown as React.ChangeEvent<HTMLInputElement>;
+                onFileChange(mockEvent, setFiles);
                 e.dataTransfer.clearData();
             }
         };

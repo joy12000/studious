@@ -10,6 +10,7 @@ import { Note } from '../lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import LoadingOverlay from '../components/LoadingOverlay';
 import { useLoading } from "../lib/useLoading";
+import { convertPdfToImages } from "../lib/pdfUtils";
 
 export default function ReviewPage() {
   const { addNoteFromReview, allSubjects, notes } = useNotes();
@@ -88,10 +89,29 @@ ${note.content}`;
     });
   };
 
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      setFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+  const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const newFiles = Array.from(e.target.files);
+
+    for (const file of newFiles) {
+      if (file.type === 'application/pdf') {
+        startLoading('PDF를 이미지로 변환 중...');
+        try {
+          const images = await convertPdfToImages(file, (progress) => {
+            setMessage(`PDF 변환 중... (${progress.pageNumber}/${progress.totalPages})`);
+          });
+          setFiles(prev => [...prev, ...images]);
+        } catch (error) {
+          console.error("PDF 변환 실패:", error);
+          setError('PDF 파일을 이미지로 변환하는 데 실패했습니다.');
+        } finally {
+          stopLoading();
+        }
+      } else {
+        setFiles(prev => [...prev, file]);
+      }
     }
+    if (e.target) e.target.value = '';
   };
   
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
@@ -99,7 +119,8 @@ ${note.content}`;
       e.stopPropagation();
       setIsDragging(false);
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-          setFiles(prev => [...prev, ...Array.from(e.dataTransfer.files)]);
+          const mockEvent = { target: { files: e.dataTransfer.files } } as unknown as React.ChangeEvent<HTMLInputElement>;
+          onFileChange(mockEvent);
           e.dataTransfer.clearData();
       }
   };

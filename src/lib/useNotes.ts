@@ -4,6 +4,7 @@ import { db } from './db';
 import { Note, Subject, ScheduleEvent, Quiz, Attachment, NoteType, ReviewItem } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, addDays, startOfYear, endOfYear, startOfToday, endOfToday } from 'date-fns';
+import { upload } from '@vercel/blob/client';
 
 export type Filters = {
   search?: string;
@@ -85,29 +86,23 @@ export function useNotes(defaultFilters?: Filters) {
     const addNoteFromReview = async (args: AddNoteFromReviewPayload) => {
       const { aiConversationText, files, subjects, onProgress, onComplete, onError, noteDate } = args;
       try {
-        onProgress?.("파일 업로드 및 변환 중...");
-        let jobId = null;
-
+        let blobUrls: string[] = [];
         if (files.length > 0) {
-            const uploadFormData = new FormData();
-            files.forEach(file => uploadFormData.append('files', file));
-    
-            const uploadResponse = await fetch('/api/upload_and_convert', { 
-              method: 'POST', 
-              body: uploadFormData 
-            });
-    
-            if (!uploadResponse.ok) {
-              const errorData = await uploadResponse.json();
-              throw new Error(errorData.error || '파일 업로드 및 변환에 실패했습니다.');
-            }
-            const uploadResult = await uploadResponse.json();
-            jobId = uploadResult.jobId;
+            onProgress?.(`파일 ${files.length}개 업로드 중...`);
+            const blobResults = await Promise.all(
+              files.map(file => 
+                upload(file.name, file, {
+                  access: 'public',
+                  handleUploadUrl: '/api/upload/route',
+                })
+              )
+            );
+            blobUrls = blobResults.map(b => b.url);
         }
 
         onProgress?.("AI 복습 노트를 생성하고 있습니다...");
         const reviewNoteBody = {
-          jobId,
+          blobUrls,
           aiConversationText,
           subjects,
           noteDate
@@ -125,7 +120,7 @@ export function useNotes(defaultFilters?: Filters) {
         }
 
         const result = await response.json();
-        const { title, summary, key_insights, quiz, subjectId } = result;
+        const { title, content, key_insights, quiz, subjectId } = result;
 
         if (!subjectId || !(subjects.some(s => s.id === subjectId))) {
             throw new Error(`API가 유효하지 않은 subjectId ('${subjectId}')를 반환했습니다. 사용 가능한 ID: ${subjects.map(s => s.id).join(', ')}`);
@@ -133,7 +128,7 @@ export function useNotes(defaultFilters?: Filters) {
 
         const newNote: Note = {
           id: uuidv4(),
-          title, content: summary, key_insights, subjectId,
+          title, content: content, key_insights, subjectId,
           noteType: 'review', sourceType: 'other',
           createdAt: new Date().toISOString(), updatedAt: new Date().getTime(),
           noteDate, favorite: false, attachments: [],
@@ -205,6 +200,33 @@ export function useNotes(defaultFilters?: Filters) {
       };
       await db.notes.add(newNote);
       return newNote;
+    };
+
+    const saveReviewNote = async (result: any, noteDate: string | undefined, subjects: Subject[]) => {
+        const { title, content, key_insights, quiz, subjectId } = result;
+
+        if (!subjectId || !(subjects.some(s => s.id === subjectId))) {
+            throw new Error(`API가 유효하지 않은 subjectId ('${subjectId}')를 반환했습니다. 사용 가능한 ID: ${subjects.map(s => s.id).join(', ')}`);
+        }
+
+        const newNote: Note = {
+          id: uuidv4(),
+          title, content: content, key_insights, subjectId,
+          noteType: 'review', sourceType: 'other',
+          createdAt: new Date().toISOString(), updatedAt: new Date().getTime(),
+          noteDate, favorite: false, attachments: [],
+        };
+
+        const newQuiz: Quiz = {
+          id: uuidv4(),
+          noteId: newNote.id,
+          questions: (result.quiz && Array.isArray(result.quiz.questions)) ? result.quiz.questions : [],
+        };
+
+        await db.notes.add(newNote);
+        await db.quizzes.add(newQuiz);
+        
+        return {newNote, newQuiz};
     };
     
     const updateNote = async (id: string, patch: Partial<Note>) => {
@@ -330,5 +352,6 @@ export function useNotes(defaultFilters?: Filters) {
         updateReviewItem,
         deleteReviewItem,
         activityData,
+        saveReviewNote,
     };
 }

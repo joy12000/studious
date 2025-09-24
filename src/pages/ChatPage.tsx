@@ -10,9 +10,11 @@ import { format } from 'date-fns';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../lib/db';
 import LoadingOverlay from '../components/LoadingOverlay';
+import { upload } from '@vercel/blob/client';
+import { convertPdfToImages } from '../lib/pdfUtils';
 
 export default function ChatPage() {
-  const { addNoteFromTextbook, allSubjects } = useNotes();
+  const { allSubjects, addNoteFromTextbook, saveReviewNote } = useNotes();
   const navigate = useNavigate();
   const location = useLocation();
   const settings = useLiveQuery(() => db.settings.get('default'));
@@ -26,74 +28,105 @@ export default function ChatPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
+  const [generationType, setGenerationType] = useState<'textbook' | 'review'>('textbook');
+
   useEffect(() => {
       if (location.state) {
           if (location.state.subject) setSelectedSubject(location.state.subject);
           if (location.state.date) setSelectedDate(new Date(location.state.date));
+          if (location.state.type) setGenerationType(location.state.type);
       }
   }, [location.state]);
 
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files) setUploadedFiles(prev => [...prev, ...Array.from(e.target.files!)]); };
+  const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+
+    const newFiles = Array.from(e.target.files);
+    
+    // PDF 변환 처리
+    for (const file of newFiles) {
+      if (file.type === 'application/pdf') {
+        setIsLoading(true);
+        try {
+          const images = await convertPdfToImages(file, (progress) => {
+            setLoadingMessage(`PDF 변환 중... (${progress.pageNumber}/${progress.totalPages})`);
+          });
+          setUploadedFiles(prev => [...prev, ...images]);
+        } catch (error) {
+          console.error("PDF 변환 실패:", error);
+          alert('PDF 파일을 이미지로 변환하는 데 실패했습니다.');
+        } finally {
+          setIsLoading(false);
+          setLoadingMessage('');
+        }
+      } else {
+        // PDF가 아닌 파일은 직접 추가
+        setUploadedFiles(prev => [...prev, file]);
+      }
+    }
+    // 파일 입력 초기화
+    if(fileInputRef.current) {
+        fileInputRef.current.value = '';
+    }
+  };
   const removeFile = (index: number) => { setUploadedFiles(prev => prev.filter((_, i) => i !== index)); };
 
-  const handleGenerateTextbook = async () => {
+  const handleGenerate = async () => {
     if (uploadedFiles.length === 0 || !selectedSubject) {
       alert('과목과 하나 이상의 파일을 업로드해주세요.');
       return;
     }
     setIsLoading(true);
-    setLoadingMessage('파일 업로드 및 변환 중...');
-
-    const uploadFormData = new FormData();
-    uploadedFiles.forEach(file => uploadFormData.append('files', file));
 
     try {
-      // Step 1: Upload and convert files
-      const uploadResponse = await fetch('/api/upload_and_convert', { 
-        method: 'POST', 
-        body: uploadFormData 
-      });
-
-      if (!uploadResponse.ok) {
-        const errorData = await uploadResponse.json();
-        throw new Error(errorData.error || '파일 업로드 및 변환에 실패했습니다.');
-      }
-
-      const { jobId } = await uploadResponse.json();
-
-      // Step 2: Generate textbook from converted files
-      setLoadingMessage('AI가 참고서 내용을 생성하는 중...');
-
-      const weekInfo = selectedDate 
-        ? `${getWeekNumber(selectedDate, settings?.semesterStartDate)}주차 (${format(selectedDate, 'M월 d일')})` 
-        : '[N주차]';
+      setLoadingMessage(`파일 ${uploadedFiles.length}개 업로드 중...`);
       
-      const createTextbookBody = {
-        jobId,
-        subject: selectedSubject.name,
-        week: weekInfo,
-        materialTypes: uploadedFiles.map(f => f.type).join(', ') || '[파일]',
+      const blobResults = await Promise.all(
+        uploadedFiles.map(file => 
+          upload(file.name, file, {
+            access: 'public',
+            handleUploadUrl: '/api/upload/route',
+          })
+        )
+      );
+      
+      setLoadingMessage('AI가 노트를 생성하고 있습니다...');
+
+      const targetApi = generationType === 'review' ? '/api/create_review_note' : '/api/create_textbook';
+      
+      const api_payload = {
+          blobUrls: blobResults.map(b => b.url),
+          subject: selectedSubject.name,
+          subjectId: selectedSubject.id,
+          week: selectedDate 
+            ? `${getWeekNumber(selectedDate, settings?.semesterStartDate)}주차 (${format(selectedDate, 'M월 d일')})` 
+            : '[N주차]',
+          materialTypes: uploadedFiles.map(f => f.type).join(', ') || '[파일]',
+          noteDate: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
       };
 
-      const textbookResponse = await fetch('/api/create_textbook', { 
+      const response = await fetch(targetApi, { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(createTextbookBody)
+        body: JSON.stringify(api_payload),
       });
 
-      if (!textbookResponse.ok) {
-        const errorData = await textbookResponse.json();
-        throw new Error(errorData.details || '참고서 생성에 실패했습니다.');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || errorData.details || '노트 생성에 실패했습니다.');
       }
 
-      const data = await textbookResponse.json();
-      setLoadingMessage('생성된 참고서를 노트에 저장하는 중...');
-      const noteTitle = `${selectedSubject.name} - ${weekInfo} 참고서`;
-      const noteDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
-      const newNote = await addNoteFromTextbook(noteTitle, data.textbook, selectedSubject.id, uploadedFiles, noteDateStr);
-      
-      alert("AI 참고서가 성공적으로 노트에 저장되었습니다!");
-      navigate(`/note/${newNote.id}`);
+      const result = await response.json();
+
+      if (generationType === 'textbook') {
+        const newNote = await addNoteFromTextbook(result.title, result.content, result.subjectId, uploadedFiles, api_payload.noteDate);
+        alert("AI 참고서가 성공적으로 노트에 저장되었습니다!");
+        navigate(`/note/${newNote.id}`);
+      } else {
+        const { newNote } = await saveReviewNote(result, api_payload.noteDate, allSubjects);
+        alert("AI 복습노트가 성공적으로 노트에 저장되었습니다!");
+        navigate(`/note/${newNote.id}`);
+      }
 
     } catch(error) {
         alert(`오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
@@ -112,6 +145,16 @@ export default function ChatPage() {
                 <CardDescription>PDF, PPT, 이미지 등 학습 자료를 업로드해주세요. AI가 맞춤 참고서를 만들어 드립니다.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+                <ToggleGroup type="single" value={generationType} onValueChange={(value: 'textbook' | 'review') => value && setGenerationType(value)} className="w-full grid grid-cols-2">
+                  <ToggleGroupItem value="textbook" aria-label="Toggle textbook">
+                    <BookMarked className="mr-2 h-4 w-4" />
+                    참고서 만들기
+                  </ToggleGroupItem>
+                  <ToggleGroupItem value="review" aria-label="Toggle review note">
+                    <FileText className="mr-2 h-4 w-4" />
+                    복습노트 만들기
+                  </ToggleGroupItem>
+                </ToggleGroup>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Popover open={isSubjectPopoverOpen} onOpenChange={setIsSubjectPopoverOpen}>
                         <PopoverTrigger asChild>
@@ -166,9 +209,9 @@ export default function ChatPage() {
                 )}
             </CardContent>
             <CardFooter>
-                 <Button onClick={handleGenerateTextbook} size="lg" className="w-full" disabled={isLoading || uploadedFiles.length === 0 || !selectedSubject}>
+                 <Button onClick={handleGenerate} size="lg" className="w-full" disabled={isLoading || uploadedFiles.length === 0 || !selectedSubject}>
                     {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <BrainCircuit className="mr-2 h-5 w-5" />}
-                    {isLoading ? loadingMessage : 'AI 참고서 생성'}
+                    {isLoading ? loadingMessage : `AI ${generationType === 'textbook' ? '참고서' : '복습노트'} 생성`}
                 </Button>
             </CardFooter>
         </Card>
