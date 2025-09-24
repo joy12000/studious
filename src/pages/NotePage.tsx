@@ -401,7 +401,7 @@ export default function NotePage() {
     <>
       <div className="flex h-screen w-full overflow-hidden">
         {/* ChatUI Panel */}
-        <div className={`h-full transition-all duration-300 ease-in-out flex-shrink-0 ${isChatOpen ? 'w-[400px]' : 'w-0'}`}>
+        <div className={`h-full transition-all duration-300 ease-in-out flex-shrink-0 ${isChatOpen ? 'w-[430px]' : 'w-0'}`}>
           {isChatOpen && <ChatUI 
               noteContext={note.content} 
               onClose={() => {
