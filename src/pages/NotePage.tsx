@@ -504,7 +504,7 @@ export default function NotePage() {
                           ))}
                         </div>
                       ) : (
-                        <div className="prose prose-lg max-w-none dark:prose-invert break-keep">
+                        <div className="prose prose-lg max-w-none dark:prose-invert">
                           <ErrorBoundary>
                             <MarkdownRenderer content={note.content} />
                           </ErrorBoundary>
@@ -517,7 +517,7 @@ export default function NotePage() {
                             {note.key_insights.map((insight, index) => (
                               <div key={index} className="flex items-start gap-3 p-4 bg-primary/5 border-l-4 border-primary/40 rounded-r-lg">
                                 <div className="text-primary font-bold mt-1">{index + 1}.</div>
-                                <div className="text-card-foreground m-0 break-keep">
+                                <div className="text-card-foreground m-0">
                                   <ErrorBoundary>
                                     <MarkdownRenderer content={insight} />
                                   </ErrorBoundary>
