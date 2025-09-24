@@ -31,7 +31,7 @@ class handler(BaseHTTPRequestHandler):
             data = json.loads(post_data)
 
             blob_urls = data.get('blobUrls', [])
-            if not blob_urls or not isinstance(blob_urls, list):
+            if 'blobUrls' not in data or not isinstance(data['blobUrls'], list):
                 return self.handle_error(ValueError("유효하지 않은 blobUrls 입니다."), status_code=400)
 
             blob_urls_to_delete.extend(blob_urls) # Add to cleanup list

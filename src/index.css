@@ -90,11 +90,12 @@
     line-height: 2.0 !important;
   }
 
-  /* 💎 KaTeX 줄바꿈 문제 해결 코드 */
+  /* 💎 KaTeX 줄바꿈 문제 해결 최종 코드 */
   .katex {
-    @apply inline-block align-baseline;
-    white-space: normal; /* 수식 내에서 자연스러운 줄바꿈 허용 */
-    text-wrap: balance;  /* 텍스트 래핑 균형 맞추기 (최신 브라우저 지원) */
+    @apply inline; /* display: inline-block을 inline으로 변경 */
+  }
+  .katex-html {
+    @apply inline; /* 내부 요소도 inline으로 처리 */
   }
 
   /* 💎 핵심 용어 툴팁 스타일 */
