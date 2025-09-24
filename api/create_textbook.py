@@ -2,11 +2,10 @@ from http.server import BaseHTTPRequestHandler
 import json
 import os
 import google.generativeai as genai
-import cgi
+import tempfile
+import shutil
 from PIL import Image
-import io
 import traceback
-from pdf2image import convert_from_bytes
 
 class handler(BaseHTTPRequestHandler):
 
@@ -24,18 +23,25 @@ class handler(BaseHTTPRequestHandler):
             return self.handle_error(ValueError("설정된 Gemini API 키가 없습니다."), "API 키 설정 오류", 500)
 
         last_error = None
+        job_id = None
+        job_dir = None
 
         try:
-            form = cgi.FieldStorage(
-                fp=self.rfile,
-                headers=self.headers,
-                environ={'REQUEST_METHOD': 'POST', 'CONTENT_TYPE': self.headers['Content-Type']}
-            )
-            learning_materials = form.getlist('files')
-            
-            subject_name = form.getvalue('subject', '[과목명]')
-            week_info = form.getvalue('week', '[N주차/18주차]')
-            material_types = form.getvalue('materialTypes', '[PPT/PDF/텍스트 등]')
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            data = json.loads(post_data)
+
+            job_id = data.get('jobId')
+            if not job_id or not isinstance(job_id, str) or '/' in job_id or '..' in job_id:
+                return self.handle_error(ValueError("유효하지 않은 jobId 입니다."), status_code=400)
+
+            job_dir = os.path.join(tempfile.gettempdir(), job_id)
+            if not os.path.isdir(job_dir):
+                return self.handle_error(FileNotFoundError(f"작업 디렉토리를 찾을 수 없습니다: {job_dir}"), status_code=404)
+
+            subject_name = data.get('subject', '[과목명]')
+            week_info = data.get('week', '[N주차/18주차]')
+            material_types = data.get('materialTypes', '[PPT/PDF/텍스트 등]')
 
             prompt = f"""
             당신은 인지과학과 교육심리학 전문가입니다. 첨부된 강의 자료를 분석하여, 학생이 스스로 깊이 있게 학습할 수 있는 최고의 참고서를 제작해야 합니다.
@@ -44,8 +50,8 @@ class handler(BaseHTTPRequestHandler):
             당신이 생성하는 모든 텍스트는 아래 규칙을 **반드시** 따라야 합니다.
 
             1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 **반드시** KaTeX 문법으로 감싸야 합니다.
-                -   인라인 수식: `$`로 감쌉니다. 예: `$\ q''_x = -k \frac{{dT}}{{dx}} $`
-                -   블록 수식: `$$`로 감쌉니다. 예: `$$ T(x) = T_s + \frac{{q'''}}{{2k}}(Lx - x^2) $$`
+                -   인라인 수식: `로 감쌉니다. 예: `$\ q''_x = -k \frac{{dT}}{{dx}} 
+                -   블록 수식: `$`로 감쌉니다. 예: `$ T(x) = T_s + \frac{{q'''}}{{2k}}(Lx - x^2) $`
             
             2.  **다이어그램 (Mermaid):** 복잡한 시스템, 알고리즘, 상태 변화는 **반드시** Mermaid.js 문법으로 시각화해야 합니다.
                 -   예시: ```mermaid\ngraph TD; A[열원] --> B(표면);\n```
@@ -75,38 +81,16 @@ class handler(BaseHTTPRequestHandler):
             request_contents = [prompt]
             text_materials = []
 
-            for material_file in learning_materials:
-                file_content = getattr(material_file, 'value', material_file)
-                file_type = getattr(material_file, 'type', 'application/octet-stream')
-                filename = getattr(material_file, 'filename', 'unknown')
-                print(f"INFO: 처리 중인 파일: {filename}, 타입: {file_type}")
-
-                if not isinstance(file_content, bytes):
-                    continue
-
-                if file_type == 'application/pdf':
-                    try:
-                        images = convert_from_bytes(file_content)
-                        if images:
-                            request_contents.extend(images)
-                    except Exception as e:
-                        print(f"WARN: PDF 처리 실패 ('{filename}'): {e}")
-                        if "Poppler" in str(e):
-                            raise ValueError("PDF 처리를 위해 Poppler를 설치해야 합니다.")
-                        else:
-                            raise e
-                elif 'image' in file_type:
-                    try:
-                        img = Image.open(io.BytesIO(file_content))
-                        request_contents.append(img)
-                    except Exception as img_err:
-                        print(f"WARN: 이미지 파일 처리 실패 ('{filename}'): {img_err}")
-                else:
-                    try:
-                        text_content = file_content.decode('utf-8', errors='ignore')
-                        text_materials.append(text_content)
-                    except Exception as txt_err:
-                        print(f"WARN: 텍스트 파일 처리 실패 ('{filename}'): {txt_err}")
+            for filename in sorted(os.listdir(job_dir)):
+                file_path = os.path.join(job_dir, filename)
+                try:
+                    if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
+                        request_contents.append(Image.open(file_path))
+                    else:
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            text_materials.append(f.read())
+                except Exception as file_err:
+                    print(f"WARN: 파일 처리 실패 ('{filename}'): {file_err}")
 
             if text_materials:
                 request_contents.append("\n--- 학습 자료 (텍스트) ---\n" + "\n\n".join(text_materials))
@@ -136,6 +120,13 @@ class handler(BaseHTTPRequestHandler):
 
         except Exception as e:
             self.handle_error(e, "참고서 생성 중 오류 발생")
+        finally:
+            if job_dir and os.path.exists(job_dir):
+                try:
+                    shutil.rmtree(job_dir)
+                    print(f"INFO: 임시 디렉토리 삭제 완료: {job_dir}")
+                except Exception as cleanup_error:
+                    print(f"ERROR: 임시 디렉토리 삭제 실패 ('{job_dir}'): {cleanup_error}")
 
     def handle_error(self, e, message="오류 발생", status_code=500):
         print(f"ERROR: {message} - {e}")
