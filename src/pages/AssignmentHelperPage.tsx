@@ -5,7 +5,7 @@ import { Loader2, UploadCloud, FileText, X, Plus, BrainCircuit, ChevronsUpDown, 
 import { Button } from "@/components/ui/button";
 import { Note } from '../lib/types';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { pdfToImage } from "pdf-to-image-ts";
+import * as pdfjsLib from 'pdfjs-dist';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
 function LoadingOverlay({ message }: { message: string }) {
@@ -31,11 +31,27 @@ const FilePreview = ({ file, onRemove }: { file: File; onRemove: () => void; }) 
                 setPreviewUrl(objectUrl);
             } else if (file.type === 'application/pdf') {
                 try {
-                    const images = await pdfToImage(file, { scale: 0.5 });
-                    setPreviewUrl(images[0]);
+                    const fileReader = new FileReader();
+                    fileReader.onload = async (event) => {
+                        if (!event.target?.result) return;
+                        const typedArray = new Uint8Array(event.target.result as ArrayBuffer);
+                        const loadingTask = pdfjsLib.getDocument(typedArray);
+                        const pdf = await loadingTask.promise;
+                        const page = await pdf.getPage(1);
+                        const viewport = page.getViewport({ scale: 0.5 });
+                        const canvas = document.createElement('canvas');
+                        const context = canvas.getContext('2d');
+                        canvas.height = viewport.height;
+                        canvas.width = viewport.width;
+                        if (context) {
+                            await page.render({ canvasContext: context, viewport: viewport }).promise;
+                            setPreviewUrl(canvas.toDataURL());
+                        }
+                    };
+                    fileReader.readAsArrayBuffer(file);
                 } catch (error) {
-                    console.error("PDF thumbnail generation failed:", error);
-                    setPreviewUrl(null);
+                    console.error("PDF 썸네일 생성 실패:", error);
+                    setPreviewUrl(null); // 실패 시 아이콘 표시
                 }
             }
         };
