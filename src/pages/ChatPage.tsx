@@ -146,16 +146,6 @@ export default function ChatPage() {
                 <CardDescription>PDF, PPT, 이미지 등 학습 자료를 업로드해주세요. AI가 맞춤 참고서를 만들어 드립니다.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-                <ToggleGroup type="single" value={generationType} onValueChange={(value: 'textbook' | 'review') => value && setGenerationType(value)} className="w-full grid grid-cols-2">
-                  <ToggleGroupItem value="textbook" aria-label="Toggle textbook">
-                    <BookMarked className="mr-2 h-4 w-4" />
-                    참고서 만들기
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="review" aria-label="Toggle review note">
-                    <FileText className="mr-2 h-4 w-4" />
-                    복습노트 만들기
-                  </ToggleGroupItem>
-                </ToggleGroup>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <Popover open={isSubjectPopoverOpen} onOpenChange={setIsSubjectPopoverOpen}>
                         <PopoverTrigger asChild>
