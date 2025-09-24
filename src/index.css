@@ -86,6 +86,9 @@
     @apply h-full;
   }
 
+  .note-content-line-height p {
+    line-height: 2.0 !important;
+  }
 
   /* 💎 핵심 용어 툴팁 스타일 */
   dfn {
