@@ -28,8 +28,7 @@ class handler(BaseHTTPRequestHandler):
             os.environ.get('GEMINI_API_KEY_PRIMARY'),
             os.environ.get('GEMINI_API_KEY_SECONDARY'),
             os.environ.get('GEMINI_API_KEY_TERTIARY'),
-            os.environ.get('GEMINI_API_KEY_QUATERNARY'),
-            os.environ.get('GEMINI_API_KEY')
+            os.environ.get('GEMINI_API_KEY_QUATERNARY')
         ]
         valid_keys = [key for key in api_keys if key]
 
@@ -119,7 +118,7 @@ class handler(BaseHTTPRequestHandler):
                 try:
                     print(f"INFO: API 키 #{i + 1} (으)로 참고서 생성 시도...")
                     genai.configure(api_key=api_key)
-                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    model = genai.GenerativeModel('gemini-2.5-pro')
                     
                     response = model.generate_content(request_contents)
                     
