@@ -35,11 +35,27 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
 
   useEffect(() => {
     if (containerRef.current) {
-        // Mermaid 다이어그램 렌더링
-        const mermaidElements = containerRef.current.querySelectorAll('code.language-mermaid');
-        if (mermaidElements.length > 0) {
-            mermaid.run({ nodes: mermaidElements as NodeListOf<HTMLElement> });
+      // Mermaid 다이어그램 렌더링
+      const mermaidElements = containerRef.current.querySelectorAll('code.language-mermaid');
+      mermaidElements.forEach((element, index) => {
+        const mermaidCode = element.textContent || '';
+        const id = `mermaid-diagram-${Date.now()}-${index}`;
+        try {
+          mermaid.render(id, mermaidCode, (svgCode) => {
+            element.parentElement!.innerHTML = svgCode;
+          });
+        } catch (error) {
+          console.error('Mermaid 렌더링 오류:', error);
+          const errorMessage = document.createElement('div');
+          errorMessage.innerHTML = `
+            <div class="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
+              <p class="font-bold">다이어그램 렌더링 오류</p>
+              <pre class="mt-2 text-xs whitespace-pre-wrap">${(error as Error).message}</pre>
+            </div>
+          `;
+          element.parentElement!.replaceWith(errorMessage);
         }
+      });
     }
   }, [content]);
 

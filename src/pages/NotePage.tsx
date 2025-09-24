@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge';
 import { ChatUI, Message } from '../components/ChatUI';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import ErrorBoundary from '../components/ErrorBoundary'; // ErrorBoundary 임포트
 
 type TextbookSection = {
   title: string;
@@ -494,12 +495,20 @@ export default function NotePage() {
                                   <span className="text-muted-foreground transition-transform group-open:rotate-90 ml-2">▶</span>
                                 </div>
                               </summary>
-                              <div className="mt-4 prose prose-lg max-w-none dark:prose-invert break-keep"><MarkdownRenderer content={section.content} /></div>
+                              <div className="mt-4 prose prose-lg max-w-none dark:prose-invert break-keep">
+                                <ErrorBoundary>
+                                  <MarkdownRenderer content={section.content} />
+                                </ErrorBoundary>
+                              </div>
                             </details>
                           ))}
                         </div>
                       ) : (
-                        <div className="prose prose-lg max-w-none dark:prose-invert break-keep"><MarkdownRenderer content={note.content} /></div>
+                        <div className="prose prose-lg max-w-none dark:prose-invert break-keep">
+                          <ErrorBoundary>
+                            <MarkdownRenderer content={note.content} />
+                          </ErrorBoundary>
+                        </div>
                       )}
                       {note.key_insights && note.key_insights.length > 0 && (
                         <div className="mt-8">
@@ -508,7 +517,11 @@ export default function NotePage() {
                             {note.key_insights.map((insight, index) => (
                               <div key={index} className="flex items-start gap-3 p-4 bg-primary/5 border-l-4 border-primary/40 rounded-r-lg">
                                 <div className="text-primary font-bold mt-1">{index + 1}.</div>
-                                <div className="text-card-foreground m-0 break-keep"><MarkdownRenderer content={insight} /></div>
+                                <div className="text-card-foreground m-0 break-keep">
+                                  <ErrorBoundary>
+                                    <MarkdownRenderer content={insight} />
+                                  </ErrorBoundary>
+                                </div>
                               </div>
                             ))}
                           </div>
