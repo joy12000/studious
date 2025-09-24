@@ -141,7 +141,7 @@ const externalAiLinks = [
 
 export default function NotePage() {
   const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate(); // 👈 [버그 수정] 누락되었던 useNavigate 훅 호출
+  const navigate = useNavigate();
   const { getNote, updateNote, deleteNote, getQuiz, addQuizToReviewDeck } = useNotes();
   
   const [note, setNote] = useState<Note | null>(null);
@@ -241,14 +241,11 @@ export default function NotePage() {
 
   const handleExportToExternalAI = async (url: string) => {
     if (!note) return;
-
     const noteContent = `--- 학습 노트 본문 ---\n${note.content}`;
     const chatHistory = (chatMessagesRef.current || [])
       .map(msg => `${msg.sender === 'user' ? '사용자' : 'AI'}: ${msg.text}`)
       .join('\n');
-    
     const fullContext = `${noteContent}\n\n--- 이전 대화 기록 ---\n${chatHistory}`;
-
     try {
       await navigator.clipboard.writeText(fullContext);
       alert('노트와 대화 내용이 클립보드에 복사되었습니다. 외부 AI에 붙여넣어 질문을 이어가세요.');
@@ -317,26 +314,19 @@ export default function NotePage() {
   const openSource = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (!note?.sourceUrl) return;
-
     const url: string = note.sourceUrl;
     const fallback = () => window.open(url, '_blank', 'noopener,noreferrer');
-
     const ua = navigator.userAgent.toLowerCase();
     const isIOS = /iphone|ipad|ipod/.test(ua);
     const isAndroid = /android/.test(ua);
-
     if (!isIOS && !isAndroid) {
       fallback();
       return;
     }
-
     const vidMatch = url.match(/(?:v=|youtu\.be\/)([A-Za-z0-9_-]{11})/i);
     const vid = vidMatch ? vidMatch[1] : null;
-    
     const deepLink = isAndroid && vid ? `vnd.youtube://watch?v=${vid}` : url;
-
     const timer = setTimeout(fallback, 500);
-
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         clearTimeout(timer);
@@ -344,25 +334,21 @@ export default function NotePage() {
       }
     };
     window.addEventListener('visibilitychange', handleVisibilityChange);
-
     window.location.href = deepLink;
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">노트를 불러오는 중...</p>
-        </div>
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   if (!note) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
+      <div className="flex items-center justify-center h-full text-center">
+        <div>
           <p className="text-lg font-semibold mb-2">노트를 찾을 수 없습니다.</p>
           <Link to="/" className="text-primary hover:text-primary/80">홈으로 돌아가기</Link>
         </div>
@@ -372,7 +358,7 @@ export default function NotePage() {
 
   return (
     <>
-      <div className="flex h-screen w-full overflow-hidden">
+      <div className="flex h-full w-full overflow-hidden">
         <div className={`transition-all duration-300 ease-in-out ${isChatOpen ? 'w-full md:w-2/5' : 'w-0'}`}>
           {isChatOpen && <ChatUI 
               noteContext={note.content} 
@@ -387,25 +373,13 @@ export default function NotePage() {
         
         <div className={`flex h-full flex-col bg-background transition-all duration-300 ease-in-out ${isChatOpen ? 'w-full md:w-3/5' : 'w-full'}`}>
             <header className="sticky top-0 z-10 flex items-center justify-between border-b bg-background/80 p-2 backdrop-blur-lg md:p-4">
-              <Button variant="ghost" size="sm" onClick={() => navigate(-1)} aria-label="뒤로 가기">
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
+              <Button variant="ghost" size="sm" onClick={() => navigate(-1)} aria-label="뒤로 가기"><ArrowLeft className="h-5 w-5" /></Button>
               <div className="flex items-center gap-1">
-                <Button variant="ghost" size="sm" onClick={handleToggleFavorite} title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}>
-                  <Star className={`h-5 w-5 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setEditing(v => !v)} title="편집">
-                  <Edit className="h-5 w-5" />
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setIsShareModalOpen(true)} title="공유/내보내기">
-                  <Share2 className="h-5 w-5" />
-                </Button>
+                <Button variant="ghost" size="sm" onClick={handleToggleFavorite} title={note.favorite ? '즐겨찾기 해제' : '즐겨찾기'}><Star className={`h-5 w-5 ${note.favorite ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} /></Button>
+                <Button variant="ghost" size="sm" onClick={() => setEditing(v => !v)} title="편집"><Edit className="h-5 w-5" /></Button>
+                <Button variant="ghost" size="sm" onClick={() => setIsShareModalOpen(true)} title="공유/내보내기"><Share2 className="h-5 w-5" /></Button>
                 <Popover>
-                  <PopoverTrigger asChild>
-                    <Button variant="ghost" size="sm" title="외부 AI로 내보내기">
-                      <ClipboardCopy className="h-5 w-5" />
-                    </Button>
-                  </PopoverTrigger>
+                  <PopoverTrigger asChild><Button variant="ghost" size="sm" title="외부 AI로 내보내기"><ClipboardCopy className="h-5 w-5" /></Button></PopoverTrigger>
                   <PopoverContent className="w-56" align="end">
                     <div className="space-y-1">
                       <h4 className="font-medium text-sm px-2">다른 AI로 질문하기</h4>
@@ -426,44 +400,21 @@ export default function NotePage() {
                     </div>
                   </PopoverContent>
                 </Popover>
-                <Button variant="ghost" size="sm" onClick={handleDelete} className="text-destructive hover:text-destructive" title="삭제">
-                  <Trash2 className="h-5 w-5" />
-                </Button>
+                <Button variant="ghost" size="sm" onClick={handleDelete} className="text-destructive hover:text-destructive" title="삭제"><Trash2 className="h-5 w-5" /></Button>
               </div>
             </header>
 
             <main className="flex-1 overflow-y-auto p-4 md:p-8">
               <article className={`mx-auto transition-all duration-300 ease-in-out ${isChatOpen ? 'max-w-full' : 'max-w-3xl'}`}>
                 <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    <span>{formatDate(note.createdAt)}</span>
-                  </div>
-                  {note.sourceType === 'youtube' && note.sourceUrl && (
-                    <button onClick={openSource} className="flex items-center gap-1.5 text-red-600 hover:text-red-700 transition-colors font-medium">
-                      <Youtube className="h-4 w-4" />
-                      YouTube에서 열기
-                    </button>
-                  )}
-                  {note.sourceType !== 'youtube' && note.sourceUrl && (
-                    <a href={note.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-primary transition-colors font-medium">
-                      <ExternalLink className="h-4 w-4" />
-                      원문 보기
-                    </a>
-                  )}
+                  <div className="flex items-center gap-2"><Calendar className="h-4 w-4" /><span>{formatDate(note.createdAt)}</span></div>
+                  {note.sourceType === 'youtube' && note.sourceUrl && (<button onClick={openSource} className="flex items-center gap-1.5 text-red-600 hover:text-red-700 font-medium"><Youtube className="h-4 w-4" />YouTube에서 열기</button>)}
+                  {note.sourceType !== 'youtube' && note.sourceUrl && (<a href={note.sourceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 hover:text-primary font-medium"><ExternalLink className="h-4 w-4" />원문 보기</a>)}
                 </div>
                 <div className="mb-6">
-                  {editing ? (
-                    <input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full text-3xl font-bold text-foreground bg-transparent border rounded-lg px-3 py-2 focus:ring-2 focus:ring-ring focus:border-transparent transition-colors" />
-                  ) : (
-                    <h1 className="mb-2 text-3xl font-bold leading-normal tracking-tight text-foreground md:text-4xl break-words">{note.title}</h1>
-                  )}
+                  {editing ? (<input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="w-full text-3xl font-bold bg-transparent border rounded-lg px-3 py-2" />) : (<h1 className="mb-2 text-3xl font-bold md:text-4xl break-words">{note.title}</h1>)}
                 </div>
-                {note.sourceType === 'youtube' && (
-                  <div className="flex flex-wrap gap-2 mb-8">
-                    {note.subjectId && <Badge variant="secondary">{note.subjectId}</Badge>}
-                  </div>
-                )}
+                {note.sourceType === 'youtube' && note.subjectId && (<div className="flex flex-wrap gap-2 mb-8"><Badge variant="secondary">{note.subjectId}</Badge></div>)}
                 <div className="mb-8">
                   {editing ? (
                     <div>
@@ -476,31 +427,27 @@ export default function NotePage() {
                     </div>
                   ) : (
                     <div>
-                        {textbookSections.length > 0 && <TableOfContents sections={textbookSections} />}
-                        {textbookSections.length > 0 ? (
-                            <div className="space-y-3">
-                                {textbookSections.map((section) => (
-                                    <details key={section.id} id={section.id} className="group rounded-lg border bg-card p-4">
-                                        <summary className="cursor-pointer font-semibold text-lg list-none flex items-center justify-between">
-                                            <span>{section.title}</span>
-                                            <div className="flex items-center">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.preventDefault(); handleAskAboutSection(section); }}>
-                                                    <MessageSquarePlus className="h-4 w-4" />
-                                                </Button>
-                                                <span className="text-muted-foreground transition-transform group-open:rotate-90 ml-2">▶</span>
-                                            </div>
-                                        </summary>
-                                        <div className="mt-4 prose prose-lg max-w-none dark:prose-invert prose-p:leading-relaxed">
-                                            <MarkdownRenderer content={section.content} />
-                                        </div>
-                                    </details>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="note-content-line-height prose prose-lg max-w-none dark:prose-invert prose-p:leading-relaxed prose-headings:font-semibold">
-                              <MarkdownRenderer content={note.content} />
-                            </div>
-                        )}
+                      {textbookSections.length > 0 && <TableOfContents sections={textbookSections} />}
+                      {textbookSections.length > 0 ? (
+                        <div className="space-y-3">
+                          {textbookSections.map((section) => (
+                            <details key={section.id} id={section.id} className="group rounded-lg border bg-card p-4">
+                              <summary className="cursor-pointer font-semibold text-lg list-none flex items-center justify-between">
+                                <span>{section.title}</span>
+                                <div className="flex items-center">
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100" onClick={(e) => { e.preventDefault(); handleAskAboutSection(section); }}>
+                                    <MessageSquarePlus className="h-4 w-4" />
+                                  </Button>
+                                  <span className="text-muted-foreground transition-transform group-open:rotate-90 ml-2">▶</span>
+                                </div>
+                              </summary>
+                              <div className="mt-4 prose prose-lg max-w-none dark:prose-invert"><MarkdownRenderer content={section.content} /></div>
+                            </details>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="prose prose-lg max-w-none dark:prose-invert"><MarkdownRenderer content={note.content} /></div>
+                      )}
                       {note.key_insights && note.key_insights.length > 0 && (
                         <div className="mt-8">
                           <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">💡 핵심 인사이트</h3>
@@ -518,10 +465,10 @@ export default function NotePage() {
                       {note.noteType === 'review' && quiz && <QuizComponent quiz={quiz} />}
                       <div className="mt-8 flex flex-col sm:flex-row gap-2">
                         {note.noteType === 'review' && quiz && (
-                            <Button onClick={() => addQuizToReviewDeck(note.id)} variant="secondary" className="w-full">
-                                <BrainCircuit className="mr-2 h-4 w-4" />
-                                이 퀴즈를 복습 덱에 추가
-                            </Button>
+                          <Button onClick={() => addQuizToReviewDeck(note.id)} variant="secondary" className="w-full">
+                            <BrainCircuit className="mr-2 h-4 w-4" />
+                            이 퀴즈를 복습 덱에 추가
+                          </Button>
                         )}
                         <Button onClick={handleTestUnderstanding} variant="outline" className="w-full">
                           나의 이해도 테스트하기
@@ -536,11 +483,7 @@ export default function NotePage() {
       </div>
       
       {!isChatOpen && (
-        <Button
-          onClick={() => setIsChatOpen(true)}
-          className="fixed bottom-6 right-6 z-20 h-14 w-14 rounded-full shadow-lg"
-          title="AI와 대화하기"
-        >
+        <Button onClick={() => setIsChatOpen(true)} className="fixed bottom-6 right-6 z-20 h-14 w-14 rounded-full shadow-lg" title="AI와 대화하기">
           <Bot className="h-7 w-7" />
         </Button>
       )}

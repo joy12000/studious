@@ -9,100 +9,197 @@ import { WeekPicker } from '../components/WeekPicker';
 import { format } from 'date-fns';
 import { Note } from '../lib/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { useLoading } from "../lib/useLoading"; // Import useLoading
 
-// ... (LoadingOverlay component remains the same) ...
+function LoadingOverlay({ message }: { message: string }) {
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <div className="flex flex-col items-center gap-4 rounded-lg bg-card p-8 text-card-foreground shadow-xl">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="text-lg font-medium">{message}</p>
+                <p className="text-sm text-muted-foreground">잠시만 기다려주세요...</p>
+            </div>
+        </div>
+    );
+}
 
 export default function ReviewPage() {
-    // ... (All hooks and state variables remain the same) ...
-  const handleSave = async () => { /* ... (handleSave logic remains the same) ... */ };
-  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => { /* ... */ };
-  const removeFile = (index: number) => { /* ... */ };
-  
-  const [isDragging, setIsDragging] = useState(false);
+    const { addNoteFromReview, allSubjects, notes } = useNotes();
+    const navigate = useNavigate();
+    const location = useLocation();
+    
+    const { isLoading, loadingMessage, startLoading, stopLoading, setMessage } = useLoading(); // ADDED THIS LINE
+    const [files, setFiles] = useState<File[]>([]);
+    const [error, setError] = useState<string | null>(null);
+    
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(true);
-  };
+    const [isNotePickerOpen, setIsNotePickerOpen] = useState(false);
+    const [selectedExistingNotes, setSelectedExistingNotes] = useState<Note[]>([]);
+    const [noteSearchQuery, setNoteSearchQuery] = useState('');
 
-  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-  };
-
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
-      e.preventDefault();
-      e.stopPropagation();
-      setIsDragging(false);
-      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-          onFileChange({ target: { files: e.dataTransfer.files } } as React.ChangeEvent<HTMLInputElement>);
-          e.dataTransfer.clearData();
+    useEffect(() => {
+      if (location.state?.date) {
+        const dateFromState = new Date(location.state.date);
+        if (!isNaN(dateFromState.getTime())) {
+          setSelectedDate(dateFromState);
+        }
       }
-  };
+    }, [location.state]);
 
-  const isLoading = progressMessage !== null;
+    const filteredNotes = (notes || []).filter(note => 
+      note.title.toLowerCase().includes(noteSearchQuery.toLowerCase()) ||
+      note.content.toLowerCase().includes(noteSearchQuery.toLowerCase())
+    );
 
-  return (
-    <>
-      {isLoading && <LoadingOverlay message={loadingMessage as string} />}
-      <div className="min-h-full w-full flex flex-col items-center justify-center p-4">
-        <Card className="w-full max-w-2xl">
-            <CardHeader className="text-center">
-                <CardTitle className="text-2xl">AI 복습 노트</CardTitle>
-                <CardDescription>학습 자료나 기존 노트를 선택하여 AI 요약 및 퀴즈를 만드세요.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <div className="flex flex-col sm:flex-row gap-2">
-                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" role="combobox" className="flex-1 justify-between">
-                                <CalendarDays className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                                <span className="truncate">{selectedDate ? format(selectedDate, "yyyy년 M월 d일") : "노트 날짜 선택 (선택)"}</span>
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><WeekPicker onDateSelect={(date) => { setSelectedDate(date); setIsCalendarOpen(false); }} /></PopoverContent>
-                    </Popover>
-                    <Popover open={isNotePickerOpen} onOpenChange={setIsNotePickerOpen}>
-                        <PopoverTrigger asChild><Button variant="outline" className="flex-1"><Plus className="mr-2 h-4 w-4" />기존 노트 추가</Button></PopoverTrigger>
-                        <PopoverContent className="w-80 p-0">{/* ... Popover content ... */}</PopoverContent>
-                    </Popover>
-                </div>
-                <div 
-                    className={`w-full min-h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer transition-colors p-6 ${isDragging ? 'border-primary bg-primary/10' : 'hover:bg-muted/50'}`}
-                    onClick={() => document.getElementById('file-upload-review')?.click()}
-                    onDragOver={handleDragOver}
-                    onDragLeave={handleDragLeave}
-                    onDrop={handleDrop}
-                >
-                    <UploadCloud className="h-12 w-12 mb-2" />
-                    <p className="font-semibold">파일을 드래그하거나 클릭해서 업로드</p>
-                    <input id="file-upload-review" type="file" multiple onChange={onFileChange} className="hidden" />
-                </div>
-                {files.length > 0 && (
-                    <div className="text-left">
-                        <h3 className="font-semibold text-sm mb-2">업로드된 파일:</h3>
-                        <ul className="space-y-2">{/* ... File list rendering ... */}</ul>
-                    </div>
-                )}
-                {selectedExistingNotes.length > 0 && (
-                    <div className="text-left mt-4">
-                        <h3 className="font-semibold text-sm mb-2">선택된 기존 노트:</h3>
-                        <ul className="space-y-2">{/* ... Note list rendering ... */}</ul>
-                    </div>
-                )}
-            </CardContent>
-            <CardFooter className="flex-col gap-4 pt-4">
-                {error && <p className="text-destructive text-sm text-center">{error}</p>}
-                <Button size="lg" className="w-full" onClick={handleSave} disabled={isLoading || (files.length === 0 && selectedExistingNotes.length === 0)}>
-                    {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <ArrowRight className="mr-2 h-5 w-5"/>}
-                    복습 노트 생성
-                </Button>
-            </CardFooter>
-        </Card>
-      </div>
-    </>
-  );
-}
+    const handleToggleNoteSelection = (note: Note) => {
+      setSelectedExistingNotes(prev => 
+        prev.some(n => n.id === note.id)
+          ? prev.filter(n => n.id !== note.id)
+          : [...prev, note]
+      );
+    };
+
+    const handleRemoveSelectedNote = (noteId: string) => {
+      setSelectedExistingNotes(prev => prev.filter(n => n.id !== noteId));
+    };
+
+    const handleSave = async () => {
+      if (files.length === 0 && selectedExistingNotes.length === 0) {
+        setError("하나 이상의 학습 자료 또는 기존 노트를 선택해주세요.");
+        return;
+      }
+      setError(null);
+      startLoading("복습 노트를 생성하는 중...");
+
+      const noteDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
+
+      let combinedContent = "";
+      const combinedFiles: File[] = [...files];
+
+      selectedExistingNotes.forEach(note => {
+        combinedContent += `\n\n--- 기존 노트: ${note.title} ---\n${note.content}`;
+        if (note.attachments) {
+          note.attachments.forEach(att => {
+            if (att.type === 'file' && att.data instanceof File) {
+              combinedFiles.push(att.data);
+            }
+          });
+        }
+      });
+
+      await addNoteFromReview({
+        files: combinedFiles,
+        subjects: allSubjects || [],
+        onProgress: setMessage,
+        onComplete: (newNote, newQuiz) => {
+          stopLoading();        navigate(`/note/${newNote.id}`);
+        },
+        onError: (err) => {
+          setError(err);
+          stopLoading();
+        },
+        noteDate: noteDateStr,
+        aiConversationText: combinedContent.trim(),
+      });
+    };
+
+    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files) {
+        setFiles(prev => [...prev, ...Array.from(e.target.files!)] as File[]);
+      }
+    };
+
+    const removeFile = (index: number) => {
+      setFiles(prev => prev.filter((_, i) => i !== index));
+    };
+    
+    const [isDragging, setIsDragging] = useState(false);
+
+    const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(true);
+    };
+
+    const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    };
+
+    const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+            onFileChange({ target: { files: e.dataTransfer.files } } as React.ChangeEvent<HTMLInputElement>);
+            e.dataTransfer.clearData();
+        }
+    };
+
+    // const isLoading = progressMessage !== null; // REMOVED THIS LINE
+
+    return (
+      <>
+        {isLoading && <LoadingOverlay message={loadingMessage as string} />}
+        <div className="min-h-full w-full flex flex-col items-center justify-center p-4">
+          <Card className="w-full max-w-2xl">
+              <CardHeader className="text-center">
+                  <CardTitle className="text-2xl">AI 복습 노트</CardTitle>
+                  <CardDescription>학습 자료나 기존 노트를 선택하여 AI 요약 및 퀴즈를 만드세요.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                      <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+                          <PopoverTrigger asChild>
+                              <Button variant="outline" role="combobox" className="flex-1 justify-between">
+                                  <CalendarDays className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                  <span className="truncate">{selectedDate ? format(selectedDate, "yyyy년 M월 d일") : "노트 날짜 선택 (선택)"}</span>
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0"><WeekPicker onDateSelect={(date) => { setSelectedDate(date); setIsCalendarOpen(false); }} /></PopoverContent>
+                      </Popover>
+                      <Popover open={isNotePickerOpen} onOpenChange={setIsNotePickerOpen}>
+                          <PopoverTrigger asChild><Button variant="outline" className="flex-1"><Plus className="mr-2 h-4 w-4" />기존 노트 추가</Button></PopoverTrigger>
+                          <PopoverContent className="w-80 p-0">{/* ... Popover content ... */}</PopoverContent>
+                      </Popover>
+                  </div>
+                  <div 
+                      className={`w-full min-h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer transition-colors p-6 ${isDragging ? 'border-primary bg-primary/10' : 'hover:bg-muted/50'}`}
+                      onClick={() => document.getElementById('file-upload-review')?.click()}
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                  >
+                      <UploadCloud className="h-12 w-12 mb-2" />
+                      <p className="font-semibold">파일을 드래그하거나 클릭해서 업로드</p>
+                      <input id="file-upload-review" type="file" multiple onChange={onFileChange} className="hidden" />
+                  </div>
+                  {files.length > 0 && (
+                      <div className="text-left">
+                          <h3 className="font-semibold text-sm mb-2">업로드된 파일:</h3>
+                          <ul className="space-y-2">{/* ... File list rendering ... */}</ul>
+                      </div>
+                  )}
+                  {selectedExistingNotes.length > 0 && (
+                      <div className="text-left mt-4">
+                          <h3 className="font-semibold text-sm mb-2">선택된 기존 노트:</h3>
+                          <ul className="space-y-2">{/* ... Note list rendering ... */}</ul>
+                      </div>
+                  )}
+              </CardContent>
+              <CardFooter className="flex-col gap-4 pt-4">
+                  {error && <p className="text-destructive text-sm text-center">{error}</p>}
+                  <Button size="lg" className="w-full" onClick={handleSave} disabled={isLoading || (files.length === 0 && selectedExistingNotes.length === 0)}>
+                      {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <ArrowRight className="mr-2 h-5 w-5"/>}
+                      복습 노트 생성
+                  </Button>
+              </CardFooter>
+          </Card>
+        </div>
+      </>
+    );
+  }
