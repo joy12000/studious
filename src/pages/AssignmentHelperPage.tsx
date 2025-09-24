@@ -139,26 +139,47 @@ export default function AssignmentHelperPage() {
             }
         }
         setError(null);
-        
-        const noteContext = selectedExistingNotes.map(n => `[기존 노트: ${n.title}]\n${n.content}`).join('\n\n');
+        setProgressMessage('파일을 Vercel Blob에 업로드하는 중...');
 
-        await addNoteFromAssignment({
-            referenceFiles,
-            problemFiles,
-            answerFiles,
-            noteContext,
-            subjectId: selectedSubject.id,
-            onProgress: setProgressMessage,
-            onComplete: (newNote) => {
-                setProgressMessage(null);
-                alert("AI 과제 도우미 작업이 완료되었습니다! 생성된 노트로 이동합니다.");
-                navigate(`/note/${newNote.id}`);
-            },
-            onError: (err) => {
-                setProgressMessage(null);
-                setError(err);
-            }
-        });
+        try {
+            const uploadFile = async (file: File) => {
+                const newBlob = await upload(file.name, file, {
+                    access: 'public',
+                    handleUploadUrl: '/api/upload/route',
+                });
+                return newBlob.url;
+            };
+
+            const referenceFileUrls = await Promise.all(referenceFiles.map(uploadFile));
+            setProgressMessage('참고 자료 업로드 완료. 과제 문제 업로드 중...');
+            const problemFileUrls = await Promise.all(problemFiles.map(uploadFile));
+            setProgressMessage('과제 문제 업로드 완료. 답안 파일 업로드 중...');
+            const answerFileUrls = await Promise.all(answerFiles.map(uploadFile));
+            setProgressMessage('모든 파일 업로드 완료. AI 분석 시작...');
+
+            const noteContext = selectedExistingNotes.map(n => `[기존 노트: ${n.title}]\n${n.content}`).join('\n\n');
+
+            await addNoteFromAssignment({
+                referenceFileUrls,
+                problemFileUrls,
+                answerFileUrls,
+                noteContext,
+                subjectId: selectedSubject.id,
+                onProgress: setProgressMessage,
+                onComplete: (newNote) => {
+                    setProgressMessage(null);
+                    alert("AI 과제 도우미 작업이 완료되었습니다! 생성된 노트로 이동합니다.");
+                    navigate(`/note/${newNote.id}`);
+                },
+                onError: (err) => {
+                    setProgressMessage(null);
+                    setError(err instanceof Error ? err.message : '파일 업로드 또는 노트 생성 중 오류가 발생했습니다.');
+                }
+            });
+        } catch (error) {
+            setProgressMessage(null);
+            setError(error instanceof Error ? error.message : '파일 업로드 또는 노트 생성 중 오류가 발생했습니다.');
+        }
     };
     
     const isLoading = progressMessage !== null;
@@ -259,7 +280,38 @@ export default function AssignmentHelperPage() {
                               기존 노트 추가
                             </Button>
                           </PopoverTrigger>
-                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">{/* ... Popover content ... */}</PopoverContent>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                <div className="p-2">
+                                  <input 
+                                    type="text" 
+                                    placeholder="노트 검색..." 
+                                    className="w-full p-2 border rounded-md mb-2"
+                                    value={noteSearchQuery}
+                                    onChange={(e) => setNoteSearchQuery(e.target.value)}
+                                  />
+                                  <div className="max-h-60 overflow-y-auto">
+                                    {filteredNotes.length > 0 ? (
+                                      filteredNotes.map(note => (
+                                        <div key={note.id} className="flex items-center justify-between p-2 hover:bg-muted rounded-md">
+                                          <label htmlFor={`note-${note.id}`} className="flex items-center gap-2 cursor-pointer flex-1">
+                                            <input 
+                                              type="checkbox" 
+                                              id={`note-${note.id}`} 
+                                              checked={selectedExistingNotes.some(n => n.id === note.id)}
+                                              onChange={() => handleToggleNoteSelection(note)}
+                                              className="form-checkbox h-4 w-4 text-primary rounded"
+                                            />
+                                            <span className="text-sm truncate">{note.title || '제목 없음'}</span>
+                                          </label>
+                                        </div>
+                                      ))
+                                    ) : ( <p className="text-sm text-muted-foreground text-center">노트가 없습니다.</p> )}
+                                  </div>
+                                </div>
+                                <div className="p-2 border-t">
+                                  <Button onClick={() => setIsNotePickerOpen(false)} className="w-full">선택 완료</Button>
+                                </div>
+                          </PopoverContent>
                         </Popover>
                         {selectedExistingNotes.length > 0 && (
                             <div className="text-left">

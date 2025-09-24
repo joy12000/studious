@@ -164,7 +164,38 @@ export default function ReviewPage() {
                       </Popover>
                       <Popover open={isNotePickerOpen} onOpenChange={setIsNotePickerOpen}>
                           <PopoverTrigger asChild><Button variant="outline" className="flex-1"><Plus className="mr-2 h-4 w-4" />기존 노트 추가</Button></PopoverTrigger>
-                          <PopoverContent className="w-80 p-0">{/* ... Popover content ... */}</PopoverContent>
+                          <PopoverContent className="w-80 p-0">
+                                <div className="p-2">
+                                  <input 
+                                    type="text" 
+                                    placeholder="노트 검색..." 
+                                    className="w-full p-2 border rounded-md mb-2"
+                                    value={noteSearchQuery}
+                                    onChange={(e) => setNoteSearchQuery(e.target.value)}
+                                  />
+                                  <div className="max-h-60 overflow-y-auto">
+                                    {filteredNotes.length > 0 ? (
+                                      filteredNotes.map(note => (
+                                        <div key={note.id} className="flex items-center justify-between p-2 hover:bg-muted rounded-md">
+                                          <label htmlFor={`note-${note.id}`} className="flex items-center gap-2 cursor-pointer flex-1">
+                                            <input 
+                                              type="checkbox" 
+                                              id={`note-${note.id}`} 
+                                              checked={selectedExistingNotes.some(n => n.id === note.id)}
+                                              onChange={() => handleToggleNoteSelection(note)}
+                                              className="form-checkbox h-4 w-4 text-primary rounded"
+                                            />
+                                            <span className="text-sm truncate">{note.title || '제목 없음'}</span>
+                                          </label>
+                                        </div>
+                                      ))
+                                    ) : ( <p className="text-sm text-muted-foreground text-center">노트가 없습니다.</p> )}
+                                  </div>
+                                </div>
+                                <div className="p-2 border-t">
+                                  <Button onClick={() => setIsNotePickerOpen(false)} className="w-full">선택 완료</Button>
+                                </div>
+                          </PopoverContent>
                       </Popover>
                   </div>
                   <div 
@@ -181,13 +212,27 @@ export default function ReviewPage() {
                   {files.length > 0 && (
                       <div className="text-left">
                           <h3 className="font-semibold text-sm mb-2">업로드된 파일:</h3>
-                          <ul className="space-y-2">{/* ... File list rendering ... */}</ul>
+                          <ul className="space-y-2">
+                            {files.map((file, index) => (
+                              <li key={index} className="flex items-center justify-between bg-muted/50 p-2 rounded-lg text-sm">
+                                <div className="flex items-center gap-2 min-w-0"><FileText className="h-4 w-4 flex-shrink-0" /><span className="truncate">{file.name}</span></div>
+                                <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => removeFile(index)}><X className="h-4 w-4" /></Button>
+                              </li>
+                            ))}
+                          </ul>
                       </div>
                   )}
                   {selectedExistingNotes.length > 0 && (
                       <div className="text-left mt-4">
                           <h3 className="font-semibold text-sm mb-2">선택된 기존 노트:</h3>
-                          <ul className="space-y-2">{/* ... Note list rendering ... */}</ul>
+                          <ul className="space-y-2">
+                              {selectedExistingNotes.map(note => (
+                                  <li key={note.id} className="flex items-center justify-between bg-muted/50 p-2 rounded-lg text-sm">
+                                      <div className="flex items-center gap-2 min-w-0"><FileText className="h-4 w-4 flex-shrink-0" /><span className="truncate">{note.title || '제목 없음'}</span></div>
+                                      <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => handleRemoveSelectedNote(note.id)}><X className="h-4 w-4" /></Button>
+                                  </li>
+                              ))}
+                          </ul>
                       </div>
                   )}
               </CardContent>
