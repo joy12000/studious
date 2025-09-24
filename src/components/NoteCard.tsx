@@ -64,11 +64,10 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
         <div className="flex flex-row items-start gap-4 p-4">
           <div className="flex-1 min-w-0">
             <Link to={`/note/${note.id}`} className="block mb-2">
-              <h2 className="line-clamp-2 text-base font-semibold leading-snug hover:text-primary">{note.title || '제목 없음'}</h2>
+              <p className="line-clamp-3 text-xs text-muted-foreground hover:text-primary">
+                  {cleanContentForPreview(note.content)}
+              </p>
             </Link>
-            <p className="line-clamp-3 text-xs text-muted-foreground">
-                {cleanContentForPreview(note.content)}
-            </p>
           </div>
           <Link to={`/note/${note.id}`} className="block flex-shrink-0 w-28 sm:w-36 aspect-video rounded-md overflow-hidden bg-muted">
             {thumbnailUrl ? (
@@ -119,8 +118,7 @@ export default function NoteCard({ note, onToggleFavorite, view = 'grid' }: Note
 
         {/* Text & Footer Area */}
         <div className="p-3 flex-grow flex flex-col">
-            <h3 className="text-sm font-semibold leading-snug line-clamp-2 mb-1 h-[2.5em]">{note.title || '제목 없음'}</h3>
-            <p className="text-xs text-muted-foreground flex-grow overflow-hidden line-clamp-2">
+            <p className="text-xs text-muted-foreground flex-grow overflow-hidden line-clamp-4 h-[4.5em]">
               {cleanContentForPreview(note.content)}
             </p>
             <div className="flex items-center justify-between mt-2 pt-2 border-t">
