@@ -125,4 +125,4 @@ def summarize_youtube_handler():
     try:
         if not API_KEY or not APIFY_ENDPOINT or not APIFY_TOKEN:
             print("ERROR: Missing required environment variables.")
-            return jsonify({"error": "Required server environment variables (GEMINI, APIFY) are not set.", "details": "GEMINI_API_KEY, APIFY_ENDPOINT, APIFY_TOKEN must be configured in the Vercel project settings."
+            return jsonify({"error": "Required server environment variables (GEMINI, APIFY) are not set.", "details": "GEMINI_API_KEY, APIFY_ENDPOINT, APIFY_TOKEN must be configured in the Vercel project settings."})

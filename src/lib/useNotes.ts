@@ -6,6 +6,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { format, addDays, startOfYear, endOfYear, startOfToday, endOfToday } from 'date-fns';
 import { upload } from '@vercel/blob/client';
 
+// Helper function to generate a random pastel HSL color
+const generatePastelColor = (): string => {
+  const hue = Math.floor(Math.random() * 360); // 0-360
+  const saturation = Math.floor(Math.random() * 20) + 40; // 40-60%
+  const lightness = Math.floor(Math.random() * 10) + 70; // 70-80%
+  return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
+};
+
 export type Filters = {
   search?: string;
   subjectId?: string;
@@ -352,7 +360,8 @@ export function useNotes(defaultFilters?: Filters) {
     };
 
     const addSubject = async (name: string, color?: string) => {
-      const newSubject: Subject = { id: uuidv4(), name, color };
+      const subjectColor = color || generatePastelColor();
+      const newSubject: Subject = { id: uuidv4(), name, color: subjectColor };
       await db.subjects.add(newSubject);
       return newSubject;
     };

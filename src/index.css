@@ -81,6 +81,9 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
   }
   html, #root {
     @apply h-full;

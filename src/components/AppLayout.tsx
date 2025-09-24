@@ -41,7 +41,7 @@ const SidebarContent = ({ isCollapsed }: { isCollapsed: boolean }) => {
     const { setIsSidebarOpen } = useSidebar();
     return (
       <div className="flex h-full max-h-screen flex-col">
-        <div className="flex h-16 items-center border-b px-6 lg:h-[68px]">
+        <div className={cn("flex h-16 items-center border-b px-6 lg:h-[68px]", isCollapsed && "justify-center px-2")}>
           <Link to="/" className="flex items-center gap-2 font-bold text-lg tracking-tight">
             <GraduationCap className="h-6 w-6" />
             {!isCollapsed && <span className="">Studious</span>}
@@ -69,8 +69,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true); // 기본 상태를 '접힘'으로 변경
 
-  const desktopAsideWidth = isCollapsed ? "md:w-[64px]" : "md:w-[256px]";
-  const desktopMainContentMargin = isCollapsed ? "md:ml-[64px]" : "md:ml-[256px]";
+  const desktopAsideWidth = isCollapsed ? "md:w-[70px]" : "md:w-[256px]";
+  const desktopMainContentMargin = isCollapsed ? "md:ml-[70px]" : "md:ml-[256px]";
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, setIsSidebarOpen }}>
@@ -85,7 +85,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
             {/* Sidebar */}
             <aside 
-                className={`fixed inset-y-0 left-0 z-40 bg-background border-r transition-all duration-300 ease-in-out 
+                className={`fixed inset-y-0 left-0 z-40 border-r transition-all duration-300 ease-in-out bg-gradient-to-b from-gray-50 to-gray-100 dark:bg-background 
                 ${isSidebarOpen ? 'translate-x-0 w-[256px]' : '-translate-x-full'}
                 md:translate-x-0 ${desktopAsideWidth}`}
                 onMouseEnter={() => setIsCollapsed(false)}
