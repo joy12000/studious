@@ -19,19 +19,24 @@ marked.use({
   gfm: true,
 });
 
-// Mermaid.js 초기화
-mermaid.initialize({
-  startOnLoad: false,
-  theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
-  securityLevel: 'loose',
-});
-
 interface Props {
   content: string;
 }
 
 const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   const containerRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    try {
+      mermaid.initialize({
+        startOnLoad: false,
+        theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
+        securityLevel: 'loose',
+      });
+    } catch (e) {
+      console.error('Mermaid 초기화 실패', e);
+    }
+  }, []);
 
   useEffect(() => {
     if (containerRef.current) {
