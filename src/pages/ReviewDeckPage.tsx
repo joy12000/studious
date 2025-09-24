@@ -89,7 +89,7 @@ export default function ReviewDeckPage() {
     return (
         <div className="p-4 sm:p-8 flex flex-col items-center">
             <h1 className="text-3xl font-bold mb-6">오늘의 복습</h1>
-            {todaysReviewItems.length > 0 ? (
+            {(todaysReviewItems || []).length > 0 ? (
                 currentItem ? (
                     <ReviewCard item={currentItem} onAnswer={handleNext} onDelete={handleDelete} />
                 ) : (
