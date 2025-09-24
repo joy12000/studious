@@ -10,6 +10,10 @@ import traceback
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
+        print("--- SCHEDULE PROCESSING START ---")
+        print(f"Request Method: {self.command}")
+        print(f"Content-Type Header: {self.headers.get('Content-Type')}")
+
         api_keys = [
             os.environ.get('GEMINI_API_KEY_PRIMARY'),
             os.environ.get('GEMINI_API_KEY_SECONDARY'),
@@ -21,11 +25,23 @@ class handler(BaseHTTPRequestHandler):
         last_error = None
 
         try:
+            print("Attempting to parse form data with cgi.FieldStorage...")
             form = cgi.FieldStorage(
                 fp=self.rfile,
                 headers=self.headers,
                 environ={'REQUEST_METHOD': 'POST', 'CONTENT_TYPE': self.headers['Content-Type']}
             )
+            print("Form data parsed successfully.")
+
+            if 'file' not in form:
+                print("ERROR: 'file' field NOT found in form.")
+                self.send_response(400)
+                self.send_header('Content-type', 'application/json; charset=utf-8')
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": "File part is missing in the request.", "details": "The 'file' field was not found in the form data."}).encode('utf-8'))
+                return
+            
+            print("'file' field found in form.")
             
             uploaded_file = form['file']
             file_data = uploaded_file.file.read()
