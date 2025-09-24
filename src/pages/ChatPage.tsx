@@ -29,6 +29,9 @@ export default function ChatPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
+  const MAX_FILE_SIZE_MB = 5; // 개별 파일 최대 5MB
+  const MAX_TOTAL_SIZE_MB = 10; // 총 파일 최대 10MB
+
   const [generationType, setGenerationType] = useState<'textbook' | 'review'>('textbook');
 
   useEffect(() => {
@@ -43,16 +46,22 @@ export default function ChatPage() {
     if (!e.target.files) return;
 
     const newFiles = Array.from(e.target.files);
-    
-    // PDF 변환 처리
+    let filesToAdd: File[] = [];
+    let currentTotalSize = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
+
     for (const file of newFiles) {
+      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        alert(`개별 파일 크기는 ${MAX_FILE_SIZE_MB}MB를 초과할 수 없습니다: ${file.name}`);
+        continue;
+      }
+
       if (file.type === 'application/pdf') {
         setIsLoading(true);
         try {
           const images = await convertPdfToImages(file, (progress) => {
             setLoadingMessage(`PDF 변환 중... (${progress.pageNumber}/${progress.totalPages})`);
           });
-          setUploadedFiles(prev => [...prev, ...images]);
+          filesToAdd.push(...images);
         } catch (error) {
           console.error("PDF 변환 실패:", error);
           alert('PDF 파일을 이미지로 변환하는 데 실패했습니다.');
@@ -61,10 +70,19 @@ export default function ChatPage() {
           setLoadingMessage('');
         }
       } else {
-        // PDF가 아닌 파일은 직접 추가
-        setUploadedFiles(prev => [...prev, file]);
+        filesToAdd.push(file);
       }
     }
+
+    // 총 파일 크기 검사
+    const totalSizeAfterAdding = currentTotalSize + filesToAdd.reduce((sum, file) => sum + file.size, 0);
+    if (totalSizeAfterAdding > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
+      alert(`총 파일 크기는 ${MAX_TOTAL_SIZE_MB}MB를 초과할 수 없습니다. 현재: ${(currentTotalSize / (1024 * 1024)).toFixed(2)}MB, 추가하려는 파일: ${(filesToAdd.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024)).toFixed(2)}MB`);
+      return;
+    }
+
+    setUploadedFiles(prev => [...prev, ...filesToAdd]);
+
     // 파일 입력 초기화
     if(fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -77,6 +95,13 @@ export default function ChatPage() {
       alert('과목과 하나 이상의 파일을 업로드해주세요.');
       return;
     }
+
+    const currentTotalSize = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
+    if (currentTotalSize > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
+      alert(`총 파일 크기는 ${MAX_TOTAL_SIZE_MB}MB를 초과할 수 없습니다. 현재: ${(currentTotalSize / (1024 * 1024)).toFixed(2)}MB`);
+      return;
+    }
+
     setIsLoading(true);
 
     try {

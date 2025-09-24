@@ -27,6 +27,9 @@ export default function ReviewPage() {
   const [noteSearchQuery, setNoteSearchQuery] = useState('');
   const [isDragging, setIsDragging] = useState(false);
 
+  const MAX_FILE_SIZE_MB = 5; // 개별 파일 최대 5MB
+  const MAX_TOTAL_SIZE_MB = 10; // 총 파일 최대 10MB
+
   useEffect(() => {
     if (location.state?.date) {
       const dateFromState = new Date(location.state.date);
@@ -59,6 +62,18 @@ export default function ReviewPage() {
       return;
     }
     setError(null);
+
+    const currentUploadedFilesSize = files.reduce((sum, file) => sum + file.size, 0);
+    const currentSelectedNotesAttachmentsSize = selectedExistingNotes.reduce((sum, note) => 
+      sum + (note.attachments?.reduce((attSum, att) => attSum + (att.data instanceof File ? att.data.size : 0), 0) || 0)
+    , 0);
+    const totalSize = currentUploadedFilesSize + currentSelectedNotesAttachmentsSize;
+
+    if (totalSize > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
+      setError(`총 파일 크기는 ${MAX_TOTAL_SIZE_MB}MB를 초과할 수 없습니다. 현재: ${(totalSize / (1024 * 1024)).toFixed(2)}MB`);
+      return;
+    }
+
     startLoading("복습 노트를 생성하는 중...");
 
     const noteDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
@@ -70,6 +85,9 @@ export default function ReviewPage() {
 
 --- 기존 노트: ${note.title} ---
 ${note.content}`;
+      // Attachments from existing notes are not directly combined into combinedFiles for upload
+      // as they are already stored in the database. Their content is implicitly part of the note.content
+      // However, their size is accounted for in the totalSize check.
     });
 
     await addNoteFromReview({
@@ -92,15 +110,27 @@ ${note.content}`;
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const newFiles = Array.from(e.target.files);
+    let filesToAdd: File[] = [];
+
+    const currentUploadedFilesSize = files.reduce((sum, file) => sum + file.size, 0);
+    const currentSelectedNotesAttachmentsSize = selectedExistingNotes.reduce((sum, note) => 
+      sum + (note.attachments?.reduce((attSum, att) => attSum + (att.data instanceof File ? att.data.size : 0), 0) || 0)
+    , 0);
+    const currentTotalSize = currentUploadedFilesSize + currentSelectedNotesAttachmentsSize;
 
     for (const file of newFiles) {
+      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        setError(`개별 파일 크기는 ${MAX_FILE_SIZE_MB}MB를 초과할 수 없습니다: ${file.name}`);
+        continue;
+      }
+
       if (file.type === 'application/pdf') {
         startLoading('PDF를 이미지로 변환 중...');
         try {
           const images = await convertPdfToImages(file, (progress) => {
             setMessage(`PDF 변환 중... (${progress.pageNumber}/${progress.totalPages})`);
           });
-          setFiles(prev => [...prev, ...images]);
+          filesToAdd.push(...images);
         } catch (error) {
           console.error("PDF 변환 실패:", error);
           setError('PDF 파일을 이미지로 변환하는 데 실패했습니다.');
@@ -108,9 +138,18 @@ ${note.content}`;
           stopLoading();
         }
       } else {
-        setFiles(prev => [...prev, file]);
+        filesToAdd.push(file);
       }
     }
+
+    const totalSizeAfterAdding = currentTotalSize + filesToAdd.reduce((sum, file) => sum + file.size, 0);
+    if (totalSizeAfterAdding > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
+      setError(`총 파일 크기는 ${MAX_TOTAL_SIZE_MB}MB를 초과할 수 없습니다. 현재: ${(currentTotalSize / (1024 * 1024)).toFixed(2)}MB, 추가하려는 파일: ${(filesToAdd.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024)).toFixed(2)}MB`);
+      return;
+    }
+
+    setFiles(prev => [...prev, ...filesToAdd]);
+
     if (e.target) e.target.value = '';
   };
   
