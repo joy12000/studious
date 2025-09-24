@@ -118,7 +118,7 @@ from http.server import BaseHTTPRequestHandler
   시도...")
                       genai.configure(api_key=api_key)
                       model =
-  genai.GenerativeModel('gemini-1.5-pro-latest')
+  genai.GenerativeModel('gemini-2.0-flash')
 
                       response = model.generate_content(request_contents)
 

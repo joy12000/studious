@@ -9,8 +9,8 @@ app = Flask(__name__)
 # ==============================================================================
 # CONFIGURATION
 # ==============================================================================
-GENAI_MODEL = os.getenv("GENAI_MODEL", "gemini-1.5-flash-latest")
-API_KEY = os.getenv("GEMINI_API_KEY")
+GENAI_MODEL = os.getenv("GENAI_MODEL", "gemini-2.5-flash")
+API_KEY = os.getenv("GEMINI_API_KEY_TERTIARY")
 APIFY_ENDPOINT = os.getenv("APIFY_ENDPOINT")
 APIFY_TOKEN = os.getenv("APIFY_TOKEN")
 HTTP_TIMEOUT = 240 # Apify can take a while, give it up to 4 minutes
