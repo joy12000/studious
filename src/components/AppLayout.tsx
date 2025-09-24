@@ -84,12 +84,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             )}
 
             {/* Sidebar */}
-            <aside 
-                className={`fixed inset-y-0 left-0 z-40 border-r transition-all duration-300 ease-in-out bg-gradient-to-b from-gray-50 to-gray-100 dark:bg-background 
-                ${isSidebarOpen ? 'translate-x-0 w-[256px]' : '-translate-x-full'}
-                md:translate-x-0 ${desktopAsideWidth}`}
-                onMouseEnter={() => setIsCollapsed(false)}
-                onMouseLeave={() => setIsCollapsed(true)}
+                        <aside 
+                            className={`fixed inset-y-0 left-0 z-40 border-r transition-all duration-300 ease-in-out bg-gradient-to-b from-gray-50 to-gray-100 dark:bg-gray-800
+                            ${isSidebarOpen ? 'translate-x-0 w-[256px]' : '-translate-x-full'}
+                            md:translate-x-0 ${desktopAsideWidth}`}
+                            onMouseEnter={() => setIsCollapsed(false)}                onMouseLeave={() => setIsCollapsed(true)}
             >
                 <SidebarContent isCollapsed={isCollapsed} />
             </aside>

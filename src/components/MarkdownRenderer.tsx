@@ -2,20 +2,16 @@
 import React, { useEffect, useRef } from 'react';
 import { marked } from 'marked';
 import { InlineMath, BlockMath } from 'react-katex';
+import mermaid from 'mermaid';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
+import VisualRenderer from './VisualRenderer'; // 🚀 새로 만든 컴포넌트 임포트
 
-// Marked.js에 highlight.js 연동 설정
-marked.setOptions({
-  highlight: function(code, lang) {
-    const language = hljs.getLanguage(lang) ? lang : 'plaintext';
-    return hljs.highlight(code, { language }).value;
-  },
-});
-
-marked.use({
-  breaks: true,
-  gfm: true,
+// Mermaid.js 초기화
+mermaid.initialize({
+  startOnLoad: false,
+  theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
+  securityLevel: 'loose',
 });
 
 interface Props {
@@ -26,82 +22,66 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   const containerRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
-    const renderMermaidDiagrams = async () => {
-      if (containerRef.current) {
-        const mermaidElements = containerRef.current.querySelectorAll('code.language-mermaid');
+    if (containerRef.current) {
+        const mermaidElements = containerRef.current.querySelectorAll('pre.mermaid > code');
         if (mermaidElements.length > 0) {
-          try {
-            const mermaid = (await import('mermaid')).default;
-            mermaid.initialize({
-              startOnLoad: false,
-              theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
-              securityLevel: 'loose',
-            });
-
-            // mermaid.run()은 Promise를 반환하므로 .catch()로 오류 처리
-            mermaid.run({ nodes: mermaidElements as NodeListOf<HTMLElement> })
-              .catch(error => {
-                console.error('Mermaid 렌더링 오류:', error);
-                if (containerRef.current) {
-                  containerRef.current.innerHTML = `
-                    <div class="p-4 bg-destructive/10 border border-destructive/20 rounded-lg text-destructive text-sm">
-                      <p class="font-bold">다이어그램 렌더링 오류</p>
-                      <pre class="mt-2 text-xs whitespace-pre-wrap">${(error as Error).message}</pre>
-                    </div>
-                  `;
-                }
-              });
-          } catch (e) {
-            console.error('Mermaid 라이브러리 로드 실패:', e);
-          }
+            mermaid.run({ nodes: mermaidElements as NodeListOf<HTMLElement> });
         }
-      }
-    };
-
-    renderMermaidDiagrams();
+    }
   }, [content]);
 
-  const blockParts = content.split(/(```mermaid[\s\S]*?```|\$\$[\s\S]*?\$\$)/g);
+  // 🚀 [수정] visual, mermaid, katex를 모두 분리하도록 정규식 확장
+  const parts = content.split(/(```(?:visual|mermaid)[\s\S]*?```|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g);
 
   return (
     <span ref={containerRef}>
-      {blockParts.map((blockPart, i) => {
-        if (blockPart.startsWith('$$') && blockPart.endsWith('$$')) {
-          const math = blockPart.slice(2, -2);
-          return <BlockMath key={`block-${i}`}>{math}</BlockMath>;
+      {parts.map((part, i) => {
+        if (!part) return null;
+
+        // 블록 수학 (KaTeX)
+        if (part.startsWith('$$') && part.endsWith('$$')) {
+          return <BlockMath key={i}>{part.slice(2, -2)}</BlockMath>;
+        }
+        
+        // 인라인 수학 (KaTeX)
+        if (part.startsWith('$') && part.endsWith('$')) {
+          return <InlineMath key={i}>{part.slice(1, -1)}</InlineMath>;
         }
 
-        // 🚀 [추가] Mermaid 코드 블록 처리 로직
-        if (blockPart.startsWith('```mermaid')) {
-          const code = blockPart.slice(10, -3).trim();
+        // Mermaid 다이어그램
+        if (part.startsWith('```mermaid')) {
+          const code = part.slice(10, -3).trim();
           return (
-            <pre className="mermaid" key={`mermaid-${i}`}>
-              <code className="language-mermaid">{code}</code>
-            </pre>
+            <div className="flex justify-center my-4">
+              <pre className="mermaid" key={i}>
+                <code>{code}</code>
+              </pre>
+            </div>
           );
         }
 
-        const inlineParts = blockPart.split(/(\$[\s\S]*?\$)/g);
+        // 🚀 [추가] 동적 시각 컴포넌트
+        if (part.startsWith('```visual')) {
+          const jsonText = part.slice(10, -3).trim();
+          try {
+            const visualData = JSON.parse(jsonText);
+            return <div className="my-4" key={i}><VisualRenderer config={visualData} /></div>;
+          } catch (e) {
+            console.error('Failed to parse visual JSON:', e);
+            return <pre key={i} style={{ color: 'red' }}>동적 시각화 컴포넌트 JSON 오류</pre>;
+          }
+        }
         
-        return inlineParts.map((inlinePart, j) => {
-          if (inlinePart.startsWith('$') && inlinePart.endsWith('$')) {
-            const math = inlinePart.slice(1, -1);
-            return <InlineMath key={`inline-${i}-${j}`}>{math}</InlineMath>;
-          }
-          
-          if (inlinePart) {
-            return (
-              <span
-                key={`text-${i}-${j}`}
-                dangerouslySetInnerHTML={{ __html: marked.parseInline(inlinePart) as string }}
-              />
-            );
-          }
-          return null;
-        });
+        // 나머지 일반 텍스트 및 마크다운
+        return (
+          <span
+            key={i}
+            dangerouslySetInnerHTML={{ __html: marked.parseInline(part) as string }}
+          />
+        );
       })}
     </span>
   );
 };
 
-export default MarkdownRenderer;
+export default MarkdownRenderer; 
