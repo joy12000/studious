@@ -43,11 +43,11 @@ export default function DashboardPage() {
             {
                 label: '노트 수',
                 data: stats.notesBySubject.map(s => s.count),
-                backgroundColor: theme === 'dark' ? 'hsl(210 70% 60%)' : 'hsl(222.2 47.4% 11.2%)',
+                backgroundColor: stats.notesBySubject.map(s => allSubjects.find(sub => sub.name === s.name)?.color || (theme === 'dark' ? 'hsl(210 70% 60%)' : 'hsl(222.2 47.4% 11.2%)')),
                 borderRadius: 4,
             },
         ],
-    }), [stats.notesBySubject, theme]);
+    }), [stats.notesBySubject, allSubjects, theme]);
 
     const chartOptions = useMemo(() => {
         const textColor = theme === 'dark' ? 'hsl(210 20% 95%)' : 'hsl(222.2 84% 4.9%)';
