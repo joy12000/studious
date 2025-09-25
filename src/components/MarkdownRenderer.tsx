@@ -46,38 +46,31 @@ const renderInlineContent = (text: string) => {
 const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (containerRef.current) {
-      try {
-        const mermaidElements = containerRef.current.querySelectorAll('pre.mermaid > code');
-        if (mermaidElements.length > 0) {
-            mermaid.run({ nodes: mermaidElements as NodeListOf<HTMLElement> });
-        }
-      } catch (error) {
-        console.error('Failed to render Mermaid diagram:', error);
-      }
-    }
-  }, [content]);
-
   const renderParts = () => {
     if (!content) return null;
 
-    // ✅ [수정] 복합적인 마크다운 블록을 먼저 분리 (코드블록, 그 외 텍스트)
-    // 이렇게 하면 일반 텍스트 덩어리와 특수 블록(visual, mermaid 등)을 구분할 수 있습니다.
     const blockRegex = /(```(?:jointjs|mermaid|visual|chart|[\s\S]*?)```|[\s\S]+?(?=```|$))/g;
     const blocks = content.match(blockRegex) || [];
 
     return blocks.map((block, i) => {
       const trimmedBlock = block.trim();
       
-      // 특수 블록(visual, jointjs, mermaid) 처리
       if (trimmedBlock.startsWith('```mermaid')) {
         const code = trimmedBlock.slice(10, -3).trim();
-        return (
-          <div className="flex justify-center my-4" key={i}>
-            <pre className="mermaid"><code>{code}</code></pre>
-          </div>
-        );
+        const id = `mermaid-svg-${i}`;
+        try {
+          const svg = mermaid.render(id, code);
+          return (
+            <div 
+              className="flex justify-center my-4" 
+              key={id} 
+              dangerouslySetInnerHTML={{ __html: svg }} 
+            />
+          );
+        } catch (e) {
+          console.error("Mermaid rendering failed:", e);
+          return <pre key={id} style={{ color: 'red' }}>Mermaid Diagram Error</pre>;
+        }
       }
       if (trimmedBlock.startsWith('```jointjs')) {
         const jsonText = trimmedBlock.slice(10, -3).trim();

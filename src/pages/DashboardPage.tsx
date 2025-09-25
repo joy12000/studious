@@ -80,8 +80,7 @@ export default function DashboardPage() {
                     ticks: {
                         color: textColor,
                         maxRotation: 45,
-                        minRotation: 45,
-                        autoSkip: false,
+                        minRotation: 0,
                     },
                     grid: { color: 'transparent' }
                 }
