@@ -143,3 +143,11 @@ class handler(BaseHTTPRequestHandler):
                     print(f"INFO: API 키 #{i + 1} (으)로 참고서 생성 시도...")
                     genai.configure(api_key=api_key)
                     model = genai.GenerativeModel('gemini-1.5-pro-latest')
+                    # If model initialization is successful, break the loop
+                    break
+                except Exception as e:
+                    print(f"WARN: API 키 #{i + 1} 로드 실패: {e}")
+                    last_error = e # Store the last error
+                    continue # Try next API key
+            else: # This else block executes if the loop completes without a 'break'
+                return self.handle_error(last_error or ValueError("모든 API 키로 모델 로드 실패."), "모델 로드 오류", 500)
