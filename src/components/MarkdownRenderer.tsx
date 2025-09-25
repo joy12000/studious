@@ -1,45 +1,81 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { marked } from 'marked';
 import { InlineMath, BlockMath } from 'react-katex';
 import mermaid from 'mermaid';
 import VisualRenderer from './VisualRenderer';
-import MermaidRenderer from './MermaidRenderer'; // ✅ 1. 새로 만든 MermaidRenderer를 임포트
 import { normalizeMermaidCode } from '../lib/markdownUtils';
 import 'highlight.js/styles/github-dark.css';
 import 'katex/dist/katex.min.css';
 
+// Mermaid 초기화
+mermaid.initialize({
+  startOnLoad: false,
+  theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
+  securityLevel: 'loose',
+});
+
 interface Props {
   content: string;
 }
+
+// 문단 내부의 인라인 요소만 렌더링하는 함수
+const renderInlineContent = (text: string) => {
+  if (!text) return null;
+  const regex = /(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g;
+  const parts = text.split(regex);
+
+  return parts.map((part, i) => {
+    if (!part) return null;
+    const trimmedPart = part.trim();
+
+    if (trimmedPart.startsWith('$$') && trimmedPart.endsWith('$$')) {
+      return <BlockMath key={i}>{part.slice(2, -2)}</BlockMath>;
+    }
+    if (trimmedPart.startsWith('$') && trimmedPart.endsWith('$')) {
+      return <InlineMath key={i}>{part.slice(1, -1)}</InlineMath>;
+    }
+
+    return <span key={i} dangerouslySetInnerHTML={{ __html: marked.parseInline(part, { gfm: true, breaks: true }) as string }} />;
+  });
+};
 
 const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [modalMermaidCode, setModalMermaidCode] = useState<string | null>(null);
   const modalMermaidRef = useRef<HTMLDivElement>(null);
 
-  // 문단 내부의 인라인 요소만 렌더링하는 함수
-  const renderInlineContent = useCallback((text: string) => {
-    if (!text) return null;
-    const regex = /(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g;
-    const parts = text.split(regex);
-
-    return parts.map((part, i) => {
-      if (!part) return null;
-      const trimmedPart = part.trim();
-
-      if (trimmedPart.startsWith('$$') && trimmedPart.endsWith('$$')) {
-        return <BlockMath key={i}>{part.slice(2, -2)}</BlockMath>;
-      } 
-      if (trimmedPart.startsWith('$') && trimmedPart.endsWith('$')) {
-        return <InlineMath key={i}>{part.slice(1, -1)}</InlineMath>;
+  useEffect(() => {
+    const renderMermaidDiagrams = () => {
+      if (containerRef.current) {
+        const mermaidElements = containerRef.current.querySelectorAll('pre.mermaid:not([data-processed])');
+        if (mermaidElements.length > 0) {
+          // 타이밍 문제(경쟁 상태)를 해결하기 위해 짧은 지연을 줍니다.
+          setTimeout(async () => {
+            try {
+              // 렌더링 전에 각 코드 블록의 내용을 자동 변환합니다.
+              mermaidElements.forEach(el => {
+                const codeEl = el.querySelector('code');
+                if (codeEl) {
+                  codeEl.textContent = normalizeMermaidCode(codeEl.textContent || '');
+                }
+              });
+              await mermaid.run({ nodes: mermaidElements as NodeListOf<HTMLElement> });
+              mermaidElements.forEach(el => el.setAttribute('data-processed', 'true'));
+            } catch (error) {
+              console.error('Mermaid 렌더링 실패:', error);
+              mermaidElements.forEach(el => {
+                el.innerHTML = '다이어그램 렌더링 오류';
+                el.setAttribute('style', 'color: red; text-align: center;');
+              });
+            }
+          }, 100); // DOM이 확실히 준비되도록 100ms 지연
+        }
       }
-
-      return <span key={i} dangerouslySetInnerHTML={{ __html: marked.parseInline(part, { gfm: true, breaks: true }) as string }} />;
-    });
-  }, []); // No dependencies, as it only uses external imports
-  // ❌ 복잡했던 Mermaid 렌더링 useEffect를 모두 삭제합니다.
-
-  // 모달 렌더링을 위한 useEffect는 유지합니다.
+    };
+    renderMermaidDiagrams();
+  }, [content]);
+  
+  // 모달 렌더링 useEffect (동일하게 유지)
   useEffect(() => {
     const renderModalMermaid = async () => {
       if (modalMermaidCode && modalMermaidRef.current) {
@@ -49,9 +85,6 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
         pre.innerHTML = normalizeMermaidCode(modalMermaidCode);
         modalMermaidRef.current.appendChild(pre);
         try {
-          // mermaid.run()은 Vercel 빌드 환경에서 문제를 일으킬 수 있으므로
-          // mermaid.render()를 사용하는 것이 더 안정적일 수 있습니다.
-          // 여기서는 기존 방식을 유지하되, 문제가 지속되면 MermaidRenderer와 동일한 방식으로 변경을 고려해야 합니다.
           await mermaid.run({ nodes: [pre] });
         } catch (e) {
           console.error('모달에서 Mermaid 렌더링 실패:', e);
@@ -74,14 +107,14 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       if (trimmedBlock.startsWith('```mermaid')) {
         const code = trimmedBlock.slice(10, -3).trim();
         return (
-          // ✅ 2. <pre> 태그 대신 <MermaidRenderer> 컴포넌트를 사용합니다.
           <div 
             className="flex justify-center my-4 cursor-zoom-in" 
             key={i}
             onClick={() => setModalMermaidCode(code)}
             title="클릭하여 크게 보기"
           >
-            <MermaidRenderer code={code} />
+            {/* 자동 변환은 useEffect에서 처리하므로, 여기서는 원본 코드를 그대로 둡니다. */}
+            <pre className="mermaid"><code>{code}</code></pre>
           </div>
         );
       }
@@ -101,12 +134,9 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       if (trimmedBlock.startsWith('<details')) {
         const summaryMatch = trimmedBlock.match(/<summary>([\s\S]*?)<\/summary>/);
         const summaryContent = summaryMatch ? summaryMatch[1] : '자세히 보기';
-
         const mainContentMatch = trimmedBlock.match(/<\/summary>([\s\S]*)<\/details>/);
         let mainContent = mainContentMatch ? mainContentMatch[1] : '';
-
         mainContent = mainContent.trim().replace(/^<div>/, '').replace(/<\/div>$/, '').trim();
-
         return (
             <details key={i} className="prose dark:prose-invert max-w-none my-4 border rounded-lg">
                 <summary className="cursor-pointer p-4 font-semibold" dangerouslySetInnerHTML={{ __html: marked.parseInline(summaryContent, { gfm: true, breaks: true }) }} />

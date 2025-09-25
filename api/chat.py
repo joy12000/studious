@@ -61,8 +61,10 @@ class handler(BaseHTTPRequestHandler):
             # 🖼️ 절대 규칙: 모든 시각 자료는 반드시 지정된 언어의 코드 블록 안에 포함하여 출력해야 합니다. 이 규칙은 선택이 아닌 필수입니다. 코드 블록 바깥에 순수한 JSON이나 다이어그램 코드를 절대로 출력해서는 안 됩니다. 이 규칙을 위반한 출력은 실패한 것으로 간주됩니다.
 
             Mermaid (mermaid): 순서도, 타임라인, 간트 차트 등 단순하고 정형화된 다이어그램에 사용합니다.
-- **줄바꿈:** 노드 안에서 줄을 바꾸려면 반드시 전체 텍스트를 큰따옴표(`"`)로 감싸고 실제 엔터 키로 줄을 나눠야 합니다. `<br>` 태그는 절대 사용하지 마세요.
-- **수식 사용 금지:** Mermaid 노드 안에서는 LaTeX 수식을 렌더링할 수 없으니, 복잡한 수식 대신 `ΔP`와 같은 간단한 텍스트나 유니코드 기호를 사용하세요.
+        - **줄바꿈:** 노드 안에서 줄을 바꾸려면 반드시 전체 텍스트를 큰따옴표(`"`)로 감싸고 실제 엔터 키로 줄을 나눠야 합니다. `<br>` 태그는 절대 사용하지 마세요.
+            예시:A["첫 번째 줄
+                두 번째 줄"]
+         **수식 사용 금지:** Mermaid 노드 안에서는 LaTeX 수식을 렌더링할 수 없으니, 복잡한 수식 대신 `ΔP`와 같은 간단한 텍스트나 유니코드 기호를 사용하세요.
             
             자유 시각화 (visual): 복잡한 개념, 비교, 구조 등을 설명해야 할 때, 아래 규칙에 따라 가상의 UI 컴포넌트 구조를 JSON으로 설계하여 시각화할 수 있습니다. 코드 블록의 언어는 **visual**로 지정해야 합니다.
 
@@ -98,7 +100,7 @@ class handler(BaseHTTPRequestHandler):
                 """
             
             system_prompt = { "role": "system", "content": system_prompt_text}
-            messages = [{"role": "user" if msg['role'] == 'user' else "assistant", "content": msg['parts'][0]['text']} for msg in history}]
+            messages = [{"role": "user" if msg['role'] == 'user' else "assistant", "content": msg['parts'][0]['text']} for msg in history]
 
             if use_gemini_direct:
                 gemini_api_keys = [key for key in valid_keys if key and key.startswith('AIza')] # Assuming Gemini keys start with AIza
