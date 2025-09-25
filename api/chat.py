@@ -35,7 +35,7 @@ class handler(BaseHTTPRequestHandler):
             body = json.loads(post_data.decode('utf-8'))
             history = body.get('history', [])
             note_context = body.get('noteContext', '')
-            model_identifier = body.get('model', 'google/gemini-1.5-flash')
+            model_identifier = body.get('model', 'google/gemini-2.5-flash')
             use_gemini_direct = body.get('useGeminiDirect', False) # New flag
 
             if not history:

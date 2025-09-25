@@ -173,7 +173,7 @@ class handler(BaseHTTPRequestHandler):
                 try:
                     print(f"INFO: API 키 #{i + 1} (으)로 참고서 생성 시도...")
                     genai.configure(api_key=api_key)
-                    model = genai.GenerativeModel('gemini-2.5-flash')
+                    model = genai.GenerativeModel('gemini-2.5-pro')
 
                     response = model.generate_content(request_contents)
 
