@@ -1,5 +1,5 @@
-// src/components/VisualRenderer.tsx
 import React from 'react';
+import ShadowHost from './ShadowHost';
 
 type NodeConfig = {
   type: string;
@@ -17,26 +17,19 @@ const SVG_TAGS = new Set([
 ]);
 
 const HTML_TAG_MAP: Record<string, string> = {
-  box: 'div',
-  p: 'p',
-  span: 'span',
-  img: 'img',
-  div: 'div'
+  box: 'div', p: 'p', span: 'span', img: 'img', div: 'div'
 };
 
+/** 외부 CSS 없이도 보이도록 기본값 보정 */
 function ensureVisibleDefaults(type: string, props: Record<string, any>) {
   const p = { ...props };
   if (SVG_TAGS.has(type)) {
-    // 기본 가시성 확보
     if (p.stroke == null && p.fill == null) {
       p.stroke = '#111';
       p.fill = 'none';
     }
-    if (
-      p.strokeWidth == null &&
-      (type === 'path' || type === 'line' || type === 'polyline' || type === 'polygon')
-    ) {
-      p.strokeWidth = 1.5;
+    if (p.strokeWidth == null && (type === 'path' || type === 'line' || type === 'polyline' || type === 'polygon')) {
+      p.strokeWidth = 2;
     }
   }
   return p;
@@ -45,7 +38,18 @@ function ensureVisibleDefaults(type: string, props: Record<string, any>) {
 const VisualRenderer: React.FC<Props> = ({ config }) => {
   if (!config) return null;
 
-  const renderNode = (node: NodeConfig | undefined): React.ReactNode => {
+  // Shadow DOM 안에서만 적용될 리셋/기본 스타일
+  const shadowCSS = `
+/* 외부(페이지 전역) CSS를 차단하고 기본값으로 복구 */
+:host { all: initial; }
+svg { display:block; overflow:visible; background:#fff; }
+/* SVG 내부 기본값 (외부 !important에 영향 안 받음) */
+svg, svg * { visibility: visible; opacity: 1; }
+text { fill:#111; font-size:14px; }
+line, path, polyline, polygon { stroke-width:2; }
+`;
+
+  const renderNode = (node?: NodeConfig): React.ReactNode => {
     if (!node) return null;
 
     const type = node.type;
@@ -57,56 +61,29 @@ const VisualRenderer: React.FC<Props> = ({ config }) => {
     const rest = ensureVisibleDefaults(type, rest0);
     const styleObj = (typeof style === 'object' && style) ? style : undefined;
 
-    // 루트 svg: 크기와 표시 강제
     if (isSvg && type === 'svg') {
       (rest as any).xmlns = (rest as any).xmlns || 'http://www.w3.org/2000/svg';
       if ((rest as any).width == null && (rest as any).height == null) {
-        (rest as any).width = 400;
-        (rest as any).height = 240;
+        (rest as any).width = 480; (rest as any).height = 280;
       }
-      // 강제 표시 스타일
-      const base: React.CSSProperties = {
-        display: 'block',
-        background: '#fff',
-        outline: '2px dashed #9ca3af',
-        overflow: 'visible',
-      };
-      (rest as any).style = { ...base, ...(styleObj || {}) };
+      const base: React.CSSProperties = { outline: '2px dashed #9ca3af' };
+      (rest as any).style = { ...(styleObj || {}), ...base };
 
-      // 자식 앞에 <style> 주입: 전역/부모 CSS에 의해 가려지는 것을 무시
-      const injectedStyle = React.createElement(
-        'style',
-        { key: '__force_style__' as any },
-        `
-/* 강제 가시화 */
-svg, svg * { visibility: visible !important; opacity: 1 !important; }
-text { fill: #111 !important; }
-[stroke="none"][fill="none"] { stroke: #111 !important; }
-/* 선이 너무 얇으면 안 보이니 최소 두께 */
-line, path, polyline, polygon { stroke-width: 1.5 !important; }
-/* reset로 display가 바뀌면 복구 */
-svg { display: block !important; }
-/* 텍스트가 축소되며 흐리지 않게 */
-* { vector-effect: non-scaling-stroke; }
-        `.trim()
+      const kids = (children as NodeConfig[]).map((c, i) => <React.Fragment key={i}>{renderNode(c)}</React.Fragment>);
+
+      // 🔒 Shadow DOM으로 격리해서 렌더
+      return (
+        <ShadowHost styleText={shadowCSS}>
+          {React.createElement(componentType, rest, ...kids)}
+        </ShadowHost>
       );
-
-      const renderedChildren = (children as NodeConfig[]).map((c, idx) => (
-        <React.Fragment key={idx}>{renderNode(c)}</React.Fragment>
-      ));
-
-      return React.createElement(componentType, rest, injectedStyle, ...renderedChildren);
     }
 
-    // SVG 텍스트: content를 텍스트 노드로
     if (isSvg && type === 'text') {
-      const renderedChildren = (children as NodeConfig[]).map((c, idx) => (
-        <React.Fragment key={idx}>{renderNode(c)}</React.Fragment>
-      ));
-      return React.createElement(componentType, { ...rest, style: styleObj }, content ?? null, ...renderedChildren);
+      const kids = (children as NodeConfig[]).map((c, i) => <React.Fragment key={i}>{renderNode(c)}</React.Fragment>);
+      return React.createElement(componentType, { ...rest, style: styleObj }, content ?? null, ...kids);
     }
 
-    // HTML 태그에서만 innerHTML 허용
     if (!isSvg && innerHTML) {
       return React.createElement(componentType, {
         ...rest,
@@ -115,18 +92,11 @@ svg { display: block !important; }
       });
     }
 
-    const renderedChildren = (children as NodeConfig[]).map((c, idx) => (
-      <React.Fragment key={idx}>{renderNode(c)}</React.Fragment>
-    ));
-
-    return React.createElement(componentType, { ...rest, style: styleObj }, content ?? null, ...renderedChildren);
+    const kids = (children as NodeConfig[]).map((c, i) => <React.Fragment key={i}>{renderNode(c)}</React.Fragment>);
+    return React.createElement(componentType, { ...rest, style: styleObj }, content ?? null, ...kids);
   };
 
-  return (
-    <div className="visual-root" style={{ position: 'relative' }}>
-      {renderNode(config)}
-    </div>
-  );
+  return <div className="visual-root">{renderNode(config)}</div>;
 };
 
 export default VisualRenderer;
