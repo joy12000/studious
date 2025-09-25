@@ -5,7 +5,8 @@ import { InlineMath, BlockMath } from 'react-katex';
 import mermaid from 'mermaid';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github-dark.css';
-import VisualRenderer from './VisualRenderer'; // 🚀 새로 만든 컴포넌트 임포트
+import JointJSRenderer from './JointJSRenderer'; // 🚀 JointJS 컴포넌트 임포트
+import VisualRenderer from './VisualRenderer'; // 🚀 VisualRenderer 컴포넌트 임포트
 
 // Mermaid.js 초기화
 mermaid.initialize({
@@ -30,8 +31,8 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
     }
   }, [content]);
 
-  // 🚀 [수정] visual, mermaid, katex를 모두 분리하도록 정규식 확장
-  const parts = content.split(/(```(?:visual|mermaid)[\s\S]*?```|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g);
+  // 🚀 [수정] jointjs, visual, mermaid, katex를 모두 분리하도록 정규식 확장
+  const parts = content.split(/(```(?:jointjs|visual|mermaid)[\s\S]*?```|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g);
 
   return (
     <span ref={containerRef}>
@@ -60,7 +61,19 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
           );
         }
 
-        // 🚀 [추가] 동적 시각 컴포넌트
+        // 🚀 JointJS 동적 컴포넌트
+        if (part.startsWith('```jointjs')) {
+          const jsonText = part.slice(10, -3).trim();
+          try {
+            const jointData = JSON.parse(jsonText);
+            return <div className="my-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800" key={i}><JointJSRenderer data={jointData} /></div>;
+          } catch (e) {
+            console.error('Failed to parse JointJS JSON:', e);
+            return <pre key={i} style={{ color: 'red' }}>JointJS 다이어그램 JSON 오류</pre>;
+          }
+        }
+
+        // 🚀 동적 시각 컴포넌트
         if (part.startsWith('```visual')) {
           const jsonText = part.slice(10, -3).trim();
           try {
@@ -81,7 +94,6 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
         );
       })}
     </span>
-  );
-};
+  );}
 
-export default MarkdownRenderer; 
+export default MarkdownRenderer;
