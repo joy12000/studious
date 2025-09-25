@@ -10,9 +10,17 @@ import { useSidebar } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
 
 export default function NoteListPage() {
-  const { notes, loading, filters, setFilters, toggleFavorite } = useNotes();
+  const { notes, loading, filters, setFilters, toggleFavorite, importNote } = useNotes();
   const { setIsSidebarOpen } = useSidebar();
   const navigate = useNavigate();
+
+  const handleAddNewEmptyNote = async () => {
+    const newNote = await importNote({
+      title: '빈 노트 (테스트)',
+      content: '# 제목\n\n여기에 내용을 입력하세요.',
+    });
+    navigate(`/note/${newNote.id}`);
+  };
   
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [localSearch, setLocalSearch] = useState(filters.search || '');
@@ -49,6 +57,9 @@ export default function NoteListPage() {
                     <ToggleGroupItem value="grid"><LayoutGrid className="h-5 w-5" /></ToggleGroupItem>
                     <ToggleGroupItem value="list"><List className="h-5 w-5" /></ToggleGroupItem>
                 </ToggleGroup>
+                <Button variant="outline" size="icon" onClick={handleAddNewEmptyNote} title="빈 노트 추가 (테스트용)">
+                    <Notebook className="h-5 w-5" />
+                </Button>
                 <Button variant="outline" size="icon" onClick={() => navigate('/')}>
                     <Plus className="h-5 w-5" />
                 </Button>
