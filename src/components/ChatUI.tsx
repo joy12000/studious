@@ -127,28 +127,67 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, initialMes
       parts: [{ text: msg.text }],
     }));
 
+    const botMessage: Message = {
+      id: Date.now() + 1,
+      text: '',
+      sender: 'bot',
+      followUp: [],
+    };
+    setMessages(prev => [...prev, botMessage]);
+
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // ✨ [개선] API 요청 시 noteContext 포함
         body: JSON.stringify({ history, model: selectedModel, noteContext }),
       });
-      
-      if (!response.ok) {
+
+      if (!response.ok || !response.body) {
         const errorData = await response.json();
         throw new Error(errorData.details || 'API 요청 실패');
       }
 
-      const data = await response.json();
-      
-      const botMessage: Message = {
-        id: Date.now() + 1,
-        text: data.answer,
-        sender: 'bot',
-        followUp: data.followUp,
-      };
-      setMessages(prev => [...prev, botMessage]);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+            break;
+        }
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+            if (line.startsWith('data: ')) {
+                const jsonStr = line.slice(6);
+                if (jsonStr === '[DONE]') {
+                    break;
+                }
+                try {
+                    const data = JSON.parse(jsonStr);
+                    if (data.token) {
+                        setMessages(prev => prev.map(msg => 
+                            msg.id === botMessage.id 
+                                ? { ...msg, text: msg.text + data.token } 
+                                : msg
+                        ));
+                    } else if (data.followUp) {
+                        setMessages(prev => prev.map(msg => 
+                            msg.id === botMessage.id 
+                                ? { ...msg, followUp: data.followUp } 
+                                : msg
+                        ));
+                    }
+                } catch (e) {
+                    console.error('스트림 데이터 파싱 오류:', e);
+                }
+            }
+        }
+      }
 
     } catch (error) {
       console.error('API 통신 오류:', error);
@@ -157,7 +196,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, initialMes
         text: `죄송합니다, 답변을 생성하는 중 오류가 발생했습니다.\n\n오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`,
         sender: 'bot',
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      setMessages((prev) => [...prev.filter(m => m.id !== botMessage.id), errorMessage]);
     } finally {
       setIsLoading(false);
     }

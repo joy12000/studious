@@ -114,6 +114,7 @@ class handler(BaseHTTPRequestHandler):
                     payload = {
                         "model": model_identifier,
                         "messages": [system_prompt] + messages,
+                        "stream": True  # 스트리밍 활성화
                     }
                     if model_identifier.startswith('google/'):
                         payload["response_format"] = {"type": "json_object"}
@@ -127,25 +128,71 @@ class handler(BaseHTTPRequestHandler):
                             "X-Title": "Studious"
                         },
                         json=payload,
-                        timeout=180
+                        stream=True # 스트리밍 요청
                     )
                     response.raise_for_status()
                     
-                    api_response_data = response.json()
-                    content_str = api_response_data['choices'][0]['message']['content']
-                    
-                    try:
-                        parsed_content = json.loads(content_str)
-                    except json.JSONDecodeError:
-                        print("WARN: AI 응답이 유효한 JSON이 아니므로 래핑합니다.")
-                        parsed_content = {"answer": content_str, "followUp": []}
-
-                    final_json_output = json.dumps(parsed_content, ensure_ascii=False)
-
                     self.send_response(200)
-                    self.send_header('Content-type', 'application/json; charset=utf-8')
+                    self.send_header('Content-type', 'text/event-stream; charset=utf-8')
                     self.end_headers()
-                    self.wfile.write(final_json_output.encode('utf-8'))
+
+                    full_response_content = ""
+                    for line in response.iter_lines():
+                        if line:
+                            decoded_line = line.decode('utf-8')
+                            if decoded_line.startswith('data: '):
+                                json_str = decoded_line[len('data: '):]
+                                if json_str.strip() == '[DONE]':
+                                    break
+                                try:
+                                    data = json.loads(json_str)
+                                    if 'choices' in data and data['choices']:
+                                        delta = data['choices'][0].get('delta', {})
+                                        content = delta.get('content')
+                                        if content:
+                                            full_response_content += content
+                                            # 클라이언트에 청크 전송
+                                            self.wfile.write(f"data: {json.dumps({'token': content}, ensure_ascii=False)}\n\n".encode('utf-8'))
+                                            self.wfile.flush()
+                                except json.JSONDecodeError:
+                                    print(f"WARN: 스트림에서 유효하지 않은 JSON 수신: {json_str}")
+                                    continue
+                    
+                    # 스트리밍이 끝난 후, 후속 질문 생성 및 전송
+                    try:
+                        # 후속 질문을 생성하기 위한 별도의 요청
+                        follow_up_prompt = {
+                            "role": "system",
+                            "content": f"사용자의 마지막 질문과 AI의 전체 답변을 바탕으로, 학생의 사고를 확장할 수 있는 좋은 후속 질문 3개를 제안해주세요. 전체 답변: '{full_response_content}'. 반드시 '{{"followUp": ["...", "...", "..."]}}' 형식의 JSON 객체로만 응답해야 합니다."
+                        }
+                        
+                        follow_up_payload = {
+                            "model": model_identifier, # 또는 더 빠르고 저렴한 모델 사용 가능
+                            "messages": [system_prompt] + messages + [{"role": "assistant", "content": full_response_content}, follow_up_prompt],
+                            "response_format": {"type": "json_object"}
+                        }
+
+                        follow_up_response = requests.post(
+                            url="https://openrouter.ai/api/v1/chat/completions",
+                            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                            json=follow_up_payload,
+                            timeout=60
+                        )
+                        follow_up_response.raise_for_status()
+                        follow_up_data = follow_up_response.json()
+                        follow_up_content = follow_up_data['choices'][0]['message']['content']
+                        
+                        # 후속 질문 청크 전송
+                        self.wfile.write(f"data: {follow_up_content}\n\n".encode('utf-8'))
+                        self.wfile.flush()
+
+                    except Exception as fu_e:
+                        print(f"WARN: 후속 질문 생성 실패: {fu_e}")
+                        # 실패하더라도 스트림은 정상 종료
+
+                    # 스트림 종료 신호 전송
+                    self.wfile.write('data: [DONE]\n\n'.encode('utf-8'))
+                    self.wfile.flush()
                     return
 
                 except requests.exceptions.RequestException as e:
