@@ -122,7 +122,37 @@ def summarize_text(model, text: str):
 @app.route('/api/summarize_youtube', methods=['POST'])
 def summarize_youtube_handler():
     print("--- YOUTUBE SUMMARY START (FLASK) ---")
+    if not API_KEY or not APIFY_ENDPOINT or not APIFY_TOKEN:
+        print("ERROR: Missing required environment variables.")
+        return jsonify({
+            "error": "Required server environment variables (GEMINI, APIFY) are not set.",
+            "details": "GEMINI_API_KEY, APIFY_ENDPOINT, APIFY_TOKEN must be configured in the Vercel project settings."
+        }), 500
+
     try:
-        if not API_KEY or not APIFY_ENDPOINT or not APIFY_TOKEN:
-            print("ERROR: Missing required environment variables.")
-            return jsonify({"error": "Required server environment variables (GEMINI, APIFY) are not set.", "details": "GEMINI_API_KEY, APIFY_ENDPOINT, APIFY_TOKEN must be configured in the Vercel project settings."})
+        data = request.get_json()
+        if not data or 'youtube_url' not in data:
+            return jsonify({"error": "youtube_url not provided in request body."}), 400
+
+        youtube_url = data['youtube_url']
+        print(f"Received URL: {youtube_url}")
+
+        # 1. Get Transcript
+        transcript = get_transcript_from_apify(youtube_url)
+        print(f"Successfully retrieved transcript of length {len(transcript)}.")
+
+        # 2. Summarize
+        genai.configure(api_key=API_KEY)
+        model = genai.GenerativeModel(GENAI_MODEL)
+        summary_data = summarize_text(model, transcript)
+        print("Successfully summarized text.")
+
+        # 3. Add source URL to response and return
+        summary_data['source_url'] = youtube_url
+        
+        return jsonify(summary_data), 200
+
+    except Exception as e:
+        print(f"ERROR in summarize_youtube_handler: {e}")
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
