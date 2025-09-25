@@ -1,34 +1,72 @@
 // src/components/VisualRenderer.tsx
 import React from 'react';
 
-// SVG 요소를 위한 네임스페이스
-const SVG_NS = "http://www.w3.org/2000/svg";
+/**
+ * JSON 기반으로 HTML/SVG를 재귀 렌더링하는 단순 렌더러
+ * 예시:
+ * {
+ *   "type": "svg",
+ *   "props": { "width": 400, "height": 200 },
+ *   "children": [
+ *     { "type": "rect", "props": { "x": 10, "y": 10, "width": 100, "height": 80, "fill": "#60a5fa" } },
+ *     { "type": "text", "props": { "x": 60, "y": 60, "textAnchor": "middle", "dominantBaseline": "middle", "content": "Hello" } }
+ *   ]
+ * }
+ */
 
-const VisualRenderer = ({ config }) => {
+type NodeConfig = {
+  type: string;
+  props?: Record<string, any>;
+  children?: NodeConfig[];
+};
+
+interface VisualRendererProps {
+  config: NodeConfig;
+}
+
+const SVG_TAGS = new Set([
+  'svg','g','defs','marker','path','rect','circle','ellipse','line','polyline','polygon','text',
+  'linearGradient','radialGradient','stop','pattern','clipPath','mask','foreignObject','style'
+]);
+
+const HTML_TAG_MAP: Record<string, string> = {
+  box: 'div',
+  p: 'p',
+  span: 'span',
+  img: 'img',
+  div: 'div'
+};
+
+const VisualRenderer: React.FC<VisualRendererProps> = ({ config }) => {
   if (!config) return null;
 
-  // 렌더링할 요소의 타입 결정
-  const isSvg = ['svg', 'rect', 'circle', 'path', 'defs', 'marker', 'polygon', 'ellipse', 'g', 'linearGradient', 'stop', 'text'].includes(config.type);
-  
-  // React.createElement를 사용하여 동적으로 요소 생성
-  const componentType = isSvg 
-    ? config.type 
-    : (config.type === 'box' ? 'div' : 'p');
-  
-  const { content, children, ...restProps } = config.props || {};
+  const type = config.type;
+  const isSvg = SVG_TAGS.has(type);
 
-  // 자식 요소들을 재귀적으로 렌더링
-  const childComponents = children && children.map((child, index) => (
-    <VisualRenderer key={index} config={child} />
+  const componentType = isSvg ? type : (HTML_TAG_MAP[type] ?? 'div');
+
+  // props 분리
+  const { children = [], ...rawProps } = config.props ?? {};
+
+  // 'content' 키는 텍스트/innerHTML 컨텐츠로 사용
+  const { content, innerHTML, style, ...rest } = rawProps;
+
+  // style 은 객체만 허용
+  const styleObj = (typeof style === 'object' && style) ? style : undefined;
+
+  const childNodes = (children as NodeConfig[]).map((c, idx) => (
+    <VisualRenderer key={idx} config={c} />
   ));
 
-  // SVG 텍스트는 <text> 태그 내부에 직접 렌더링
-  if (isSvg && config.type === 'text') {
-    return React.createElement(componentType, restProps, content, childComponents);
+  if (isSvg && type === 'text') {
+    return React.createElement(componentType, { ...rest, style: styleObj }, content ?? null, childNodes);
   }
-  
-  // 일반 HTML 요소
-  return React.createElement(componentType, restProps, content, childComponents);
+
+  if (innerHTML && !isSvg) {
+    return React.createElement(componentType, { ...rest, style: styleObj, dangerouslySetInnerHTML: { __html: String(innerHTML) } });
+  }
+
+  return React.createElement(componentType, { ...rest, style: styleObj }, content ?? null, childNodes);
 };
 
 export default VisualRenderer;
