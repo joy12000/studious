@@ -162,6 +162,13 @@ export default function NotePage() {
   const chatMessagesRef = useRef<Message[]>();
 
   useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'auto';
+    };
+  }, []);
+
+  useEffect(() => {
     if (!id) return;
 
     const loadNoteAndQuiz = async () => {
@@ -449,7 +456,7 @@ export default function NotePage() {
             </header>
 
             <main className="flex-1 overflow-y-auto p-4 md:p-8">
-              <article className={`mx-auto transition-all duration-300 ease-in-out ${isChatOpen ? 'max-w-full' : 'max-w-3xl'}`}>
+              <article className={`mx-auto transition-all duration-300 ease-in-out max-w-4xl`}>
                 <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2"><Calendar className="h-4 w-4" /><span>{formatDate(note.createdAt)}</span></div>
                   {note.sourceType === 'youtube' && note.sourceUrl && (<button onClick={openSource} className="flex items-center gap-1.5 text-red-600 hover:text-red-700 font-medium"><Youtube className="h-4 w-4" />YouTube에서 열기</button>)}
