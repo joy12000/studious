@@ -118,9 +118,9 @@ export default function AssignmentHelperPage() {
         setSelectedExistingNotes(prev => prev.filter(n => n.id !== noteId));
     };
 
-    const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>, setter: React.Dispatch<React.SetStateAction<File[]>>) => {
-        if (!e.target.files) return;
-        const newFiles = Array.from(e.target.files);
+    const handleFiles = async (files: FileList | null, setter: React.Dispatch<React.SetStateAction<File[]>>) => {
+        if (!files) return;
+        const newFiles = Array.from(files);
 
         for (const file of newFiles) {
             if (file.type === 'application/pdf') {
@@ -140,8 +140,6 @@ export default function AssignmentHelperPage() {
                 setter(prev => [...prev, file]);
             }
         }
-        // Reset file input
-        if (e.target) e.target.value = '';
     };
     
     const removeFile = (index: number, setter: React.Dispatch<React.SetStateAction<File[]>>) => {
@@ -238,8 +236,7 @@ export default function AssignmentHelperPage() {
             e.stopPropagation();
             setIsDragging(false);
             if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-                const mockEvent = { target: { files: e.dataTransfer.files } } as unknown as React.ChangeEvent<HTMLInputElement>;
-                onFileChange(mockEvent, setFiles);
+                handleFiles(e.dataTransfer.files, setFiles);
                 e.dataTransfer.clearData();
             }
         };
@@ -260,7 +257,7 @@ export default function AssignmentHelperPage() {
                         <UploadCloud className="h-8 w-8" />
                     </div>
                 </div>
-                <input id={inputId} type="file" multiple onChange={(e) => onFileChange(e, setFiles)} className="hidden" />
+                <input id={inputId} type="file" multiple onChange={(e) => { handleFiles(e.target.files, setFiles); e.target.value = ''; }} className="hidden" />
             </>
         );
     };

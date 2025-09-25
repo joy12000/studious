@@ -504,7 +504,7 @@ export default function NotePage() {
                           ))}
                         </div>
                       ) : (
-                        <div className="prose prose-lg max-w-none dark:prose-invert">
+                        <div className="prose prose-lg max-w-none dark:prose-invert whitespace-pre-line">
                           <ErrorBoundary>
                             <MarkdownRenderer content={note.content} />
                           </ErrorBoundary>
