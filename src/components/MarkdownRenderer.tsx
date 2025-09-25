@@ -43,6 +43,9 @@ const renderInlineContent = (text: string) => {
 
 const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  // ✅ [2단계] 모달의 상태를 관리할 state를 추가합니다. (Mermaid 코드 저장)
+  const [modalMermaidCode, setModalMermaidCode] = useState<string | null>(null);
+  const modalMermaidRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (containerRef.current) {
@@ -56,10 +59,27 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       }
     }
   }, [content]);
+  
+  // ✅ [3단계] 모달이 열리고 내용이 바뀌면, 모달 안의 Mermaid를 렌더링하는 useEffect 추가
+  useEffect(() => {
+    if (modalMermaidCode && modalMermaidRef.current) {
+      modalMermaidRef.current.innerHTML = ''; // 이전 다이어그램 초기화
+      const pre = document.createElement('pre');
+      pre.className = 'mermaid';
+      pre.innerHTML = modalMermaidCode;
+      modalMermaidRef.current.appendChild(pre);
+      try {
+        mermaid.run({ nodes: [pre] });
+      } catch (e) {
+        console.error('Failed to render mermaid in modal', e);
+        modalMermaidRef.current.innerText = '다이어그램 렌더링 오류';
+      }
+    }
+  }, [modalMermaidCode]);
 
   const renderParts = () => {
     if (!content) return null;
-
+    
     const blockRegex = /(```(?:mermaid|visual|chart|[\s\S]*?)```|[\s\S]+?(?=```|$))/g;
     const blocks = content.match(blockRegex) || [];
 
@@ -69,7 +89,13 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       if (trimmedBlock.startsWith('```mermaid')) {
         const code = trimmedBlock.slice(10, -3).trim();
         return (
-          <div className="flex justify-center my-4" key={i}>
+          // ✅ [4단계] Mermaid 래퍼를 클릭 가능한 div로 변경하고 onClick 이벤트 핸들러 추가
+          <div 
+            className="flex justify-center my-4 cursor-zoom-in" 
+            key={i}
+            onClick={() => setModalMermaidCode(code)}
+            title="클릭하여 크게 보기"
+          >
             <pre className="mermaid"><code>{code}</code></pre>
           </div>
         );
@@ -98,7 +124,21 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
     });
   }; 
 
-  return <div ref={containerRef}>{renderParts()}</div>;
+  return (
+    // ✅ [5단계] 컴포넌트의 최종 리턴값에 모달 JSX 추가
+    <div ref={containerRef}>
+      {renderParts()}
+
+      {modalMermaidCode && (
+        <div className="mermaid-modal-overlay" onClick={() => setModalMermaidCode(null)}>
+          <div className="mermaid-modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="mermaid-modal-close" onClick={() => setModalMermaidCode(null)}>×</button>
+            <div ref={modalMermaidRef} className="w-full h-full flex items-center justify-center"></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default MarkdownRenderer;
