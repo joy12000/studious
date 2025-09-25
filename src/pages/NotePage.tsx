@@ -162,11 +162,15 @@ export default function NotePage() {
   const chatMessagesRef = useRef<Message[]>();
 
   useEffect(() => {
-    document.body.style.overflow = 'hidden';
+    if (isChatOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'auto';
+    }
     return () => {
       document.body.style.overflow = 'auto';
     };
-  }, []);
+  }, [isChatOpen]); // Add isChatOpen to the dependency array
 
   useEffect(() => {
     if (!id) return;
