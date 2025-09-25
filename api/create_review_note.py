@@ -87,9 +87,12 @@ class handler(BaseHTTPRequestHandler):
               1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 반드시 KaTeX 문법으로 감싸야 합니다. 
                   -   인라인 수식: $로 감쌉니다. 예: $q''_x = -k \\frac{{dT}}{{dx}}$
                   -   블록 수식: $$로 감쌉니다. 예: $$T(x) = T_s + \\frac{{q'''}}{{2k}}(Lx - x^2)$$
+                  -   수식 내부에 일반 텍스트(한글 등)를 넣어야 할 경우, 반드시 `\\text{{}}` 명령어로 감싸야 합니다. (예: $(P_\\text{{목표}} - P_\\text{{시작}})$)
 
-              2.  **다이어그램 Mermaid (mermaid):** 순서도, 타임라인, 간트 차트 등 단순하고 정형화된 다이어그램에 사용합니다. 마크다운과 유사한 간결한 문법을 사용하세요。**주의: Mermaid 노드 안에서는 LaTeX 수식을 렌더링할 수 없으니, 복잡한 수식 대신 ΔP와 같은 간단한 텍스트나 유니코드 기호를 사용하세요.
-                  -   예시: ```mermaid\ngraph TD; A[열원] --> B(표면);\n```
+              2.  **다이어그램 (Mermaid):** 복잡한 시스템, 알고리즘, 상태 변화는 반드시 Mermaid.js 문법으로 시각화해야 합니다.
+                  -   **줄바꿈:** 노드 안에서 줄을 바꾸려면 반드시 전체 텍스트를 큰따옴표(`"`)로 감싸고 실제 엔터 키로 줄을 나눠야 합니다. `<br>` 태그는 절대 사용하지 마세요.
+                  -   **수식 사용 금지:** Mermaid 노드 안에서는 LaTeX 수식을 렌더링할 수 없으니, 복잡한 수식 대신 `ΔP`와 같은 간단한 텍스트나 유니코드 기호를 사용하세요.
+                  -   예시: ```mermaid\ngraph TD; A["노드 1<br>첫째 줄"] --> B(노드 2);\n```
 
               3.  **코드 (Code Block):** 모든 소스 코드는 반드시 언어를 명시한 코드 블록으로 작성해야 합니다.
                   -   예시: ```python\nprint("Hello")\n```
@@ -97,14 +100,18 @@ class handler(BaseHTTPRequestHandler):
               4.  **핵심 용어 (Tooltip):** 중요한 전공 용어는 반드시 <dfn title="용어에 대한 간단한 설명">핵심 용어</dfn> HTML 태그로 감싸 설명을 제공해야 합니다.
                   -   예시: <dfn title="매질 없이 열이 직접 전달되는 현상">복사</dfn>
 
+              5.  **자유 시각화 (visual):** 복잡한 개념, 비교, 구조 등을 설명해야 할 때, 아래 규칙에 따라 가상의 UI 컴포넌트 구조를 JSON으로 설계하여 시각화할 수 있습니다.
+                  ### visual JSON 생성 규칙 (★★★★★ 반드시 준수)
+                  1.  **텍스트 내용**: 텍스트를 표시할 때는 반드시 `props` 객체 안에 `content` 속성을 사용해야 합니다.
+                  2.  **요소 중첩**: 다른 요소를 자식으로 포함할 때는 반드시 최상위 레벨의 `children` 배열을 사용해야 합니다.
+                  3.  **스타일링**: 스타일은 `className`을 사용하지 말고, 반드시 CSS 속성을 직접 포함하는 인라인 `style` 객체를 사용해야 합니다.
+
               # 📚 결과물 구조 (코넬 노트 + SQ3R 변형)
               1.  **Cues (단서 영역):** 학습 내용을 대표하는 핵심 질문, 키워드, 용어를 5~7개 제시하세요.
-              2.  **Notes (노트 영역):** 
-                  -   Cues 영역의 각 항목에 대해 상세하고 깊이 있는 설명을 제공합니다.
+              2.  **Notes (노트 영역):** -   Cues 영역의 각 항목에 대해 상세하고 깊이 있는 설명을 제공합니다.
                   -   반드시 위에서 설명한 '출력 서식 규칙'을 준수하여(수식, 다이어그램, 코드, 툴팁) 내용을 풍부하게 만드세요.
                   -   단순 요약을 넘어, 개념 간의 연결, 실제 적용 사례, 잠재적인 질문을 포함하여 "살아있는 지식"을 전달해야 합니다.
-              3.  **Summary (요약 영역):** 
-                  -   강의 자료 전체의 핵심 내용을 3~5문장으로 압축하여 요약합니다.
+              3.  **Summary (요약 영역):** -   강의 자료 전체의 핵심 내용을 3~5문장으로 압축하여 요약합니다.
                   -   이 요약은 학생이 30초 안에 해당 강의의 정수를 파악할 수 있도록 도와야 합니다.
 
               # ✅ 최종 품질 체크리스트
@@ -166,12 +173,10 @@ class handler(BaseHTTPRequestHandler):
                 try:
                     print(f"INFO: API 키 #{i + 1} (으)로 참고서 생성 시도...")
                     genai.configure(api_key=api_key)
-                    model = genai.GenerativeModel('gemini-2.5-pro')
+                    model = genai.GenerativeModel('gemini-2.5-flash')
 
                     response = model.generate_content(request_contents)
 
-                    # The model is expected to return a JSON string.
-                    # We need to parse it to extract the data.
                     generated_data = extract_first_json(response.text)
 
                     json_response = {

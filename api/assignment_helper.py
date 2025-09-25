@@ -29,8 +29,8 @@ class handler(BaseHTTPRequestHandler):
             os.environ.get('GEMINI_API_KEY_PRIMARY'),
             os.environ.get('GEMINI_API_KEY_SECONDARY'),
             os.environ.get('GEMINI_API_KEY_TERTIARY'),
-            os.environ.get('GEMINI_API_KEY_QUATERNARY')
-            #os.environ.get('GEMINI_API_KEY')
+            os.environ.get('GEMINI_API_KEY_QUATERNARY'),
+            os.environ.get('GEMINI_API_KEY')
         ]
         valid_keys = [key for key in api_keys if key]
 
@@ -63,8 +63,6 @@ class handler(BaseHTTPRequestHandler):
                         response.raise_for_status()
                         
                         path = urlparse(url).path
-                        # Extract the original filename from the blob URL path
-                        # e.g. /assignments/my-file.pdf -> my-file.pdf
                         filename = unquote(os.path.basename(path))
                         
                         file_path = os.path.join(job_dir, filename)
@@ -87,12 +85,15 @@ class handler(BaseHTTPRequestHandler):
             # 🎨 출력 서식 규칙 (★★★★★ 가장 중요)
             당신이 생성하는 모든 텍스트는 아래 규칙을 **반드시** 따라야 합니다.
             
-            절대 규칙: 모든 시각 자료는 반드시 지정된 언어의 코드 블록 안에 포함하여 출력해야 합니다. 이 규칙은 선택이 아닌 필수입니다. 코드 블록 바깥에 순수한 JSON이나 다이어그램 코드를 절대로 출력해서는 안 됩니다. 이 규칙을 위반한 출력은 실패한 것으로 간주됩니다.
-
-            1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 **반드시** KaTeX 문법으로 감싸야 합니다. (인라인: `, 블록: `$`)
-            2.  **다이어그램 (Mermaid):** 복잡한 시스템, 알고리즘, 상태 변화는 **반드시** Mermaid.js 문법으로 시각화해야 합니다. (```mermaid...```)
+            1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 **반드시** KaTeX 문법으로 감싸야 합니다. (인라인: $, 블록: $$). 수식 내부에 일반 텍스트(한글 등)를 넣어야 할 경우, 반드시 `\\text{{}}` 명령어로 감싸야 합니다.
+            2.  **다이어그램 (Mermaid):** 복잡한 시스템, 알고리즘, 상태 변화는 **반드시** Mermaid.js 문법으로 시각화해야 합니다. (```mermaid...```). **주의:** 노드 안에서 줄을 바꾸려면 반드시 전체 텍스트를 큰따옴표(`"`)로 감싸고 실제 엔터 키로 줄을 나눠야 합니다. `<br>` 태그는 사용하지 마세요.
             3.  **코드 (Code Block):** 모든 소스 코드는 **반드시** 언어를 명시한 코드 블록으로 작성해야 합니다. (```python...```)
             4.  **핵심 용어 (Tooltip):** 중요한 전공 용어는 **반드시** `<dfn title="설명">용어</dfn>` HTML 태그로 감싸 설명을 제공해야 합니다.
+            5.  **자유 시각화 (visual):** 복잡한 개념 등을 시각화할 때 사용합니다.
+                ### visual JSON 생성 규칙 (★★★★★ 반드시 준수)
+                1.  **텍스트 내용**: 텍스트를 표시할 때는 반드시 `props` 객체 안에 `content` 속성을 사용해야 합니다.
+                2.  **요소 중첩**: 다른 요소를 자식으로 포함할 때는 반드시 최상위 레벨의 `children` 배열을 사용해야 합니다.
+                3.  **스타일링**: 스타일은 `className`을 사용하지 말고, 반드시 CSS 속성을 직접 포함하는 인라인 `style` 객체를 사용해야 합니다.
             """
 
             prompt_template_grading = f"""
@@ -175,7 +176,7 @@ class handler(BaseHTTPRequestHandler):
                 try:
                     print(f"INFO: API 키 #{i + 1} (으)로 Gemini API 호출 시도...")
                     genai.configure(api_key=api_key)
-                    model = genai.GenerativeModel('gemini-2.5-pro')
+                    model = genai.GenerativeModel('gemini-1.5-pro-latest')
                     response = model.generate_content(request_contents)
                     
                     cleaned_text = response.text.strip().replace('```json', '').replace('```', '')
