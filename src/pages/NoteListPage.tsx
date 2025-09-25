@@ -35,7 +35,7 @@ export default function NoteListPage() {
   const sortedNotes = useMemo(() => {
     if (!notes) return [];
     const arr = [...notes];
-    arr.sort((a, b) => (b.favorite ? 1 : 0) - (a.favorite ? 1 : 0) || b.updatedAt - a.updatedAt);
+    arr.sort((a, b) => b.updatedAt - a.updatedAt); // 최신 노트가 왼쪽 위에 오도록 updatedAt 기준으로 내림차순 정렬
     return arr;
   }, [notes]);
   
