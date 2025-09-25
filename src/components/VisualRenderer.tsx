@@ -1,6 +1,8 @@
 import React from 'react';
 import ShadowHost from './ShadowHost';
 import { InlineMath, BlockMath } from 'react-katex';
+// ✅ 1. 프로젝트의 모든 CSS를 텍스트로 가져옵니다. (Vite의 ?raw 기능)
+import appCss from '../index.css?raw';
 
 type NodeConfig = {
   type: string;
@@ -17,16 +19,19 @@ const SVG_TAGS = new Set([
   'linearGradient','radialGradient','stop','pattern','clipPath','mask','foreignObject','style'
 ]);
 
+// ✅ 2. AI가 생성하는 모든 태그 타입을 명시합니다.
 const HTML_TAG_MAP: Record<string, string> = {
-  box: 'div', p: 'p', span: 'span', img: 'img', div: 'div'
+  box: 'div', p: 'p', span: 'span', img: 'img', div: 'div',
+  h1: 'h1', h2: 'h2', h3: 'h3', ul: 'ul', li: 'li', strong: 'strong',
+  text: 'span' // 'text' 타입을 'span'으로 매핑
 };
 
-/** 외부 CSS 없이도 보이도록 기본값 보정 */
+/** 외부 CSS 없이도 보이도록 SVG 기본값 보정 */
 function ensureVisibleDefaults(type: string, props: Record<string, any>) {
   const p = { ...props };
   if (SVG_TAGS.has(type)) {
     if (p.stroke == null && p.fill == null) {
-      p.stroke = '#111';
+      p.stroke = 'currentColor'; // Tailwind의 color를 따르도록 변경
       p.fill = 'none';
     }
     if (p.strokeWidth == null && (type === 'path' || type === 'line' || type === 'polyline' || type === 'polygon')) {
@@ -55,22 +60,12 @@ const renderContentWithLatex = (text: string) => {
 const VisualRenderer: React.FC<Props> = ({ config }) => {
   if (!config) return null;
 
-  // Shadow DOM 안에서만 적용될 리셋/기본 스타일
-  const shadowCSS = `
-/* 외부(페이지 전역) CSS를 차단하고 기본값으로 복구 */
-:host { all: initial; }
-svg { display:block; overflow:visible; background:#fff; }
-/* SVG 내부 기본값 (외부 !important에 영향 안 받음) */
-svg, svg * { visibility: visible; opacity: 1; }
-text { fill:#111; font-size:14px; }
-line, path, polyline, polygon { stroke-width:2; }
-`;
-
   const renderNode = (node?: NodeConfig): React.ReactNode => {
     if (!node) return null;
 
+    // ✅ 3. className을 props에서 올바르게 추출합니다.
     const { type, props = {}, children = [] } = node;
-    const { content, innerHTML, style, ...rest0 } = props;
+    const { content, innerHTML, style, className, ...rest0 } = props;
     
     const isSvg = SVG_TAGS.has(type);
     const componentType = isSvg ? type : (HTML_TAG_MAP[type] ?? 'div');
@@ -78,45 +73,22 @@ line, path, polyline, polygon { stroke-width:2; }
     const rest = ensureVisibleDefaults(type, rest0);
     const styleObj = (typeof style === 'object' && style) ? style : undefined;
 
-    if (isSvg && type === 'svg') {
-      (rest as any).xmlns = (rest as any).xmlns || 'http://www.w3.org/2000/svg';
-      if ((rest as any).width == null && (rest as any).height == null) {
-        (rest as any).width = 480; (rest as any).height = 280;
-      }
-      const base: React.CSSProperties = { outline: '2px dashed #9ca3af' };
-      (rest as any).style = { ...(styleObj || {}), ...base };
-
-      const kids = (children as NodeConfig[]).map((c, i) => <React.Fragment key={i}>{renderNode(c)}</React.Fragment>);
-
-      // 🔒 Shadow DOM으로 격리해서 렌더
-      return (
-        <ShadowHost styleText={shadowCSS}>
-          {React.createElement(componentType, rest, ...kids)}
-        </ShadowHost>
-      );
-    }
-
-    if (isSvg && type === 'text') {
-      const kids = (children as NodeConfig[]).map((c, i) => <React.Fragment key={i}>{renderNode(c)}</React.Fragment>);
-      const renderedContent = typeof content === 'string' ? renderContentWithLatex(content) : content;
-      return React.createElement(componentType, { ...rest, style: styleObj }, renderedContent, ...kids);
-    }
-
-    if (!isSvg && innerHTML) {
-      return React.createElement(componentType, {
-        ...rest,
-        style: styleObj,
-        dangerouslySetInnerHTML: { __html: String(innerHTML) }
-      });
-    }
-
     const kids = (children as NodeConfig[]).map((c, i) => <React.Fragment key={i}>{renderNode(c)}</React.Fragment>);
     const renderedContent = typeof content === 'string' ? renderContentWithLatex(content) : content;
 
-    return React.createElement(componentType, { ...rest, style: styleObj }, renderedContent, ...kids);
+    // ✅ 4. 모든 요소에 className과 style을 전달하도록 수정합니다.
+    return React.createElement(componentType, { ...rest, style: styleObj, className }, renderedContent, ...kids);
   };
 
-  return <div className="visual-root">{renderNode(config)}</div>;
+  // ✅ 5. 최종 렌더링 시, ShadowHost로 전체를 감싸고 Tailwind CSS를 주입합니다.
+  // 이렇게 하면 SVG와 HTML 모두 Tailwind 클래스의 영향을 받게 됩니다.
+  return (
+    <div className="visual-root">
+      <ShadowHost styleText={appCss}>
+        <div className="p-1 prose dark:prose-invert max-w-none">{renderNode(config)}</div>
+      </ShadowHost>
+    </div>
+  );
 };
 
 export default VisualRenderer;
