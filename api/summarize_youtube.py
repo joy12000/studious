@@ -144,13 +144,16 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(body, ensure_ascii=False).encode("utf-8"))
 
-    def do_GET(self):
+    def do_POST(self):
         try:
             if not API_KEY or not APIFY_ENDPOINT or not APIFY_TOKEN:
                 return self._send_json(500, {"error": "Required environment variables (GEMINI, APIFY) are not set."})
 
-            qs = parse_qs(urlparse(self.path).query)
-            url = (qs.get("youtubeUrl") or [None])[0]
+            content_length = int(self.headers['Content-Length'])
+            post_data = self.rfile.read(content_length)
+            body = json.loads(post_data)
+            url = body.get("youtubeUrl")
+
             if not url:
                 return self._send_json(400, {"error": "youtubeUrl is required."})
 
@@ -173,3 +176,6 @@ class Handler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"Unhandled Exception: {e}\n{traceback.format_exc()}")
             return self._send_json(500, {"error": "An internal server error occurred."})
+
+    def do_GET(self):
+        self._send_json(405, {"error": "Method Not Allowed. Use POST."})
