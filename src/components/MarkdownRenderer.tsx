@@ -45,23 +45,28 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       if (!part) return null;
 
       const trimmedPart = part.trim();
+      
+      // Green border for successfully identified special blocks
+      const debugStyle = { border: '2px solid green', margin: '2px', padding: '2px' };
 
       // 블록 KaTeX ( $$...$$ )
       if (trimmedPart.startsWith('$$') && trimmedPart.endsWith('$$')) {
-        return <BlockMath key={i}>{trimmedPart.slice(2, -2)}</BlockMath>;
+        return <div style={debugStyle}><BlockMath key={i}>{trimmedPart.slice(2, -2)}</BlockMath></div>;
       }
 
       // 인라인 KaTeX ( $...$ )
       if (trimmedPart.startsWith('$') && trimmedPart.endsWith('$')) {
-        return <InlineMath key={i}>{trimmedPart.slice(1, -1)}</InlineMath>;
+        return <div style={debugStyle}><InlineMath key={i}>{trimmedPart.slice(1, -1)}</InlineMath></div>;
       }
 
       // Mermaid 다이어그램
       if (trimmedPart.startsWith('```mermaid')) {
         const code = trimmedPart.slice(10, -3).trim();
         return (
-          <div className="flex justify-center my-4" key={i}>
-            <pre className="mermaid"><code>{code}</code></pre>
+          <div style={debugStyle}>
+            <div className="flex justify-center my-4" key={i}>
+              <pre className="mermaid"><code>{code}</code></pre>
+            </div>
           </div>
         );
       }
@@ -71,16 +76,16 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
         const jsonText = trimmedPart.slice(10, -3).trim();
         try {
           const jointData = JSON.parse(jsonText);
-          return <div className="my-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800" key={i}><JointJSRenderer data={jointData} /></div>;
+          return <div style={debugStyle}><div className="my-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800" key={i}><JointJSRenderer data={jointData} /></div></div>;
         } catch (e) {
           console.error('Failed to parse JointJS JSON:', e);
           return <pre key={i} style={{ color: 'red' }}>JointJS 다이어그램 렌더링 오류</pre>;
         }
       }
       
-      // 위에서 걸러지지 않은 나머지 모든 텍스트는 일반 마크다운으로 취급
-      // 여기서부턴 원본 part를 사용해야 앞뒤 공백이 유지됩니다.
-      return <span key={i} dangerouslySetInnerHTML={{ __html: marked(part) as string }} />;
+      // Red border for fallback rendering
+      const fallbackDebugStyle = { border: '2px solid red', margin: '2px', padding: '2px' };
+      return <div style={fallbackDebugStyle}><span key={i} dangerouslySetInnerHTML={{ __html: marked(part) as string }} /></div>;
     });
   }; 
 
