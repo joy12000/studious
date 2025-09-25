@@ -117,22 +117,12 @@
   margin-bottom: 1.25em;
 }
 
-/* === JointJS/Visual 디버그용: 보이게 강제 === */
-.note-content svg {
+/* Visual 전용: svg가 0px로 수축되거나 가려지는 걸 방지 */
+.visual-root svg {
   display: block !important;
   width: auto !important;
   height: auto !important;
   min-height: 180px !important;
-  overflow: visible !important;  /* 뷰포트 바깥 잘림 방지 */
-}
-
-.note-content svg, 
-.note-content svg * {
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-
-/* 혹시 리셋/유틸 CSS가 stroke/fill을 지우면 대비 */
-.note-content svg [stroke="none"][fill="none"] {
-  stroke: #111 !important;
+  overflow: visible !important;
+  isolation: isolate;
 }

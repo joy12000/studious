@@ -228,6 +228,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, className 
             return (
               <div
                 key={`v-${i}`}
+                className="visual-root"
                 style={{
                   margin: '12px 0',
                   border: error ? '1px solid #ef4444' : '1px solid #22c55e',
