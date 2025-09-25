@@ -102,17 +102,19 @@ class handler(BaseHTTPRequestHandler):
             코드 블록의 언어는 **visual**로 지정해야 합니다.
 
             type: 렌더링할 요소의 종류 (box, text, svg, rect, circle, path 등).
-            props: 해당 요소의 속성 (스타일, 내용 등). className을 통해 Tailwind CSS 클래스를 사용하여 디자인합니다. SVG 요소의 경우 x, y, d 등 모든 SVG 속성을 사용합니다.
+            props: 해당 요소의 속성. **절대로 `className`을 사용하지 말고, 반드시 CSS 속성을 직접 포함하는 `style` 객체를 사용해야 합니다.**
             children: 자식 요소들의 배열.
-            예시 (간단한 비교):
+            예시 (잘못된 사용: `className`):
+            ```visual
+            {{ "type": "box", "props": {{ "className": "flex gap-4 p-4" }} }}
+            ```
+            예시 (올바른 사용: `style` 객체):
             ```visual
             {{
-            "type": "box",
-            "props": {{ "className": "flex gap-4 p-4" }},
-            "children": [
-            {{ "type": "box", "props": {{ "className": "flex-1 p-3" }}, "children": [{{ "type": "text", "props": {{ "content": "항목 1" }} }}]}},
-            {{ "type": "box", "props": {{ "className": "flex-1 p-3" }}, "children": [{{ "type": "text", "props": {{ "content": "항목 2" }} }}]}}
-            ]
+              "type": "box",
+              "props": {{
+                "style": {{ "display": "flex", "gap": "1rem", "padding": "1rem" }}
+              }}
             }}
             ```
 
