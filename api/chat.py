@@ -2,8 +2,12 @@ from http.server import BaseHTTPRequestHandler
 import json
 import os
 import google.generativeai as genai
+import tempfile
+import shutil
+from PIL import Image
 import traceback
-import re
+import requests
+import io
 
 class handler(BaseHTTPRequestHandler):
     def handle_error(self, e, message="오류 발생", status_code=500):
@@ -20,97 +24,122 @@ class handler(BaseHTTPRequestHandler):
                 print(f"FATAL: 오류 응답 전송 중 추가 오류 발생: {write_error}")
 
     def do_POST(self):
-        # List of API keys to try
         api_keys = [
             os.environ.get('GEMINI_API_KEY_PRIMARY'),
             os.environ.get('GEMINI_API_KEY_SECONDARY'),
             os.environ.get('GEMINI_API_KEY_TERTIARY'),
-            os.environ.get('GEMINI_API_KEY_QUATERNARY'),
-            os.environ.get('GEMINI_API_KEY')
+            os.environ.get('GEMINI_API_KEY_QUATERNARY')
         ]
         valid_keys = [key for key in api_keys if key]
 
         if not valid_keys:
-            return self.handle_error(ValueError("No valid Gemini API keys found."), "Configuration Error", 500)
+            return self.handle_error(ValueError("설정된 Gemini API 키가 없습니다."), "API 키 설정 오류", 500)
+
+        last_error = None
+        blob_urls_to_delete = [] # To store URLs for cleanup
 
         try:
-            # 1. Parse Request
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data)
-            
-            note_context = data.get('noteContext', '')
-            chat_history = data.get('history', []) 
-            
-            if not chat_history or chat_history[-1]['role'] != 'user':
-                 return self.handle_error(ValueError("Invalid history format or missing user message."), "Bad Request", 400)
 
-            user_message = chat_history[-1]['parts'][0]['text']
-
-            # 2. Prepare Chat
-            system_prompt = f"""You are a helpful study assistant. Your goal is to help the user understand their notes.
-            Use the provided note context to answer the user's questions.
-            Keep your answers concise and clear. Format responses in Markdown.
-            After your main answer, on new lines, suggest exactly 3 follow-up questions the user might have, starting with the phrase \"Follow-up questions\".
-
-            --- NOTE CONTEXT ---
-            {note_context}
-            --- END NOTE CONTEXT ---"""
+            blob_urls = data.get('blobUrls', [])
+            if not blob_urls or not isinstance(blob_urls, list):
+                return self.handle_error(ValueError("유효하지 않은 blobUrls 입니다."), status_code=400)
             
-            model_history = chat_history[:-1]
-            
-            full_prompt = f"{system_prompt}\n\nUSER QUESTION: {user_message}"
+            blob_urls_to_delete.extend(blob_urls) # Add to cleanup list
 
-            last_error = None
-            for api_key in valid_keys:
+            subject_name = data.get('subject', '[과목명]')
+            subject_id = data.get('subjectId')
+            week_info = data.get('week', '[N주차/18주차]')
+            material_types = data.get('materialTypes', '[PPT/PDF/텍스트 등]')
+
+            prompt = f"""
+            당신은 인지과학과 교육심리학 전문가입니다. 첨부된 강의 자료를 분석하여, 학생이 스스로 깊이 있게 학습할 수 있는 최고의 참고서를 제작해야 합니다.
+
+            # 📖 교과서 정보
+            - 과목: {subject_name}
+            - 주차: {week_info}
+            - 자료 형태: {material_types}
+
+            # 🎨 출력 서식 규칙 (★★★★★ 가장 중요)
+            당신이 생성하는 모든 텍스트는 아래 규칙을 **반드시** 따라야 합니다.
+
+            1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 **반드시** KaTeX 문법으로 감싸야 합니다.
+                -   인라인 수식: $로 감쌉니다. 예: $q''_x = -k \frac{{dT}}{{dx}}$
+                -   블록 수식: $$로 감쌉니다. 예: $$ T(x) = T_s + \frac{{q'''}}{{2k}}(Lx - x^2) $$
+
+            2.  **코드 (Code Block):** 모든 소스 코드는 **반드시** 언어를 명시한 코드 블록으로 작성해야 합니다.
+                -   예시: ```python\nprint("Hello")\n```
+
+            3.  **핵심 용어 (Tooltip):** 중요한 전공 용어는 **반드시** `<dfn title="용어에 대한 간단한 설명">핵심 용어</dfn>` HTML 태그로 감싸 설명을 제공해야 합니다.
+                -   예시: `<dfn title="매질 없이 열이 직접 전달되는 현상">복사</dfn>`
+
+            # 🖼️ 절대 규칙: 모든 시각 자료는 반드시 지정된 언어의 코드 블록 안에 포함하여 출력해야 합니다. 이 규칙은 선택이 아닌 필수입니다. 코드 블록 바깥에 순수한 JSON이나 다이어그램 코드를 절대로 출력해서는 안 됩니다. 이 규칙을 위반한 출력은 실패한 것으로 간주됩니다.
+
+            Mermaid (mermaid): 순서도, 타임라인, 간트 차트 등 단순하고 정형화된 다이어그램에 사용합니다. 마크다운과 유사한 간결한 문법을 사용하세요.
+
+            자유 시각화 (JSON Component): 복잡한 개념, 비교, 구조 등을 설명해야 할 때, 아래 규칙에 따라 가상의 UI 컴포넌트 구조를 JSON으로 설계하여 시각화할 수 있습니다.
+            코드 블록의 언어는 **visual**로 지정해야 합니다.
+
+            type: 렌더링할 요소의 종류 (box, text, svg, rect, circle, path 등).
+            props: 해당 요소의 속성. **절대로 `className`을 사용하지 말고, 반드시 CSS 속성을 직접 포함하는 `style` 객체를 사용해야 합니다.**
+            children: 자식 요소들의 배열.
+            예시 (잘못된 사용: `className`):
+            ```visual
+            {{ "type": "box", "props": {{ "className": "flex gap-4 p-4" }} }}
+            ```
+            예시 (올바른 사용: `style` 객체):
+            ```visual
+            {{
+              "type": "box",
+              "props": {{
+                "style": {{ "display": "flex", "gap": "1rem", "padding": "1rem" }}
+              }}
+            }}
+            ```
+
+            # 📚 결과물 구조 (Gagne의 9단계 + 백워드 설계)
+            1단계: **주의집중 & 학습목표** (핵심 질문, 구체적 목표, 이전 학습과의 연결고리)
+            2단계: **선행지식 활성화** (사전 점검 퀴즈, 관련 개념 요약)
+            3단계: **핵심 내용 구조화** (각 개념별 정의, 시각화(Mermaid), 구체적 예시, 주의사항 제시)
+            4단계: **단계별 예제** (유형별 모범 풀이와 사고과정 설명, 변형 문제 제시)
+            5단계: **능동 연습 설계** (기초/응용/교차 연습 문제 및 자가 채점 해설)
+            6단계: **요약 및 연결** (핵심 요약, 암기용 개념 카드, 다음 학습 예고)
+            7단계: **복습 스케줄링** (1일/3일/1주 후 복습 계획 제안)
+
+            # ✅ 최종 품질 체크리스트
+            - 위의 '출력 서식 규칙'이 모두 완벽하게 적용되었는가?
+            - 자기주도 학습이 가능한 친절하고 상세한 설명인가?
+
+            결과물은 다른 설명 없이, 위 규칙들을 모두 준수한 참고서 본문(마크다운)만 생성해야 합니다.
+            """
+            
+            request_contents = [prompt]
+            text_materials = []
+            import google.ai.generativelanguage as glm
+
+            for url in blob_urls:
                 try:
-                    # 3. Configure API and send request
+                    response = requests.get(url, stream=True)
+                    response.raise_for_status()
+                    file_content = response.content
+                    content_type = response.headers.get('content-type', 'application/octet-stream')
+
+                    if 'image/' in content_type:
+                        request_contents.append(Image.open(io.BytesIO(file_content)))
+                    elif 'application/pdf' in content_type:
+                        request_contents.append(glm.Part(inline_data=glm.Blob(mime_type='application/pdf', data=file_content)))
+                    else:
+                        text_materials.append(file_content.decode('utf-8', errors='ignore'))
+                except Exception as e:
+                    print(f"WARN: Blob URL에서 파일 다운로드 또는 처리 실패 ('{url}'): {e}")
+
+            if text_materials:
+                request_contents.append("\n--- 학습 자료 (텍스트) ---\n" + "\n\n".join(text_materials))
+                
+            for i, api_key in enumerate(valid_keys):
+                try:
+                    print(f"INFO: API 키 #{i + 1} (으)로 참고서 생성 시도...")
                     genai.configure(api_key=api_key)
                     model = genai.GenerativeModel('gemini-1.5-pro-latest')
-                    
-                    chat = model.start_chat(history=model_history)
-                    response = chat.send_message(full_prompt)
-
-                    # 4. Post-process for follow-up questions
-                    response_text = response.text
-                    
-                    # Find the follow-up questions section
-                    follow_up_match = re.search(r'Follow-up questions:(.*)', response_text, re.IGNORECASE | re.DOTALL)
-                    
-                    answer = response_text
-                    follow_ups = []
-
-                    if follow_up_match:
-                        # Extract the main answer by splitting at the follow-up section
-                        answer = response_text.split(follow_up_match.group(0))[0].strip()
-                        
-                        # Extract the questions from the matched group
-                        questions_text = follow_up_match.group(1).strip()
-                        # Split by newline and filter out empty strings
-                        follow_ups = [q.strip() for q in questions_text.split('\n') if q.strip()]
-                        # Further clean up by removing potential numbering/bullets
-                        follow_ups = [re.sub(r'^[\d\*\-]+\s*', '', q) for q in follow_ups]
-
-
-                    # 5. Send JSON Response
-                    self.send_response(200)
-                    self.send_header('Content-type', 'application/json; charset=utf-8')
-                    self.end_headers()
-                    
-                    response_data = {
-                        "answer": answer,
-                        "followUp": follow_ups[:3] # Return up to 3 follow-up questions
-                    }
-                    self.wfile.write(json.dumps(response_data, ensure_ascii=False).encode('utf-8'))
-                    return # Success, exit the loop and function
-
-                except Exception as e:
-                    last_error = e
-                    print(f"WARN: API key failed. Trying next key. Error: {e}")
-                    continue # Try next key
-            
-            # If all keys failed
-            raise ConnectionError("All API keys failed.") from last_error
-
-        except Exception as e:
-            self.handle_error(e)
