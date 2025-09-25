@@ -1,18 +1,11 @@
 // src/components/MarkdownRenderer.tsx
-
 import React, { useEffect, useRef } from 'react';
-
 import { marked } from 'marked';
-
 import { InlineMath, BlockMath } from 'react-katex';
-
 import mermaid from 'mermaid';
-
-import JointJSRenderer from './JointJSRenderer';
-
+import JointJSRenderer from './JointJSRenderer'; // JointJS 렌더러 임포트
 import 'highlight.js/styles/github-dark.css';
-
-
+import 'katex/dist/katex.min.css'; // KaTeX CSS 임포트
 
 // Mermaid.js 초기화
 mermaid.initialize({
@@ -21,134 +14,78 @@ mermaid.initialize({
   securityLevel: 'loose',
 });
 
-
-
 interface Props {
   content: string;
 }
 
-
-
-// 텍스트 한 줄(문단) 내에서 인라인 수학($...$)을 처리하는 헬퍼 함수
-const renderInlineContent = (text: string, keyPrefix: string) => {
-    const parts = text.split(/(\$\S[\s\S]*?\S\$)/g);
-    return parts.map((part, index) => {
-        if (part.startsWith('$') && part.endsWith('$')) {
-            return <InlineMath key={`${keyPrefix}-${index}`}>{part.slice(1, -1)}</InlineMath>;
-        }
-        // 인라인 텍스트 내의 다른 마크다운(**볼드** 등)을 처리
-        return <span key={`${keyPrefix}-${index}`} dangerouslySetInnerHTML={{ __html: marked.parseInline(part) as string }} />;
-    });
-};
-
-
-
 const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-
-
+  // Mermaid 렌더링을 위한 useEffect는 그대로 유지
   useEffect(() => {
     if (containerRef.current) {
+      try {
         const mermaidElements = containerRef.current.querySelectorAll('pre.mermaid > code');
         if (mermaidElements.length > 0) {
             mermaid.run({ nodes: mermaidElements as NodeListOf<HTMLElement> });
         }
+      } catch (error) {
+        console.error('Failed to render Mermaid diagram:', error);
+      }
     }
   }, [content]);
 
-
-
-  // 🚀 새로운 렌더링 로직의 핵심
-  const renderBlocks = () => {
+  const renderParts = () => {
     if (!content) return null;
 
+    // 🚀 [핵심] 모든 특수 블록과 인라인 수식을 한번에 식별하는 통합 정규식
+    const regex = /(```(?:jointjs|mermaid|visual|chart)[\s\S]*?```|\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g;
+    const parts = content.split(regex);
 
+    return parts.map((part, i) => {
+      if (!part) return null;
 
-    // 1. 먼저 JointJS, Mermaid, 블록 수학 같은 '특수 블록'들을 기준으로 전체 노트를 나눕니다.
+      // 블록 KaTeX ( $$...$$ )
+      if (part.startsWith('$$') && part.endsWith('$$')) {
+        return <BlockMath key={i}>{part.slice(2, -2)}</BlockMath>;
+      }
 
-    const blocks = content.split(/(```(?:jointjs|mermaid)[\s\S]*?```|\$\$[\][\s\S]*?\$\$)/g);
+      // 인라인 KaTeX ( $...$ )
+      if (part.startsWith('$') && part.endsWith('$')) {
+        return <InlineMath key={i}>{part.slice(1, -1)}</InlineMath>;
+      }
 
+      // Mermaid 다이어그램
+      if (part.startsWith('```mermaid')) {
+        const code = part.slice(10, -3).trim();
+        return (
+          <div className="flex justify-center my-4" key={i}>
+            <pre className="mermaid"><code>{code}</code></pre>
+          </div>
+        );
+      }
 
-
-    return blocks.map((block, i) => {
-
-      if (!block) return null;
-
-
-
-      // 2. 각 '특수 블록'을 렌더링합니다.
-
-      if (block.startsWith('```jointjs')) {
-        const jsonText = block.slice(10, -3).trim();
+      // JointJS 다이어그램 (회로도, 시각화 등)
+      if (part.startsWith('```jointjs')) {
+        const jsonText = part.slice(10, -3).trim();
         try {
           const jointData = JSON.parse(jsonText);
           return <div className="my-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800" key={i}><JointJSRenderer data={jointData} /></div>;
         } catch (e) {
-          return <pre key={i} style={{ color: 'red' }}>JointJS JSON 오류</pre>;
+          console.error('Failed to parse JointJS JSON:', e);
+          return <pre key={i} style={{ color: 'red' }}>JointJS 다이어그램 렌더링 오류</pre>;
         }
       }
-
-
-
-      if (block.startsWith('```mermaid')) {
-        const code = block.slice(10, -3).trim();
-        return (
-
-          <div className="flex justify-center my-4" key={i}>
-
-            <pre className="mermaid"><code>{code}</code></pre>
-
-          </div>
-
-        );
-
-      }
-
-
-
-      if (block.startsWith('$$') && block.endsWith('$$')) {
-
-        return <BlockMath key={i}>{block.slice(2, -2)}</BlockMath>;
-
-      }
-
-
-
-      // 3. '특수 블록'이 아닌 나머지 텍스트 덩어리는 문단(엔터 두 번) 기준으로 다시 나눕니다.
-
-      const paragraphs = block.trim().split(/\n\s*\n/);
-
-      return paragraphs.map((para, pIndex) => {
-
-        if (!para.trim()) return null;
-
-
-
-        // 4. 각 문단을 <p> 태그로 감싸고, 그 안에서 인라인 수학($)을 처리합니다.
-
-        return (
-
-          <p key={`${i}-${pIndex}`}>
-
-            {renderInlineContent(para, `${i}-${pIndex}`)}
-
-          </p>
-
-        );
-
-      });
-
+      
+      // 🚀 [가장 중요한 수정]
+      // 위에서 걸러지지 않은 나머지 모든 텍스트는 일반 마크다운으로 취급
+      // marked() 함수가 문단, 목록, 강조 등 모든 것을 올바르게 처리
+      return <span key={i} dangerouslySetInnerHTML={{ __html: marked(part) as string }} />;
     });
+  }; 
 
-  };
-
-
-
-  return <div ref={containerRef}>{renderBlocks()}</div>;
-
-}; 
-
-
+  // 렌더링 컨테이너는 div를 사용해야 문단(<p>) 등이 올바르게 포함됩니다.
+  return <div ref={containerRef}>{renderParts()}</div>;
+};
 
 export default MarkdownRenderer;
