@@ -117,12 +117,14 @@
   margin-bottom: 1.25em;
 }
 
-/* Visual 전용: svg가 0px로 수축되거나 가려지는 걸 방지 */
-.visual-root svg {
-  display: block !important;
-  width: auto !important;
-  height: auto !important;
-  min-height: 180px !important;
-  overflow: visible !important;
-  isolation: isolate;
+/* Visual 영역을 통째로 CSS 초기화 + 선/텍스트만 보이게 */
+.visual-root svg * {
+  all: revert !important;           /* 외부 CSS 영향 제거 */
+  stroke: #111 !important;          /* 선색 강제 */
+  stroke-width: 2 !important;       /* 선두께 강제 */
+  fill: none !important;            /* 채우기 off (하양 덮임 방지) */
 }
+.visual-root svg text {
+  fill: #111 !important;            /* 텍스트 색 강제 */
+}
+.visual-root svg { display:block !important; overflow:visible !important; }
