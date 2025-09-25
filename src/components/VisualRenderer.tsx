@@ -1,27 +1,14 @@
 // src/components/VisualRenderer.tsx
 import React from 'react';
 
-/**
- * JSON 기반으로 HTML/SVG를 재귀 렌더링하는 단순 렌더러
- * 예시:
- * {
- *   "type": "svg",
- *   "props": { "width": 400, "height": 200 },
- *   "children": [
- *     { "type": "rect", "props": { "x": 10, "y": 10, "width": 100, "height": 80, "fill": "#60a5fa" } },
- *     { "type": "text", "props": { "x": 60, "y": 60, "textAnchor": "middle", "dominantBaseline": "middle", "content": "Hello" } }
- *   ]
- * }
- */
-
 type NodeConfig = {
   type: string;
   props?: Record<string, any>;
   children?: NodeConfig[];
 };
 
-interface VisualRendererProps {
-  config: NodeConfig;
+interface Props {
+  config?: NodeConfig;
 }
 
 const SVG_TAGS = new Set([
@@ -37,21 +24,31 @@ const HTML_TAG_MAP: Record<string, string> = {
   div: 'div'
 };
 
-const VisualRenderer: React.FC<VisualRendererProps> = ({ config }) => {
+const VisualRenderer: React.FC<Props> = ({ config }) => {
   if (!config) return null;
+
+  // 디버그: 콘솔에 config 찍기 (개발중에만 유용)
+  if (typeof window !== 'undefined' && (window as any).__DEV__) {
+    console.debug('VisualRenderer config:', config);
+  }
 
   const type = config.type;
   const isSvg = SVG_TAGS.has(type);
-
   const componentType = isSvg ? type : (HTML_TAG_MAP[type] ?? 'div');
 
-  // props 분리
   const { children = [], ...rawProps } = config.props ?? {};
-
-  // 'content' 키는 텍스트/innerHTML 컨텐츠로 사용
   const { content, innerHTML, style, ...rest } = rawProps;
 
-  // style 은 객체만 허용
+  // SVG 루트라면 xmlns 보장
+  const finalProps: any = { ...rest };
+  if (isSvg && type === 'svg') {
+    finalProps.xmlns = finalProps.xmlns || 'http://www.w3.org/2000/svg';
+    // viewBox나 width/height 숫자/문자형 체크
+    if (finalProps.viewBox && typeof finalProps.viewBox !== 'string') {
+      finalProps.viewBox = String(finalProps.viewBox);
+    }
+  }
+
   const styleObj = (typeof style === 'object' && style) ? style : undefined;
 
   const childNodes = (children as NodeConfig[]).map((c, idx) => (
@@ -59,14 +56,15 @@ const VisualRenderer: React.FC<VisualRendererProps> = ({ config }) => {
   ));
 
   if (isSvg && type === 'text') {
-    return React.createElement(componentType, { ...rest, style: styleObj }, content ?? null, childNodes);
+    // SVG text: content는 텍스트 노드로
+    return React.createElement(componentType, { ...finalProps, style: styleObj }, content ?? null, childNodes);
   }
 
   if (innerHTML && !isSvg) {
-    return React.createElement(componentType, { ...rest, style: styleObj, dangerouslySetInnerHTML: { __html: String(innerHTML) } });
+    return React.createElement(componentType, { ...finalProps, style: styleObj, dangerouslySetInnerHTML: { __html: String(innerHTML) } });
   }
 
-  return React.createElement(componentType, { ...rest, style: styleObj }, content ?? null, childNodes);
+  return React.createElement(componentType, { ...finalProps, style: styleObj }, content ?? null, childNodes);
 };
 
 export default VisualRenderer;
