@@ -117,25 +117,5 @@
   margin-bottom: 1.25em;
 }
 
-/* === VISUAL DEBUGGING: FORCE VISIBILITY === */
-
-/* General SVG visibility to catch all cases */
-.note-content svg, .visual-root svg {
-  display: block !important;
-  width: auto !important;
-  height: auto !important;
-  min-height: 180px !important;
-  overflow: visible !important;
-  background-color: rgba(255, 230, 230, 0.5) !important; /* Light red background to see container */
-}
-
-/* VisualRenderer specific reset */
-.visual-root svg * {
-  all: revert !important;
-  stroke: #111 !important;
-  stroke-width: 2 !important;
-  fill: none !important;
-}
-.visual-root svg text {
-  fill: #111 !important;
-}
+.visual-root svg * { stroke:#ff0000 !important; fill:none !important; opacity:1 !important; visibility:visible !important; }
+.visual-root svg text { fill:#ff0000 !important; font-size:20px !important; }
