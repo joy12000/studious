@@ -53,12 +53,18 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, initialMes
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { updateNote } = useNotes(); // useNotes 훅 사용
+  const prevMessagesLength = useRef(messages.length); // Ref to store previous messages length
 
   // ✨ [핵심 추가] messages 상태가 변경될 때마다 ref를 업데이트합니다.
   useEffect(() => {
     if (messagesRef) {
       messagesRef.current = messages;
     }
+    // Only scroll to bottom if new messages have been added
+    if (messages.length > prevMessagesLength.current) {
+      scrollToBottom();
+    }
+    prevMessagesLength.current = messages.length; // Update previous length
   }, [messages, messagesRef]);
   
   const [selectedModel, setSelectedModel] = useState(models[0].id);
@@ -67,8 +73,6 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, initialMes
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
-
-  useEffect(scrollToBottom, [messages]);
   
   // ✨ [추가] 컴포넌트 마운트 시 첫 AI 메시지 설정
   useEffect(() => {
