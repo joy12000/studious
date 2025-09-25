@@ -51,6 +51,41 @@ const JointJSRenderer: React.FC<Props> = ({ data, height = 360 }) => {
       try {
         if (data && (data.cells || data.elements || Array.isArray(data))) {
           graph.fromJSON(data);
+          // fromJSON 성공 직후 (graph.fromJSON(data) 다음에 추가)
+          try {
+            // 요소(사각형 등)와 링크 모두 "눈에 띄는" 스타일로 강제 보정
+            graph.getElements().forEach((el) => {
+              el.attr({
+                'body/fill': el.attr('body/fill') ?? '#60a5fa',
+                'body/stroke': '#111',
+                'body/strokeWidth': 2,
+                'label/fill': '#111',
+                'label/fontSize': 14,
+              });
+            });
+            graph.getLinks().forEach((lnk) => {
+              lnk.attr({
+                'line/stroke': '#111',
+                'line/strokeWidth': 2,
+                'line/targetMarker': { 'type': 'path', 'd': 'M 10 -5 0 0 10 5 z', 'fill': '#111' }
+              });
+            });
+
+            // 뷰포트 밖이면 보이도록 맞추기
+            if (typeof (paper as any).fitToContent === 'function') {
+              (paper as any).fitToContent({ padding: 20, allowNewOrigin: 'any' });
+            } else if (typeof (paper as any).scaleContentToFit === 'function') {
+              (paper as any).scaleContentToFit({ padding: 20 });
+            }
+
+            // SVG 아웃라인을 강제로 그려 "존재" 시각화
+            const svgEl: SVGSVGElement | null = (paper as any).svg || ref.current!.querySelector('svg');
+            if (svgEl) {
+              (svgEl as any).style.outline = '2px dashed #f59e0b';
+              (svgEl as any).style.background = '#fff';
+              (svgEl as any).style.overflow = 'visible';
+            }
+          } catch {}
         } else {
           // 데이터가 애매하면 샘플 셀
           const rect = new (shapes as any).standard.Rectangle({
