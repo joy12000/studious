@@ -1,6 +1,8 @@
 // src/components/JointJSRenderer.tsx
-import React, { useEffect, useRef } from 'react';
-import { dia, shapes } from '@joint/core'; // 권장 임포트 방식
+import React, { useEffect, useRef, useState } from 'react';
+// 권장: named import (환경에 따라 아래 주석처럼 바꿔보세요)
+// import * as joint from '@joint/core'; const { dia, shapes } = joint as any;
+import { dia, shapes } from '@joint/core';
 
 interface Props {
   data?: any;
@@ -9,65 +11,101 @@ interface Props {
 
 const JointJSRenderer: React.FC<Props> = ({ data, height = 360 }) => {
   const ref = useRef<HTMLDivElement | null>(null);
+  const [cellCount, setCellCount] = useState<number>(-1);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ref.current) return;
 
-    // Graph: shapes 네임스페이스를 명시하여 fromJSON 시 타입 해석 보장
-    const graph = new dia.Graph({ cellNamespace: shapes as any });
-
-    const paper = new dia.Paper({
-      el: ref.current,
-      model: graph,
-      width: ref.current.clientWidth || 800,
-      height,
-      gridSize: 10,
-      drawGrid: true,
-      async: true,
-      // 뷰 네임스페이스도 명시
-      cellViewNamespace: shapes as any,
-      // optional: background: { color: '#fff' }
-    });
-
-    // 반응형: 컨테이너 크기 변경 시 Paper 크기도 조정
-    const ro = new ResizeObserver(() => {
-      if (ref.current) {
-        const w = ref.current.clientWidth || 800;
-        paper.setDimensions(w, height);
-      }
-    });
-    ro.observe(ref.current);
+    let paper: dia.Paper | null = null;
+    let graph: dia.Graph | null = null;
 
     try {
-      if (data && (data.cells || data.length || data.elements)) {
-        // fromJSON expects graph JSON; ensure we pass correct shape
-        graph.fromJSON(data);
-      } else {
-        // 만약 data가 비어있다면 간단한 테스트 셀 삽입(디버그 목적)
-        // graph.addCell(new shapes.standard.Rectangle({ position: { x: 20, y: 20 }, size: { width: 120, height: 40 }, attrs: { body: { fill: '#60a5fa' }, label: { text: 'Sample' } } }));
-      }
-    } catch (err) {
-      // 콘솔에 에러 찍기 (브라우저 개발자도구 확인)
-      console.error('JointJSRenderer: graph.fromJSON error', err);
-    }
+      // JointJS 타입 문자열("standard.Rectangle" 등)을 인식하려면 네임스페이스 지정이 필요
+      graph = new dia.Graph({ cellNamespace: shapes as any });
 
-    return () => {
-      ro.disconnect();
-      paper.remove();
-      graph.clear();
-    };
+      paper = new dia.Paper({
+        el: ref.current,
+        model: graph,
+        width: ref.current.clientWidth || 800,
+        height,
+        gridSize: 10,
+        drawGrid: true,
+        async: true,
+        cellViewNamespace: shapes as any, // 뷰 네임스페이스도 지정
+        sorting: dia.Paper.sorting.APPROX,
+        background: { color: 'var(--paper-bg, #fff)' },
+      });
+
+      // 반응형 리사이즈
+      const ro = new ResizeObserver(() => {
+        if (ref.current && paper) {
+          const w = ref.current.clientWidth || 800;
+          paper.setDimensions(w, height);
+        }
+      });
+      ro.observe(ref.current);
+
+      // 데이터 주입
+      if (data) {
+        try {
+          if (data.cells || data.elements || Array.isArray(data)) {
+            graph.fromJSON(data);
+          } else {
+            // 구조가 애매하면 "렌더 파이프라인은 정상"임을 확인하기 위한 샘플 셀 삽입
+            const rect = new (shapes as any).standard.Rectangle({
+              position: { x: 20, y: 20 },
+              size: { width: 140, height: 44 },
+              attrs: { label: { text: 'No cells in JSON' }, body: { fill: '#fde68a', stroke: '#111' } },
+            });
+            graph.addCell(rect);
+          }
+        } catch (e: any) {
+          console.error('JointJS fromJSON error:', e);
+          setErrorMsg(`fromJSON error: ${e?.message || String(e)}`);
+        }
+      } else {
+        // data가 완전 비어있으면 샘플 셀 하나 그려서 "보임" 자체 확인
+        const rect = new (shapes as any).standard.Rectangle({
+          position: { x: 20, y: 20 },
+          size: { width: 140, height: 44 },
+          attrs: { label: { text: 'Empty data' }, body: { fill: '#fecaca', stroke: '#b91c1c' } },
+        });
+        graph.addCell(rect);
+      }
+
+      setCellCount(graph.getCells().length);
+
+      // cleanup
+      return () => {
+        ro.disconnect();
+        paper?.remove();
+        graph?.clear();
+      };
+    } catch (err: any) {
+      console.error('JointJSRenderer init error:', err);
+      setErrorMsg(`init error: ${err?.message || String(err)}`);
+    }
   }, [data, height]);
 
-  // 만약 data가 비어있거나 구조가 이상하면 사용자에게 표시
-  if (!data) {
-    return (
-      <div style={{ border: '1px dashed #999', padding: 8, borderRadius: 6, minHeight: height }}>
-        <strong>JointJS:</strong> 렌더할 데이터가 없습니다.
+  return (
+    <div style={{ position: 'relative' }}>
+      <div
+        ref={ref}
+        style={{
+          width: '100%',
+          minHeight: height,
+          height,
+          overflow: 'auto',
+          background: 'var(--paper-bg, #fff)',
+          borderRadius: 8,
+        }}
+      />
+      <div style={{ position: 'absolute', right: 8, bottom: 8, fontSize: 12, opacity: 0.8, background: '#0000000d', padding: '2px 6px', borderRadius: 6 }}>
+        cells: {cellCount >= 0 ? cellCount : '—'} {errorMsg ? `| ${errorMsg}` : ''}
       </div>
-    );
-  }
-
-  return <div ref={ref} style={{ width: '100%', minHeight: height, height }} />;
+    </div>
+  );
 };
 
 export default JointJSRenderer;

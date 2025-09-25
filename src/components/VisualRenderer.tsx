@@ -24,29 +24,42 @@ const HTML_TAG_MAP: Record<string, string> = {
   div: 'div'
 };
 
+// 누락 시 기본 stroke/fill을 넣어 "안 보이는" 문제 방지
+const ensureVisibleDefaults = (type: string, props: Record<string, any>) => {
+  const p = { ...props };
+  if (SVG_TAGS.has(type)) {
+    if (p.stroke == null && p.fill == null) {
+      p.stroke = '#111';
+      p.fill = 'none';
+    }
+    if (p.strokeWidth == null && (type === 'path' || type === 'line' || type === 'polyline' || type === 'polygon')) {
+      p.strokeWidth = 1.5;
+    }
+  }
+  return p;
+};
+
 const VisualRenderer: React.FC<Props> = ({ config }) => {
   if (!config) return null;
-
-  // 디버그: 콘솔에 config 찍기 (개발중에만 유용)
-  if (typeof window !== 'undefined' && (window as any).__DEV__) {
-    console.debug('VisualRenderer config:', config);
-  }
 
   const type = config.type;
   const isSvg = SVG_TAGS.has(type);
   const componentType = isSvg ? type : (HTML_TAG_MAP[type] ?? 'div');
 
   const { children = [], ...rawProps } = config.props ?? {};
-  const { content, innerHTML, style, ...rest } = rawProps;
+  const { content, innerHTML, style, ...rest0 } = rawProps;
 
-  // SVG 루트라면 xmlns 보장
-  const finalProps: any = { ...rest };
+  const rest = ensureVisibleDefaults(type, rest0);
+
+  // SVG 루트: xmlns/사이즈 기본값 보장
   if (isSvg && type === 'svg') {
-    finalProps.xmlns = finalProps.xmlns || 'http://www.w3.org/2000/svg';
-    // viewBox나 width/height 숫자/문자형 체크
-    if (finalProps.viewBox && typeof finalProps.viewBox !== 'string') {
-      finalProps.viewBox = String(finalProps.viewBox);
+    (rest as any).xmlns = (rest as any).xmlns || 'http://www.w3.org/2000/svg';
+    if ((rest as any).width == null && (rest as any).height == null) {
+      (rest as any).width = 400;
+      (rest as any).height = 240;
     }
+    if ((rest as any).style == null) (rest as any).style = {};
+    (rest as any).style.display = (rest as any).style.display || 'block';
   }
 
   const styleObj = (typeof style === 'object' && style) ? style : undefined;
@@ -57,14 +70,14 @@ const VisualRenderer: React.FC<Props> = ({ config }) => {
 
   if (isSvg && type === 'text') {
     // SVG text: content는 텍스트 노드로
-    return React.createElement(componentType, { ...finalProps, style: styleObj }, content ?? null, childNodes);
+    return React.createElement(componentType, { ...rest, style: styleObj }, content ?? null, childNodes);
   }
 
   if (innerHTML && !isSvg) {
-    return React.createElement(componentType, { ...finalProps, style: styleObj, dangerouslySetInnerHTML: { __html: String(innerHTML) } });
+    return React.createElement(componentType, { ...rest, style: styleObj, dangerouslySetInnerHTML: { __html: String(innerHTML) } });
   }
 
-  return React.createElement(componentType, { ...finalProps, style: styleObj }, content ?? null, childNodes);
+  return React.createElement(componentType, { ...rest, style: styleObj }, content ?? null, childNodes);
 };
 
 export default VisualRenderer;
