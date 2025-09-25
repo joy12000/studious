@@ -51,19 +51,29 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       if (containerRef.current) {
         const mermaidElements = containerRef.current.querySelectorAll('pre.mermaid:not([data-processed])');
         if (mermaidElements.length > 0) {
-          try {
-            await mermaid.run({ nodes: mermaidElements as NodeListOf<HTMLElement> });
-          } catch (error) {
-            console.error('Mermaid 렌더링 실패:', error);
-            mermaidElements.forEach(el => {
-              el.innerHTML = '다이어그램 렌더링 오류';
-              el.setAttribute('style', 'color: red; text-align: center;');
-            });
-          }
+          // ✅ [수정] 렌더링을 다음 이벤트 루프로 넘겨 DOM이 준비될 시간을 확보합니다.
+          setTimeout(async () => {
+            try {
+              // 렌더링 전에 각 코드 블록의 내용을 정규화합니다.
+              mermaidElements.forEach(el => {
+                const codeEl = el.querySelector('code');
+                if (codeEl) {
+                  codeEl.innerHTML = normalizeMermaidCode(codeEl.innerHTML);
+                }
+              });
+              await mermaid.run({ nodes: mermaidElements as NodeListOf<HTMLElement> });
+              mermaidElements.forEach(el => el.setAttribute('data-processed', 'true'));
+            } catch (error) {
+              console.error('Mermaid 렌더링 실패:', error);
+              mermaidElements.forEach(el => {
+                el.innerHTML = '다이어그램 렌더링 오류';
+                el.setAttribute('style', 'color: red; text-align: center;');
+              });
+            }
+          }, 10); // 10ms 정도의 짧은 지연
         }
       }
     };
-    
     renderMermaidDiagrams();
   }, [content]);
   
