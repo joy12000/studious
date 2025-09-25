@@ -12,7 +12,31 @@ interface Props {
   content: string;
 }
 
-const MarkdownRenderer: React.FC<Props> = ({ content }) => {\n  const containerRef = useRef<HTMLDivElement>(null);\n  const [modalMermaidCode, setModalMermaidCode] = useState<string | null>(null);\n  const modalMermaidRef = useRef<HTMLDivElement>(null);\n\n  // 문단 내부의 인라인 요소만 렌더링하는 함수\n  const renderInlineContent = useCallback((text: string) => {\n    if (!text) return null;\n    const regex = /(\\$\\$[\\s\\S]*?\\$\\$|\\$[\\s\\S]*?\$)/g;\n    const parts = text.split(regex);\n\n    return parts.map((part, i) => {\n      if (!part) return null;\n      const trimmedPart = part.trim();\n\n      if (trimmedPart.startsWith(\'$$\') && trimmedPart.endsWith(\'$$\')) {\n        return <BlockMath key={i}>{part.slice(2, -2)}</BlockMath>;\n      } \n      if (trimmedPart.startsWith(\'$\') && trimmedPart.endsWith(\'$\')) {\n        return <InlineMath key={i}>{part.slice(1, -1)}</InlineMath>;\n      }\n\n      return <span key={i} dangerouslySetInnerHTML={{ __html: marked.parseInline(part, { gfm: true, breaks: true }) as string }} />;\n    });\n  }, []); // No dependencies, as it only uses external imports
+const MarkdownRenderer: React.FC<Props> = ({ content }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [modalMermaidCode, setModalMermaidCode] = useState<string | null>(null);
+  const modalMermaidRef = useRef<HTMLDivElement>(null);
+
+  // 문단 내부의 인라인 요소만 렌더링하는 함수
+  const renderInlineContent = useCallback((text: string) => {
+    if (!text) return null;
+    const regex = /(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g;
+    const parts = text.split(regex);
+
+    return parts.map((part, i) => {
+      if (!part) return null;
+      const trimmedPart = part.trim();
+
+      if (trimmedPart.startsWith('$$') && trimmedPart.endsWith('$$')) {
+        return <BlockMath key={i}>{part.slice(2, -2)}</BlockMath>;
+      } 
+      if (trimmedPart.startsWith('$') && trimmedPart.endsWith('$')) {
+        return <InlineMath key={i}>{part.slice(1, -1)}</InlineMath>;
+      }
+
+      return <span key={i} dangerouslySetInnerHTML={{ __html: marked.parseInline(part, { gfm: true, breaks: true }) as string }} />;
+    });
+  }, []); // No dependencies, as it only uses external imports
   // ❌ 복잡했던 Mermaid 렌더링 useEffect를 모두 삭제합니다.
 
   // 모달 렌더링을 위한 useEffect는 유지합니다.
