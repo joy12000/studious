@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from 'react';
 // 환경에 따라 아래 대안을 사용하세요.
 // import * as joint from '@joint/core'; const { dia, shapes } = joint as any;
 import { dia, shapes } from '@joint/core';
+import ShadowHost from './ShadowHost';
 
 interface Props {
   data?: any;
@@ -14,6 +15,14 @@ const JointJSRenderer: React.FC<Props> = ({ data, height = 360 }) => {
   const [cellCount, setCellCount] = useState<number>(-1);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [svgInfo, setSvgInfo] = useState<string>('—');
+
+  const shadowCSS = `
+    :host { all: initial; }
+    .joint-paper { background: var(--paper-bg, #fff); }
+    .joint-grid { stroke: #e0e0e0; }
+    .joint-cell text { font-family: sans-serif; fill: #000; }
+    .joint-cell path { stroke: #333; }
+  `;
 
   useEffect(() => {
     if (!ref.current) return;
@@ -139,17 +148,19 @@ const JointJSRenderer: React.FC<Props> = ({ data, height = 360 }) => {
 
   return (
     <div style={{ position: 'relative' }}>
-      <div
-        ref={ref}
-        style={{
-          width: '100%',
-          minHeight: height,
-          height,
-          overflow: 'auto',
-          background: 'var(--paper-bg, #fff)',
-          borderRadius: 8,
-        }}
-      />
+      <ShadowHost styleText={shadowCSS}>
+        <div
+          ref={ref}
+          style={{
+            width: '100%',
+            minHeight: height,
+            height,
+            overflow: 'auto',
+            background: 'var(--paper-bg, #fff)',
+            borderRadius: 8,
+          }}
+        />
+      </ShadowHost>
       <div style={{ position: 'absolute', right: 8, bottom: 8, fontSize: 12, opacity: 0.85, background: '#00000014', padding: '4px 8px', borderRadius: 6, lineHeight: 1.2 }}>
         cells: {cellCount >= 0 ? cellCount : '—'} {errorMsg ? `| ${errorMsg}` : ''}<br/>
         {svgInfo}

@@ -1,24 +1,122 @@
-// src/components/VisualRenderer.tsx
 import React from 'react';
+import ShadowHost from './ShadowHost';
+import { InlineMath, BlockMath } from 'react-katex';
 
-const VisualRenderer = ({ config }: { config: any }) => {
+type NodeConfig = {
+  type: string;
+  props?: Record<string, any>;
+  children?: NodeConfig[];
+};
+
+interface Props {
+  config?: NodeConfig;
+}
+
+const SVG_TAGS = new Set([
+  'svg','g','defs','marker','path','rect','circle','ellipse','line','polyline','polygon','text',
+  'linearGradient','radialGradient','stop','pattern','clipPath','mask','foreignObject','style'
+]);
+
+const HTML_TAG_MAP: Record<string, string> = {
+  box: 'div', p: 'p', span: 'span', img: 'img', div: 'div'
+};
+
+/** 외부 CSS 없이도 보이도록 기본값 보정 */
+function ensureVisibleDefaults(type: string, props: Record<string, any>) {
+  const p = { ...props };
+  if (SVG_TAGS.has(type)) {
+    if (p.stroke == null && p.fill == null) {
+      p.stroke = '#111';
+      p.fill = 'none';
+    }
+    if (p.strokeWidth == null && (type === 'path' || type === 'line' || type === 'polyline' || type === 'polygon')) {
+      p.strokeWidth = 2;
+    }
+  }
+  return p;
+}
+
+const renderContentWithLatex = (text: string) => {
+  if (!text) return null;
+  const regex = /(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g;
+  const parts = text.split(regex);
+
+  return parts.map((part, i) => {
+    if (part.startsWith('$$') && part.endsWith('$$')) {
+      return <BlockMath key={i}>{part.slice(2, -2)}</BlockMath>;
+    }
+    if (part.startsWith('$') && part.endsWith('$')) {
+      return <InlineMath key={i}>{part.slice(1, -1)}</InlineMath>;
+    }
+    return part;
+  });
+};
+
+const VisualRenderer: React.FC<Props> = ({ config }) => {
   if (!config) return null;
 
-  // ✅ [수정 코드] config 객체에서 props와 children을 올바르게 분리
-  const { type, props = {}, children = [] } = config;
-  const { content, ...restProps } = props;
+  // Shadow DOM 안에서만 적용될 리셋/기본 스타일
+  const shadowCSS = `
+/* 외부(페이지 전역) CSS를 차단하고 기본값으로 복구 */
+:host { all: initial; }
+svg { display:block; overflow:visible; background:#fff; }
+/* SVG 내부 기본값 (외부 !important에 영향 안 받음) */
+svg, svg * { visibility: visible; opacity: 1; }
+text { fill:#111; font-size:14px; }
+line, path, polyline, polygon { stroke-width:2; }
+`;
 
-  const isSvg = ['svg', 'rect', 'circle', 'path', 'defs', 'marker', 'polygon', 'ellipse', 'g', 'linearGradient', 'stop', 'text'].includes(type);
-  
-  const componentType = isSvg 
-    ? type 
-    : (type === 'box' ? 'div' : 'p');
+  const renderNode = (node?: NodeConfig): React.ReactNode => {
+    if (!node) return null;
 
-  const childComponents = children && children.map((child: any, index: number) => (
-    <VisualRenderer key={index} config={child} />
-  ));
+    const { type, props = {}, children = [] } = node;
+    const { content, innerHTML, style, ...rest0 } = props;
+    
+    const isSvg = SVG_TAGS.has(type);
+    const componentType = isSvg ? type : (HTML_TAG_MAP[type] ?? 'div');
 
-  return React.createElement(componentType, restProps, content || null, childComponents);
+    const rest = ensureVisibleDefaults(type, rest0);
+    const styleObj = (typeof style === 'object' && style) ? style : undefined;
+
+    if (isSvg && type === 'svg') {
+      (rest as any).xmlns = (rest as any).xmlns || 'http://www.w3.org/2000/svg';
+      if ((rest as any).width == null && (rest as any).height == null) {
+        (rest as any).width = 480; (rest as any).height = 280;
+      }
+      const base: React.CSSProperties = { outline: '2px dashed #9ca3af' };
+      (rest as any).style = { ...(styleObj || {}), ...base };
+
+      const kids = (children as NodeConfig[]).map((c, i) => <React.Fragment key={i}>{renderNode(c)}</React.Fragment>);
+
+      // 🔒 Shadow DOM으로 격리해서 렌더
+      return (
+        <ShadowHost styleText={shadowCSS}>
+          {React.createElement(componentType, rest, ...kids)}
+        </ShadowHost>
+      );
+    }
+
+    if (isSvg && type === 'text') {
+      const kids = (children as NodeConfig[]).map((c, i) => <React.Fragment key={i}>{renderNode(c)}</React.Fragment>);
+      const renderedContent = typeof content === 'string' ? renderContentWithLatex(content) : content;
+      return React.createElement(componentType, { ...rest, style: styleObj }, renderedContent, ...kids);
+    }
+
+    if (!isSvg && innerHTML) {
+      return React.createElement(componentType, {
+        ...rest,
+        style: styleObj,
+        dangerouslySetInnerHTML: { __html: String(innerHTML) }
+      });
+    }
+
+    const kids = (children as NodeConfig[]).map((c, i) => <React.Fragment key={i}>{renderNode(c)}</React.Fragment>);
+    const renderedContent = typeof content === 'string' ? renderContentWithLatex(content) : content;
+
+    return React.createElement(componentType, { ...rest, style: styleObj }, renderedContent, ...kids);
+  };
+
+  return <div className="visual-root">{renderNode(config)}</div>;
 };
 
 export default VisualRenderer;
