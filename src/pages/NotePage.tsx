@@ -162,17 +162,31 @@ export default function NotePage() {
   const chatMessagesRef = useRef<Message[]>();
 
   useEffect(() => {
-    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth; // Calculate scrollbar width
+    const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+    const scrollY = window.scrollY; // Store current scroll position
+
     if (isChatOpen) {
       document.body.style.overflow = 'hidden';
-      document.body.style.paddingRight = `${scrollbarWidth}px`; // Add padding to compensate for scrollbar
+      document.body.style.paddingRight = `${scrollbarWidth}px`;
+      document.body.style.position = 'fixed'; // Lock the body
+      document.body.style.top = `-${scrollY}px`; // Maintain scroll position
+      document.body.style.width = '100%'; // Ensure full width
     } else {
       document.body.style.overflow = 'auto';
-      document.body.style.paddingRight = '0px'; // Remove padding
+      document.body.style.paddingRight = '0px';
+      document.body.style.position = ''; // Restore position
+      document.body.style.top = ''; // Restore top
+      document.body.style.width = ''; // Restore width
+      window.scrollTo(0, scrollY); // Restore scroll position
     }
+
     return () => {
       document.body.style.overflow = 'auto';
       document.body.style.paddingRight = '0px';
+      document.body.style.position = '';
+      document.body.style.top = '';
+      document.body.style.width = '';
+      window.scrollTo(0, scrollY); // Ensure scroll position is restored on unmount
     };
   }, [isChatOpen]); // Add isChatOpen to the dependency array
 
