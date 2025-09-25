@@ -154,3 +154,8 @@
   @apply absolute top-2 right-2 text-2xl text-gray-500 hover:text-gray-800 dark:hover:text-gray-200;
   line-height: 1;
 }
+
+/* ✅ [추가] Mermaid 확대보기 모달 내부의 SVG 크기를 키우는 스타일 */
+.mermaid-modal-content svg {
+  @apply max-w-full w-full h-auto;
+}
