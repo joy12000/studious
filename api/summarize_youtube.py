@@ -137,12 +137,23 @@ def summarize_youtube_handler():
         youtube_url = data['youtube_url']
         print(f"Received URL: {youtube_url}")
 
-        # Clean the URL by removing query parameters
-        clean_url = youtube_url.split('?')[0]
-        print(f"Cleaned URL for Apify: {clean_url}")
+        # Robustly parse and clean the YouTube URL
+        parsed_url = urlparse(youtube_url)
+        video_id = None
+        if 'youtu.be' in parsed_url.netloc:
+            video_id = parsed_url.path.lstrip('/')
+        elif 'youtube.com' in parsed_url.netloc:
+            qs = parse_qs(parsed_url.query)
+            video_id = qs.get('v', [None])[0]
+        
+        if not video_id:
+            raise ValueError(f"Invalid YouTube URL: No video ID found in {youtube_url}")
+
+        final_url = f'https://www.youtube.com/watch?v={video_id}'
+        print(f"Final URL for Apify: {final_url}")
 
         # 1. Get Transcript
-        transcript = get_transcript_from_apify(clean_url)
+        transcript = get_transcript_from_apify(final_url)
         print(f"Successfully retrieved transcript of length {len(transcript)}.")
 
         # 2. Summarize
