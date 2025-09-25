@@ -87,7 +87,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
 
   const renderParts = () => {
     if (!content) return null;
-
+    
     const blockRegex = /(```(?:mermaid|visual|chart|[\s\S]*?)```|<details[\s\S]*?<\/details>|[\s\S]+?(?=```|<details|$))/g;
     const blocks = content.match(blockRegex) || [];
 
@@ -120,9 +120,26 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
          return <div key={i} dangerouslySetInnerHTML={{ __html: marked(block, { gfm: true, breaks: true }) as string }} />;
       }
       
-      // ✅ [수정] <details> 태그로 시작하는 블록을 인식하여 그대로 렌더링합니다.
+      // ✅ [수정] <details> 블록을 수동으로 파싱하고, 내부 콘텐츠를 MarkdownRenderer로 재귀 호출합니다.
       if (trimmedBlock.startsWith('<details')) {
-        return <div key={i} dangerouslySetInnerHTML={{ __html: marked(block, { gfm: true, breaks: true }) as string }} />;
+        const summaryMatch = trimmedBlock.match(/<summary>([\s\S]*?)<\/summary>/);
+        const summaryContent = summaryMatch ? summaryMatch[1] : '자세히 보기';
+
+        const mainContentMatch = trimmedBlock.match(/<\/summary>([\s\S]*)<\/details>/);
+        let mainContent = mainContentMatch ? mainContentMatch[1] : '';
+
+        // 내부의 <div> 태그 제거 (선택적)
+        mainContent = mainContent.trim().replace(/^<div>/, '').replace(/<\/div>$/, '').trim();
+
+        return (
+            <details key={i} className="prose dark:prose-invert max-w-none my-4 border rounded-lg">
+                <summary className="cursor-pointer p-4 font-semibold" dangerouslySetInnerHTML={{ __html: marked.parseInline(summaryContent, { gfm: true, breaks: true }) }} />
+                <div className="p-4 border-t">
+                    {/* 재귀 렌더링으로 내부 콘텐츠도 완벽하게 처리 */}
+                    <MarkdownRenderer content={mainContent} />
+                </div>
+            </details>
+        );
       }
       
       if (trimmedBlock) {
