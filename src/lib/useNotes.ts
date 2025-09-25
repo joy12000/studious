@@ -123,7 +123,7 @@ export function useNotes(defaultFilters?: Filters) {
         }
 
         const result = await response.json();
-        const { title, content, subject, insights } = result;
+        const { title, summary: content, tag: subject, key_insights: insights } = result;
 
         // Find or create subject
         let subjectId = (allSubjects || []).find(s => s.name.toLowerCase() === subject.toLowerCase())?.id;
