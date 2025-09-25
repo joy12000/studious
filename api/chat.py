@@ -51,42 +51,23 @@ class handler(BaseHTTPRequestHandler):
 
             # 🖼️ 절대 규칙: 모든 시각 자료는 반드시 지정된 언어의 코드 블록 안에 포함하여 출력해야 합니다. 이 규칙은 선택이 아닌 필수입니다. 코드 블록 바깥에 순수한 JSON이나 다이어그램 코드를 절대로 출력해서는 안 됩니다. 이 규칙을 위반한 출력은 실패한 것으로 간주됩니다.
 
-            Mermaid (mermaid): 순서도, 타임라인, 간트 차트 등 단순하고 정형화된 다이어그램에 사용합니다. 마크다운과 유사한 간결한 문법을 사용하세요。
-            JointJS (jointjs): 회로도, 시스템 아키텍처, 복잡한 개념도 등 정교하고 비정형적인 다이어그램에 사용합니다. 아래의 JSON 구조를 따르세요。
-            cells: 모든 요소를 담는 배열。
-            각 요소는 type, position, size, 고유 id, attrs (스타일) 등을 포함합니다.
-            연결선(standard.Link)은 source와 target에 연결할 요소의 id를 명시합니다.
-            회로도 기호는 SVG 이미지를 데이터 URI로 직접 생성하여 standard.Image 타입의 xlink:href 속성에 포함시킬 수 있습니다.
-            JointJS 예시 (회로도):
-            ```jointjs
-            {
-            "cells": [
-            {
-            "type": "standard.Image",
-            "id": "resistor",
-            "position": { "x": 100, "y": 80 },
-            "size": { "width": 100, "height": 40 },
-            "attrs": { "image": { "xlink:href": "data:image/svg+xml;utf8,<svg>...</svg>" } }
-            }
-            ]
-            }
-            ```
+            Mermaid (mermaid): 순서도, 타임라인, 간트 차트 등 단순하고 정형화된 다이어그램에 사용합니다. 마크다운과 유사한 간결한 문법을 사용하세요。**주의:노드 안에서 줄을 바꾸려면 반드시 전체 텍스트를 큰따옴표(`"`)로 감싸고 실제 엔터 키로 줄을 나눠야 합니다. `<br>` 태그는 사용하지 마세요. Mermaid 노드 안에서는 LaTeX 수식을 렌더링할 수 없으니, 복잡한 수식 대신 ΔP와 같은 간단한 텍스트나 유니코드 기호를 사용하세요.**
+            
             자유 시각화 (visual): 복잡한 개념, 비교, 구조 등을 설명해야 할 때, 아래 규칙에 따라 가상의 UI 컴포넌트 구조를 JSON으로 설계하여 시각화할 수 있습니다. 코드 블록의 언어는 **visual**로 지정해야 합니다.
 
-            type: 렌더링할 요소의 종류 (box, text, svg, rect, circle, path 등).
-            props: 해당 요소의 속성 (스타일, 내용 등). className을 통해 Tailwind CSS 클래스를 사용하여 디자인합니다. SVG 요소의 경우 x, y, d 등 모든 SVG 속성을 사용합니다.
-            children: 자식 요소들의 배열.
-            예시 (간단한 비교):
-            ```visual
-            {
-            "type": "box",
-            "props": { "className": "flex gap-4 p-4" },
-            "children": [
-            { "type": "box", "props": { "className": "flex-1 p-3" }, "children": [{ "type": "text", "props": { "content": "항목 1" }}]},
-            { "type": "box", "props": { "className": "flex-1 p-3" }, "children": [{ "type": "text", "props": { "content": "항목 2" }}]}
-            ]
-            }
-            ```
+            ### visual JSON 생성 규칙 (★★★★★ 반드시 준수)
+            1.  **텍스트 내용**: 텍스트를 표시할 때는 반드시 `props` 객체 안에 `content` 속성을 사용해야 합니다.
+                -   **올바른 예시:** `{ "type": "text", "props": { "content": "내용" } }`
+                -   **잘못된 예시:** `{ "type": "text", "props": { "children": "내용" } }`
+
+            2.  **요소 중첩**: 다른 요소를 자식으로 포함할 때는 반드시 최상위 레벨의 `children` 배열을 사용해야 합니다.
+                -   **올바른 예시:** `{ "type": "box", "children": [ { "type": "text", ... } ] }`
+                -   **잘못된 예시:** `{ "type": "box", "props": { "children": [ ... ] } }`
+
+            3.  **스타일링**: 스타일은 `className`을 사용하지 말고, 반드시 CSS 속성을 직접 포함하는 인라인 `style` 객체를 사용해야 합니다.
+                -   **올바른 예시:** `{ "props": { "style": { "color": "blue", "fontSize": "16px" } } }`
+                -   **잘못된 예시:** `{ "props": { "className": "text-blue-500 text-base" } }`
+
 
             # 💬 대화 규칙
             1.  **명확성:** 학생의 질문에 명확하고 구조적으로 답변합니다.
@@ -114,7 +95,6 @@ class handler(BaseHTTPRequestHandler):
                     payload = {
                         "model": model_identifier,
                         "messages": [system_prompt] + messages,
-                        "stream": True  # 스트리밍 활성화
                     }
                     if model_identifier.startswith('google/'):
                         payload["response_format"] = {"type": "json_object"}
@@ -128,71 +108,25 @@ class handler(BaseHTTPRequestHandler):
                             "X-Title": "Studious"
                         },
                         json=payload,
-                        stream=True # 스트리밍 요청
+                        timeout=180
                     )
                     response.raise_for_status()
                     
-                    self.send_response(200)
-                    self.send_header('Content-type', 'text/event-stream; charset=utf-8')
-                    self.end_headers()
-
-                    full_response_content = ""
-                    for line in response.iter_lines():
-                        if line:
-                            decoded_line = line.decode('utf-8')
-                            if decoded_line.startswith('data: '):
-                                json_str = decoded_line[len('data: '):]
-                                if json_str.strip() == '[DONE]':
-                                    break
-                                try:
-                                    data = json.loads(json_str)
-                                    if 'choices' in data and data['choices']:
-                                        delta = data['choices'][0].get('delta', {})
-                                        content = delta.get('content')
-                                        if content:
-                                            full_response_content += content
-                                            # 클라이언트에 청크 전송
-                                            self.wfile.write(f"data: {json.dumps({'token': content}, ensure_ascii=False)}\n\n".encode('utf-8'))
-                                            self.wfile.flush()
-                                except json.JSONDecodeError:
-                                    print(f"WARN: 스트림에서 유효하지 않은 JSON 수신: {json_str}")
-                                    continue
+                    api_response_data = response.json()
+                    content_str = api_response_data['choices'][0]['message']['content']
                     
-                    # 스트리밍이 끝난 후, 후속 질문 생성 및 전송
                     try:
-                        # 후속 질문을 생성하기 위한 별도의 요청
-                        follow_up_prompt = {
-                            "role": "system",
-                            "content": f"사용자의 마지막 질문과 AI의 전체 답변을 바탕으로, 학생의 사고를 확장할 수 있는 좋은 후속 질문 3개를 제안해주세요. 전체 답변: '{full_response_content}'. 반드시 '{{"followUp": ["...", "...", "..."]}}' 형식의 JSON 객체로만 응답해야 합니다."
-                        }
-                        
-                        follow_up_payload = {
-                            "model": model_identifier, # 또는 더 빠르고 저렴한 모델 사용 가능
-                            "messages": [system_prompt] + messages + [{"role": "assistant", "content": full_response_content}, follow_up_prompt],
-                            "response_format": {"type": "json_object"}
-                        }
+                        parsed_content = json.loads(content_str)
+                    except json.JSONDecodeError:
+                        print("WARN: AI 응답이 유효한 JSON이 아니므로 래핑합니다.")
+                        parsed_content = {"answer": content_str, "followUp": []}
 
-                        follow_up_response = requests.post(
-                            url="https://openrouter.ai/api/v1/chat/completions",
-                            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                            json=follow_up_payload,
-                            timeout=60
-                        )
-                        follow_up_response.raise_for_status()
-                        follow_up_data = follow_up_response.json()
-                        follow_up_content = follow_up_data['choices'][0]['message']['content']
-                        
-                        # 후속 질문 청크 전송
-                        self.wfile.write(f"data: {follow_up_content}\n\n".encode('utf-8'))
-                        self.wfile.flush()
+                    final_json_output = json.dumps(parsed_content, ensure_ascii=False)
 
-                    except Exception as fu_e:
-                        print(f"WARN: 후속 질문 생성 실패: {fu_e}")
-                        # 실패하더라도 스트림은 정상 종료
-
-                    # 스트림 종료 신호 전송
-                    self.wfile.write('data: [DONE]\n\n'.encode('utf-8'))
-                    self.wfile.flush()
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json; charset=utf-8')
+                    self.end_headers()
+                    self.wfile.write(final_json_output.encode('utf-8'))
                     return
 
                 except requests.exceptions.RequestException as e:
