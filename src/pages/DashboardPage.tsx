@@ -56,7 +56,14 @@ export default function DashboardPage() {
             maintainAspectRatio: false, // 👈 [버그 수정] 컨테이너 크기에 맞추도록 설정
             responsive: true,
             plugins: {
-                legend: { display: false },
+                legend: {
+                    display: true,
+                    position: 'bottom' as const,
+                    align: 'center' as const,
+                    labels: {
+                        color: textColor,
+                    },
+                },
                 title: { display: true, text: '과목별 노트 수', color: textColor, font: { size: 16 } },
                 tooltip: {
                     backgroundColor: theme === 'dark' ? 'hsl(220 25% 15%)' : 'hsl(0 0% 100%)',
@@ -70,7 +77,12 @@ export default function DashboardPage() {
                     grid: { color: gridColor }
                 },
                 x: {
-                    ticks: { color: textColor },
+                    ticks: {
+                        color: textColor,
+                        maxRotation: 45,
+                        minRotation: 45,
+                        autoSkip: false,
+                    },
                     grid: { color: 'transparent' }
                 }
             }
