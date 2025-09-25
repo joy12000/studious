@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { ArrowUp, Loader2, RefreshCw, Copy, Save, ChevronsUpDown, Check, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"; // Add Tooltip imports
 import MarkdownRenderer from './MarkdownRenderer';
 import { useNotes } from '../lib/useNotes';
+import { useCallback } from 'react'; // useCallback 임포트 추가
 
 const models = [
     { id: 'openai/gpt-oss-20b:free', name: '🧠 모두가 아는 그 gpt' },
