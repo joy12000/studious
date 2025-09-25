@@ -116,6 +116,3 @@
   margin-top: 1.25em;
   margin-bottom: 1.25em;
 }
-
-.visual-root svg * { stroke:#ff0000 !important; fill:none !important; opacity:1 !important; visibility:visible !important; }
-.visual-root svg text { fill:#ff0000 !important; font-size:20px !important; }

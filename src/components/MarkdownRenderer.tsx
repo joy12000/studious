@@ -45,25 +45,20 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       if (!part) return null;
 
       const trimmedPart = part.trim();
-      
-      const debugStyle = { border: '2px solid green', margin: '2px', padding: '2px', minHeight: '20px' };
-      const fallbackDebugStyle = { border: '2px solid red', margin: '2px', padding: '2px', minHeight: '20px' };
 
       if (trimmedPart.startsWith('$$') && trimmedPart.endsWith('$$')) {
-        return <div style={debugStyle} key={i}><BlockMath>{trimmedPart.slice(2, -2)}</BlockMath></div>;
+        return <BlockMath key={i}>{trimmedPart.slice(2, -2)}</BlockMath>;
       }
 
       if (trimmedPart.startsWith('$') && trimmedPart.endsWith('$')) {
-        return <div style={debugStyle} key={i}><InlineMath>{trimmedPart.slice(1, -1)}</InlineMath></div>;
+        return <InlineMath key={i}>{trimmedPart.slice(1, -1)}</InlineMath>;
       }
 
       if (trimmedPart.startsWith('```mermaid')) {
         const code = trimmedPart.slice(10, -3).trim();
         return (
-          <div style={debugStyle} key={i}>
-            <div className="flex justify-center my-4">
-              <pre className="mermaid"><code>{code}</code></pre>
-            </div>
+          <div className="flex justify-center my-4" key={i}>
+            <pre className="mermaid"><code>{code}</code></pre>
           </div>
         );
       }
@@ -72,7 +67,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
         const jsonText = trimmedPart.slice(10, -3).trim();
         try {
           const jointData = JSON.parse(jsonText);
-          return <div style={debugStyle} key={i}><div className="my-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800"><JointJSRenderer data={jointData} /></div></div>;
+          return <div className="my-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800" key={i}><JointJSRenderer data={jointData} /></div>;
         } catch (e) {
           return <pre key={i} style={{ color: 'red' }}>JointJS JSON Error</pre>;
         }
@@ -82,13 +77,13 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
         const jsonText = trimmedPart.slice(10, -3).trim();
         try {
           const visualData = JSON.parse(jsonText);
-          return <div style={debugStyle} key={i}><div className="my-4"><VisualRenderer config={visualData} /></div></div>;
+          return <div className="my-4" key={i}><VisualRenderer config={visualData} /></div>;
         } catch(e) {
           return <pre key={i} style={{ color: 'red' }}>Visual JSON Error</pre>;
         }
       }
       
-      return <div style={fallbackDebugStyle} key={i}><span dangerouslySetInnerHTML={{ __html: marked(part) as string }} /></div>;
+      return <span key={i} dangerouslySetInnerHTML={{ __html: marked(part) as string }} />;
     });
   }; 
 
