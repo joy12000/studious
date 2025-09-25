@@ -123,20 +123,15 @@ export function useNotes(defaultFilters?: Filters) {
         }
 
         const result = await response.json();
-        const { title, summary: content, tag: subject, key_insights: insights } = result;
+        const { title, summary: content, key_insights: insights } = result; // Remove 'tag: subject' from destructuring
 
-        // Find or create subject
-        let subjectId = (allSubjects || []).find(s => s.name.toLowerCase() === subject.toLowerCase())?.id;
-        if (!subjectId) {
-            const newSubject = await addSubject(subject);
-            subjectId = newSubject.id;
-        }
-
+        // For YouTube notes, we do not create or assign a subject.
+        // The subjectId will be undefined, as it's an optional field in the Note interface.
         const newNote: Note = {
           id: uuidv4(),
           title,
           content,
-          subjectId,
+          // subjectId is intentionally omitted for YouTube notes
           noteType: 'general',
           sourceType: 'youtube',
           sourceUrl: youtubeUrl,
