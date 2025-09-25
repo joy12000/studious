@@ -161,12 +161,16 @@ class handler(BaseHTTPRequestHandler):
             ans_files = files[reference_file_count + problem_file_count:]
 
             def process_files(file_list, category_name):
+                import google.ai.generativelanguage as glm
                 contents = [f"\n--- {category_name} ---"]
                 for filename in file_list:
                     file_path = os.path.join(job_dir, filename)
                     try:
                         if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.webp')):
                             contents.append(Image.open(file_path))
+                        elif filename.lower().endswith('.pdf'):
+                            with open(file_path, 'rb') as f:
+                                contents.append(glm.Part(inline_data=glm.Blob(mime_type='application/pdf', data=f.read())))
                         else:
                             with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                                 contents.append(f.read())

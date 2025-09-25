@@ -153,6 +153,7 @@ class handler(BaseHTTPRequestHandler):
                 request_contents.append(ai_conversation_text)
 
             text_materials = []
+            import google.ai.generativelanguage as glm
 
             for url in blob_urls:
                 try:
@@ -163,6 +164,8 @@ class handler(BaseHTTPRequestHandler):
 
                     if 'image/' in content_type:
                         request_contents.append(Image.open(io.BytesIO(file_content)))
+                    elif 'application/pdf' in content_type:
+                        request_contents.append(glm.Part(inline_data=glm.Blob(mime_type='application/pdf', data=file_content)))
                     else:
                         text_materials.append(file_content.decode('utf-8', errors='ignore'))
                 except Exception as e:

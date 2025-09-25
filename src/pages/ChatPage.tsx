@@ -33,6 +33,29 @@ export default function ChatPage() {
   const MAX_TOTAL_SIZE_MB = 10; // 총 파일 최대 10MB
 
   const [generationType, setGenerationType] = useState<'textbook' | 'review'>('textbook');
+  const [isDragging, setIsDragging] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragging(false);
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          onFileChange(e.dataTransfer.files);
+          e.dataTransfer.clearData();
+      }
+  };
 
   useEffect(() => {
       if (location.state) {
@@ -42,10 +65,10 @@ export default function ChatPage() {
       }
   }, [location.state]);
 
-  const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files) return;
+  const onFileChange = async (files: FileList | null) => {
+    if (!files) return;
 
-    const newFiles = Array.from(e.target.files);
+    const newFiles = Array.from(files);
     let filesToAdd: File[] = [];
     let currentTotalSize = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
 
@@ -56,18 +79,23 @@ export default function ChatPage() {
       }
 
       if (file.type === 'application/pdf') {
-        setIsLoading(true);
-        try {
-          const images = await convertPdfToImages(file, (progress) => {
-            setLoadingMessage(`PDF 변환 중... (${progress.pageNumber}/${progress.totalPages})`);
-          });
-          filesToAdd.push(...images);
-        } catch (error) {
-          console.error("PDF 변환 실패:", error);
-          alert('PDF 파일을 이미지로 변환하는 데 실패했습니다.');
-        } finally {
-          setIsLoading(false);
-          setLoadingMessage('');
+        const isScanned = window.confirm("이 PDF가 스캔된 문서인가요? (텍스트 선택이 불가능한 경우) '확인'을 누르면 이미지로 변환하고, '취소'를 누르면 텍스트로 처리합니다.");
+        if (isScanned) {
+            setIsLoading(true);
+            try {
+              const images = await convertPdfToImages(file, (progress) => {
+                setLoadingMessage(`PDF 변환 중... (${progress.pageNumber}/${progress.totalPages})`);
+              });
+              filesToAdd.push(...images);
+            } catch (error) {
+              console.error("PDF 변환 실패:", error);
+              alert('PDF 파일을 이미지로 변환하는 데 실패했습니다.');
+            } finally {
+              setIsLoading(false);
+              setLoadingMessage('');
+            }
+        } else {
+            filesToAdd.push(file);
         }
       } else {
         filesToAdd.push(file);
@@ -203,12 +231,15 @@ export default function ChatPage() {
                     </Popover>
                 </div>
                 <div 
-                  className="w-full min-h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer hover:bg-muted/50 transition-colors p-6"
+                  className={`w-full min-h-48 border-2 border-dashed rounded-lg flex flex-col items-center justify-center text-muted-foreground cursor-pointer transition-colors p-6 ${isDragging ? 'border-primary bg-primary/10' : 'hover:bg-muted/50'}`}
                   onClick={() => fileInputRef.current?.click()}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
                 >
                   <UploadCloud className="h-12 w-12 mb-4" />
                   <p className="font-semibold">파일을 드래그하거나 클릭하여 업로드</p>
-                  <input ref={fileInputRef} type="file" multiple onChange={onFileChange} className="hidden" />
+                  <input ref={fileInputRef} type="file" multiple onChange={(e) => onFileChange(e.target.files)} className="hidden" />
                 </div>
                 {uploadedFiles.length > 0 && (
                   <div className="text-left">

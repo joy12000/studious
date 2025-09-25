@@ -124,17 +124,22 @@ export default function AssignmentHelperPage() {
 
         for (const file of newFiles) {
             if (file.type === 'application/pdf') {
-                setProgressMessage('PDF를 이미지로 변환 중...');
-                try {
-                    const images = await convertPdfToImages(file, (progress) => {
-                        setProgressMessage(`PDF 변환 중... (${progress.pageNumber}/${progress.totalPages})`);
-                    });
-                    setter(prev => [...prev, ...images]);
-                } catch (err) {
-                    setError('PDF 변환에 실패했습니다.');
-                    console.error(err);
-                } finally {
-                    setProgressMessage(null);
+                const isScanned = window.confirm("이 PDF가 스캔된 문서인가요? (텍스트 선택이 불가능한 경우) '확인'을 누르면 이미지로 변환하고, '취소'를 누르면 텍스트로 처리합니다.");
+                if (isScanned) {
+                    setProgressMessage('PDF를 이미지로 변환 중...');
+                    try {
+                        const images = await convertPdfToImages(file, (progress) => {
+                            setProgressMessage(`PDF 변환 중... (${progress.pageNumber}/${progress.totalPages})`);
+                        });
+                        setter(prev => [...prev, ...images]);
+                    } catch (err) {
+                        setError('PDF 변환에 실패했습니다.');
+                        console.error(err);
+                    } finally {
+                        setProgressMessage(null);
+                    }
+                } else {
+                    setter(prev => [...prev, file]);
                 }
             } else {
                 setter(prev => [...prev, file]);

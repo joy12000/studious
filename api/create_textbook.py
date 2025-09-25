@@ -106,14 +106,14 @@ class handler(BaseHTTPRequestHandler):
             children: 자식 요소들의 배열.
             예시 (간단한 비교):
             ```visual
-            {
+            {{
             "type": "box",
-            "props": { "className": "flex gap-4 p-4" },
+            "props": {{ "className": "flex gap-4 p-4" }},
             "children": [
-            { "type": "box", "props": { "className": "flex-1 p-3" }, "children": [{ "type": "text", "props": { "content": "항목 1" }}]},
-            { "type": "box", "props": { "className": "flex-1 p-3" }, "children": [{ "type": "text", "props": { "content": "항목 2" }}]}
+            {{ "type": "box", "props": {{ "className": "flex-1 p-3" }}, "children": [{{ "type": "text", "props": {{ "content": "항목 1" }} }}]}},
+            {{ "type": "box", "props": {{ "className": "flex-1 p-3" }}, "children": [{{ "type": "text", "props": {{ "content": "항목 2" }} }}]}}
             ]
-            }
+            }}
             ```
 
             # 📚 결과물 구조 (Gagne의 9단계 + 백워드 설계)
@@ -134,6 +134,7 @@ class handler(BaseHTTPRequestHandler):
             
             request_contents = [prompt]
             text_materials = []
+            import google.ai.generativelanguage as glm
 
             for url in blob_urls:
                 try:
@@ -144,6 +145,8 @@ class handler(BaseHTTPRequestHandler):
 
                     if 'image/' in content_type:
                         request_contents.append(Image.open(io.BytesIO(file_content)))
+                    elif 'application/pdf' in content_type:
+                        request_contents.append(glm.Part(inline_data=glm.Blob(mime_type='application/pdf', data=file_content)))
                     else:
                         text_materials.append(file_content.decode('utf-8', errors='ignore'))
                 except Exception as e:

@@ -125,17 +125,22 @@ ${note.content}`;
       }
 
       if (file.type === 'application/pdf') {
-        startLoading('PDF를 이미지로 변환 중...');
-        try {
-          const images = await convertPdfToImages(file, (progress) => {
-            setMessage(`PDF 변환 중... (${progress.pageNumber}/${progress.totalPages})`);
-          });
-          filesToAdd.push(...images);
-        } catch (error) {
-          console.error("PDF 변환 실패:", error);
-          setError('PDF 파일을 이미지로 변환하는 데 실패했습니다.');
-        } finally {
-          stopLoading();
+        const isScanned = window.confirm("이 PDF가 스캔된 문서인가요? (텍스트 선택이 불가능한 경우) '확인'을 누르면 이미지로 변환하고, '취소'를 누르면 텍스트로 처리합니다.");
+        if (isScanned) {
+            startLoading('PDF를 이미지로 변환 중...');
+            try {
+              const images = await convertPdfToImages(file, (progress) => {
+                setMessage(`PDF 변환 중... (${progress.pageNumber}/${progress.totalPages})`);
+              });
+              filesToAdd.push(...images);
+            } catch (error) {
+              console.error("PDF 변환 실패:", error);
+              setError('PDF 파일을 이미지로 변환하는 데 실패했습니다.');
+            } finally {
+              stopLoading();
+            }
+        } else {
+            filesToAdd.push(file);
         }
       } else {
         filesToAdd.push(file);
