@@ -93,7 +93,7 @@ def get_transcript_from_apify(youtube_url: str) -> str:
         raise ValueError("APIFY_ENDPOINT and APIFY_TOKEN must be set.")
 
     api_url = f"{APIFY_ENDPOINT}?token={APIFY_TOKEN}"
-    payload = {'startUrls': [{'url': youtube_url}]}
+    payload = {'videoUrl': youtube_url}
     headers = {"Content-Type": "application/json"}
 
     print(f"Final API URL being called: {APIFY_ENDPOINT}?token=...REDACTED...")

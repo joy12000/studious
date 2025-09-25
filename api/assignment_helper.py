@@ -176,7 +176,7 @@ class handler(BaseHTTPRequestHandler):
                 try:
                     print(f"INFO: API 키 #{i + 1} (으)로 Gemini API 호출 시도...")
                     genai.configure(api_key=api_key)
-                    model = genai.GenerativeModel('gemini-1.5-pro-latest')
+                    model = genai.GenerativeModel('gemini-2.5-flash')
                     response = model.generate_content(request_contents)
                     
                     cleaned_text = response.text.strip().replace('```json', '').replace('```', '')
