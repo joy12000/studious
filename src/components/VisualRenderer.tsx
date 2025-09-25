@@ -24,7 +24,6 @@ const HTML_TAG_MAP: Record<string, string> = {
   div: 'div'
 };
 
-// 누락 시 기본 stroke/fill을 넣어 "안 보이는" 문제 방지
 const ensureVisibleDefaults = (type: string, props: Record<string, any>) => {
   const p = { ...props };
   if (SVG_TAGS.has(type)) {
@@ -51,7 +50,6 @@ const VisualRenderer: React.FC<Props> = ({ config }) => {
 
   const rest = ensureVisibleDefaults(type, rest0);
 
-  // SVG 루트: xmlns/사이즈 기본값 보장
   if (isSvg && type === 'svg') {
     (rest as any).xmlns = (rest as any).xmlns || 'http://www.w3.org/2000/svg';
     if ((rest as any).width == null && (rest as any).height == null) {
@@ -69,7 +67,6 @@ const VisualRenderer: React.FC<Props> = ({ config }) => {
   ));
 
   if (isSvg && type === 'text') {
-    // SVG text: content는 텍스트 노드로
     return React.createElement(componentType, { ...rest, style: styleObj }, content ?? null, childNodes);
   }
 
