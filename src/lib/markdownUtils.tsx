@@ -7,7 +7,7 @@
  */
 export function normalizeMermaidCode(code: string): string {
   // 정규식: 노드 정의 부분 (예: A[...], B["..."], C(...) 등)을 찾습니다.
-  const nodeRegex = /(\w+)(\[|\(|>|"|\()/([\s\S]+?)(\]|\||"|\))/g;
+  const nodeRegex = /(\\w+)(\\[|\\(|>|\"|\\()/([\\s\\S]+?)([\]|\"\\)])/g;
 
   return code.replace(nodeRegex, (match, nodeId, startBracket, content, endBracket) => {
     // 1. 내용물에서 <br> 태그를 실제 줄바꿈(\n)으로 변경합니다.
