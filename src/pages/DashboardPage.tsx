@@ -7,6 +7,29 @@ import { BrainCircuit, GraduationCap, Youtube } from 'lucide-react';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
+// Helper function to wrap long labels
+const formatLabel = (label: string, maxWidth = 8): string | string[] => {
+    if (label.length < maxWidth) {
+        return label;
+    }
+    const words = label.split(' ');
+    if (words.length === 1) {
+        return label; // Don't split single long words
+    }
+    const lines: string[] = [];
+    let currentLine = '';
+    for (const word of words) {
+        if ((currentLine + ' ' + word).trim().length > maxWidth) {
+            if (currentLine) lines.push(currentLine);
+            currentLine = word;
+        } else {
+            currentLine = (currentLine ? currentLine + ' ' : '') + word;
+        }
+    }
+    if (currentLine) lines.push(currentLine);
+    return lines;
+};
+
 export default function DashboardPage() {
     const { notes, allSubjects } = useNotes();
     const [theme, setTheme] = useState(localStorage.getItem('pref-theme') || 'light');
@@ -37,7 +60,7 @@ export default function DashboardPage() {
     }, [notes, allSubjects]);
 
     const chartData = useMemo(() => ({
-        labels: stats.notesBySubject.map(s => s.name),
+        labels: stats.notesBySubject.map(s => formatLabel(s.name)),
         datasets: [
             {
                 label: '노트 수',
@@ -53,7 +76,7 @@ export default function DashboardPage() {
         const gridColor = theme === 'dark' ? 'hsl(215 15% 20%)' : 'hsl(214.3 31.8% 91.4%)';
 
         return {
-            maintainAspectRatio: false, // 👈 [버그 수정] 컨테이너 크기에 맞추도록 설정
+            maintainAspectRatio: false,
             responsive: true,
             plugins: {
                 legend: {
@@ -79,7 +102,7 @@ export default function DashboardPage() {
                 x: {
                     ticks: {
                         color: textColor,
-                        maxRotation: 45,
+                        maxRotation: 0,
                         minRotation: 0,
                     },
                     grid: { color: 'transparent' }
@@ -131,7 +154,6 @@ export default function DashboardPage() {
             
             <Card>
                 <CardContent className="pt-6">
-                    {/* 👈 [버그 수정] 차트를 고정된 높이의 div로 감싸서 크기 문제 해결 */}
                     <div className="relative h-[400px]">
                         {stats.notesBySubject.length > 0 ? (
                             <Bar options={chartOptions} data={chartData} />
