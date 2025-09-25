@@ -93,19 +93,6 @@ class handler(BaseHTTPRequestHandler):
             2.  **다이어그램 (Mermaid):** 복잡한 시스템, 알고리즘, 상태 변화는 **반드시** Mermaid.js 문법으로 시각화해야 합니다. (```mermaid...```)
             3.  **코드 (Code Block):** 모든 소스 코드는 **반드시** 언어를 명시한 코드 블록으로 작성해야 합니다. (```python...```)
             4.  **핵심 용어 (Tooltip):** 중요한 전공 용어는 **반드시** `<dfn title="설명">용어</dfn>` HTML 태그로 감싸 설명을 제공해야 합니다.
-            5.  **회로도 (JSON):** 전자 회로는 반드시 jointjs 라이브러리 형식의 JSON으로 코드 블록 안에 작성해야 합니다.
-                elements: 회로 소자 배열. 각 소자는 type, name, 연결점(to, from), label 등을 가집니다.
-                예시 (RC 회로):
-                ```circuit
-                {
-                "elements": [
-                { "type": "SourceV", "name": "Vin", "to": "n1" },
-                { "type": "Resistor", "name": "R1", "from": "n1", "to": "n2", "label": "1kΩ" },
-                { "type": "Capacitor", "name": "C1", "from": "n2", "to": "gnd", "label": "1μF" },
-                { "type": "Ground", "name": "gnd" }
-                ]
-                }
-                ```
             """
 
             prompt_template_grading = f"""
