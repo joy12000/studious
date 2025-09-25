@@ -4,6 +4,7 @@ import { marked } from 'marked';
 import { InlineMath, BlockMath } from 'react-katex';
 import mermaid from 'mermaid';
 import VisualRenderer from './VisualRenderer';
+import { normalizeMermaidCode } from '../lib/markdownUtils';
 import 'highlight.js/styles/github-dark.css';
 import 'katex/dist/katex.min.css';
 
@@ -72,7 +73,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
         modalMermaidRef.current.innerHTML = '';
         const pre = document.createElement('pre');
         pre.className = 'mermaid';
-        pre.innerHTML = modalMermaidCode;
+        pre.innerHTML = normalizeMermaidCode(modalMermaidCode);
         modalMermaidRef.current.appendChild(pre);
         try {
           await mermaid.run({ nodes: [pre] });
@@ -95,15 +96,18 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       const trimmedBlock = block.trim();
       
       if (trimmedBlock.startsWith('```mermaid')) {
-        const code = trimmedBlock.slice(10, -3).trim();
+        const rawCode = trimmedBlock.slice(10, -3).trim();
+        // ✅ 3. AI가 생성한 코드를 정규화 함수에 통과시킵니다.
+        const normalizedCode = normalizeMermaidCode(rawCode);
+
         return (
           <div 
             className="flex justify-center my-4 cursor-zoom-in" 
             key={i}
-            onClick={() => setModalMermaidCode(code)}
+            onClick={() => setModalMermaidCode(rawCode)} // 모달에는 원본 코드를 넘겨줌
             title="클릭하여 크게 보기"
           >
-            <pre className="mermaid"><code>{code}</code></pre>
+            <pre className="mermaid"><code>{normalizedCode}</code></pre>
           </div>
         );
       }
