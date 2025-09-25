@@ -116,16 +116,3 @@
   margin-top: 1.25em;
   margin-bottom: 1.25em;
 }
-
-/* VisualRenderer 전용 임시 안전 패치 (테스트용) */
-.visual-root svg * {
-  stroke: #111 !important;
-  fill: none !important;
-  stroke-width: 2 !important;
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-.visual-root svg text {
-  fill: #111 !important;
-  font-size: 14px !important;
-}
