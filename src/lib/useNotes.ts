@@ -114,7 +114,7 @@ export function useNotes(defaultFilters?: Filters) {
         const response = await fetch('/api/summarize_youtube', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ youtube_url: youtubeUrl }),
+          body: JSON.stringify({ youtubeUrl }),
         });
 
         if (!response.ok) {
