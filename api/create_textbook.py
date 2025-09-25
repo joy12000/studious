@@ -85,17 +85,17 @@ class handler(BaseHTTPRequestHandler):
             회로도 기호는 SVG 이미지를 데이터 URI로 직접 생성하여 standard.Image 타입의 xlink:href 속성에 포함시킬 수 있습니다.
             JointJS 예시 (회로도):
             ```jointjs
-            {
+            {{
             "cells": [
-            {
+            {{
             "type": "standard.Image",
             "id": "resistor",
-            "position": { "x": 100, "y": 80 },
-            "size": { "width": 100, "height": 40 },
-            "attrs": { "image": { "xlink:href": "data:image/svg+xml;utf8,<svg>...</svg>" } }
-            }
+            "position": {{ "x": 100, "y": 80 }},
+            "size": {{ "width": 100, "height": 40 }},
+            "attrs": {{ "image": {{ "xlink:href": "data:image/svg+xml;utf8,<svg>...</svg>" }} }}
+            }}
             ]
-            }
+            }}
             ```
 
             자유 시각화 (JSON Component): 복잡한 개념, 비교, 구조 등을 설명해야 할 때, 아래 규칙에 따라 가상의 UI 컴포넌트 구조를 JSON으로 설계하여 시각화할 수 있습니다.
