@@ -9,6 +9,25 @@ export default {
     './app/**/*.{ts,tsx}',
     './src/**/*.{ts,tsx}',
 	],
+  safelist: [
+    'flex',
+    'gap-4',
+    'p-3',
+    'p-4',
+    'flex-1',
+    {
+      pattern: /^(bg|text|border|ring)-/,
+    },
+    {
+      pattern: /^(w|h)-/,
+    },
+    {
+      pattern: /^(p|m)(x|y|t|r|b|l)?-?\d+/
+    },
+    {
+      pattern: /^(rounded)-/,
+    },
+  ],
   prefix: "",
   theme: {
     container: {
