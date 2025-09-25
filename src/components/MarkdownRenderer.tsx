@@ -45,53 +45,54 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       if (!part) return null;
 
       const trimmedPart = part.trim();
+      
+      // Green border for successfully identified special blocks
+      const debugStyle = { border: '2px solid green', margin: '2px', padding: '2px', minHeight: '20px' };
+      // Red border for fallback rendering
+      const fallbackDebugStyle = { border: '2px solid red', margin: '2px', padding: '2px', minHeight: '20px' };
 
-      // 블록 KaTeX ( $$...$$ )
       if (trimmedPart.startsWith('$$') && trimmedPart.endsWith('$$')) {
-        return <BlockMath key={i}>{trimmedPart.slice(2, -2)}</BlockMath>;
+        return <div style={debugStyle} key={i}><BlockMath>{trimmedPart.slice(2, -2)}</BlockMath></div>;
       }
 
-      // 인라인 KaTeX ( $...$ )
       if (trimmedPart.startsWith('$') && trimmedPart.endsWith('$')) {
-        return <InlineMath key={i}>{trimmedPart.slice(1, -1)}</InlineMath>;
+        return <div style={debugStyle} key={i}><InlineMath>{trimmedPart.slice(1, -1)}</InlineMath></div>;
       }
 
-      // Mermaid 다이어그램
       if (trimmedPart.startsWith('```mermaid')) {
         const code = trimmedPart.slice(10, -3).trim();
         return (
-          <div className="flex justify-center my-4" key={i}>
-            <pre className="mermaid"><code>{code}</code></pre>
+          <div style={debugStyle} key={i}>
+            <div className="flex justify-center my-4">
+              <pre className="mermaid"><code>{code}</code></pre>
+            </div>
           </div>
         );
       }
 
-      // JointJS 다이어그램
       if (trimmedPart.startsWith('```jointjs')) {
         const jsonText = trimmedPart.slice(10, -3).trim();
         try {
           const jointData = JSON.parse(jsonText);
-          return <div className="my-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800" key={i}><JointJSRenderer data={jointData} /></div>;
+          return <div style={debugStyle} key={i}><div className="my-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800"><JointJSRenderer data={jointData} /></div></div>;
         } catch (e) {
           console.error('Failed to parse JointJS JSON:', e);
           return <pre key={i} style={{ color: 'red' }}>JointJS 다이어그램 렌더링 오류</pre>;
         }
       }
 
-      // Visual 블록
       if (trimmedPart.startsWith('```visual')) {
         const jsonText = trimmedPart.slice(10, -3).trim();
         try {
           const visualData = JSON.parse(jsonText);
-          return <div className="my-4" key={i}><VisualRenderer config={visualData} /></div>;
+          return <div style={debugStyle} key={i}><div className="my-4"><VisualRenderer config={visualData} /></div></div>;
         } catch(e) {
           console.error('Failed to parse Visual JSON:', e);
           return <pre key={i} style={{ color: 'red' }}>Visual Component 렌더링 오류</pre>;
         }
       }
       
-      // 위에서 걸러지지 않은 나머지 모든 텍스트는 일반 마크다운으로 취급
-      return <span key={i} dangerouslySetInnerHTML={{ __html: marked(part) as string }} />;
+      return <div style={fallbackDebugStyle} key={i}><span dangerouslySetInnerHTML={{ __html: marked(part) as string }} /></div>;
     });
   }; 
 
