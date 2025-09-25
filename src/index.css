@@ -116,3 +116,29 @@
   margin-top: 1.25em;
   margin-bottom: 1.25em;
 }
+
+/* ✅ [추가] JointJSRenderer 스타일 충돌 해결을 위한 CSS 초기화 코드 */
+.jointjs-container * {
+  margin: 0;
+  padding: 0;
+  line-height: initial;
+  color: initial;
+  border: 0;
+  background: none;
+  font-size: 100%;
+  font: inherit;
+  vertical-align: baseline;
+}
+
+.jointjs-container svg {
+  display: block;
+}
+
+.jointjs-container text {
+  font-family: sans-serif !important;
+  fill: #333 !important; /* 다크 모드에서도 텍스트가 잘 보이도록 강제 */
+}
+
+.jointjs-container .joint-cell path {
+    stroke: #333 !important; /* 다크 모드에서도 선이 잘 보이도록 강제 */
+}

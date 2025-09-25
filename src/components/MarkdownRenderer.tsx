@@ -83,7 +83,12 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
         const jsonText = trimmedBlock.slice(10, -3).trim();
         try {
           const jointData = JSON.parse(jsonText);
-          return <div className="my-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800" key={i}><JointJSRenderer data={jointData} /></div>;
+          // ✅ [수정] "jointjs-container" 클래스를 추가합니다.
+          return (
+            <div className="jointjs-container my-4 p-4 border rounded-lg bg-gray-50 dark:bg-gray-800" key={i}>
+              <JointJSRenderer data={jointData} />
+            </div>
+          );
         } catch (e) {
           return <pre key={i} style={{ color: 'red' }}>JointJS JSON Error</pre>;
         }

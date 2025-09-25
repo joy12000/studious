@@ -29,8 +29,8 @@ class handler(BaseHTTPRequestHandler):
             os.environ.get('GEMINI_API_KEY_PRIMARY'),
             os.environ.get('GEMINI_API_KEY_SECONDARY'),
             os.environ.get('GEMINI_API_KEY_TERTIARY'),
-            os.environ.get('GEMINI_API_KEY_QUATERNARY'),
-            os.environ.get('GEMINI_API_KEY')
+            os.environ.get('GEMINI_API_KEY_QUATERNARY')
+            #os.environ.get('GEMINI_API_KEY')
         ]
         valid_keys = [key for key in api_keys if key]
 
@@ -87,6 +87,8 @@ class handler(BaseHTTPRequestHandler):
             # 🎨 출력 서식 규칙 (★★★★★ 가장 중요)
             당신이 생성하는 모든 텍스트는 아래 규칙을 **반드시** 따라야 합니다.
             
+            절대 규칙: 모든 시각 자료는 반드시 지정된 언어의 코드 블록 안에 포함하여 출력해야 합니다. 이 규칙은 선택이 아닌 필수입니다. 코드 블록 바깥에 순수한 JSON이나 다이어그램 코드를 절대로 출력해서는 안 됩니다. 이 규칙을 위반한 출력은 실패한 것으로 간주됩니다.
+
             1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 **반드시** KaTeX 문법으로 감싸야 합니다. (인라인: `, 블록: `$`)
             2.  **다이어그램 (Mermaid):** 복잡한 시스템, 알고리즘, 상태 변화는 **반드시** Mermaid.js 문법으로 시각화해야 합니다. (```mermaid...```)
             3.  **코드 (Code Block):** 모든 소스 코드는 **반드시** 언어를 명시한 코드 블록으로 작성해야 합니다. (```python...```)
@@ -186,7 +188,7 @@ class handler(BaseHTTPRequestHandler):
                 try:
                     print(f"INFO: API 키 #{i + 1} (으)로 Gemini API 호출 시도...")
                     genai.configure(api_key=api_key)
-                    model = genai.GenerativeModel('gemini-1.5-pro-latest')
+                    model = genai.GenerativeModel('gemini-2.5-pro')
                     response = model.generate_content(request_contents)
                     
                     cleaned_text = response.text.strip().replace('```json', '').replace('```', '')
