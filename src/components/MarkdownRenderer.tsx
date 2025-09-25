@@ -45,19 +45,15 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   const [modalMermaidCode, setModalMermaidCode] = useState<string | null>(null);
   const modalMermaidRef = useRef<HTMLDivElement>(null);
 
-  // ✅ [수정] Mermaid 렌더링 useEffect를 async/await 및 try/catch로 감싸 에러를 처리합니다.
   useEffect(() => {
     const renderMermaidDiagrams = async () => {
       if (containerRef.current) {
-        // 렌더링되지 않은 mermaid 블록을 찾습니다.
         const mermaidElements = containerRef.current.querySelectorAll('pre.mermaid:not([data-processed])');
         if (mermaidElements.length > 0) {
           try {
-            // mermaid.run()은 Promise를 반환하므로 await으로 기다립니다.
             await mermaid.run({ nodes: mermaidElements as NodeListOf<HTMLElement> });
           } catch (error) {
             console.error('Mermaid 렌더링 실패:', error);
-            // 오류가 발생한 다이어그램에 에러 메시지를 표시할 수도 있습니다.
             mermaidElements.forEach(el => {
               el.innerHTML = '다이어그램 렌더링 오류';
               el.setAttribute('style', 'color: red; text-align: center;');
@@ -70,11 +66,10 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
     renderMermaidDiagrams();
   }, [content]);
   
-  // 모달이 열리고 내용이 바뀌면, 모달 안의 Mermaid를 렌더링하는 useEffect
   useEffect(() => {
     const renderModalMermaid = async () => {
       if (modalMermaidCode && modalMermaidRef.current) {
-        modalMermaidRef.current.innerHTML = ''; // 이전 다이어그램 초기화
+        modalMermaidRef.current.innerHTML = '';
         const pre = document.createElement('pre');
         pre.className = 'mermaid';
         pre.innerHTML = modalMermaidCode;
@@ -93,7 +88,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   const renderParts = () => {
     if (!content) return null;
 
-    const blockRegex = /(```(?:mermaid|visual|chart|[\s\S]*?)```|[\s\S]+?(?=```|$))/g;
+    const blockRegex = /(```(?:mermaid|visual|chart|[\s\S]*?)```|<details[\s\S]*?<\/details>|[\s\S]+?(?=```|<details|$))/g;
     const blocks = content.match(blockRegex) || [];
 
     return blocks.map((block, i) => {
@@ -108,7 +103,6 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
             onClick={() => setModalMermaidCode(code)}
             title="클릭하여 크게 보기"
           >
-            {/* pre 태그는 초기에 코드만 담고, useEffect가 렌더링을 처리합니다. */}
             <pre className="mermaid"><code>{code}</code></pre>
           </div>
         );
@@ -124,6 +118,11 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       }
       if (trimmedBlock.startsWith('```')) {
          return <div key={i} dangerouslySetInnerHTML={{ __html: marked(block, { gfm: true, breaks: true }) as string }} />;
+      }
+      
+      // ✅ [수정] <details> 태그로 시작하는 블록을 인식하여 그대로 렌더링합니다.
+      if (trimmedBlock.startsWith('<details')) {
+        return <div key={i} dangerouslySetInnerHTML={{ __html: marked(block, { gfm: true, breaks: true }) as string }} />;
       }
       
       if (trimmedBlock) {
