@@ -137,8 +137,12 @@ def summarize_youtube_handler():
         youtube_url = data['youtube_url']
         print(f"Received URL: {youtube_url}")
 
+        # Clean the URL by removing query parameters
+        clean_url = youtube_url.split('?')[0]
+        print(f"Cleaned URL for Apify: {clean_url}")
+
         # 1. Get Transcript
-        transcript = get_transcript_from_apify(youtube_url)
+        transcript = get_transcript_from_apify(clean_url)
         print(f"Successfully retrieved transcript of length {len(transcript)}.")
 
         # 2. Summarize
