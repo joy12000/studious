@@ -1,9 +1,8 @@
 // src/components/MarkdownRenderer.tsx
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react'; // ✅ [수정] useState를 여기서 임포트합니다.
 import { marked } from 'marked';
 import { InlineMath, BlockMath } from 'react-katex';
 import mermaid from 'mermaid';
-import JointJSRenderer from './JointJSRenderer';
 import VisualRenderer from './VisualRenderer';
 import 'highlight.js/styles/github-dark.css';
 import 'katex/dist/katex.min.css';
@@ -19,8 +18,10 @@ interface Props {
   content: string;
 }
 
+// 문단 내부의 인라인 요소만 렌더링하는 함수
 const renderInlineContent = (text: string) => {
   if (!text) return null;
+  // LaTeX 수식을 찾는 정규식
   const regex = /(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g;
   const parts = text.split(regex);
 
@@ -35,7 +36,7 @@ const renderInlineContent = (text: string) => {
       return <InlineMath key={i}>{trimmedPart.slice(1, -1)}</InlineMath>;
     }
 
-    // ✅ [수정] gfm과 breaks 옵션을 추가하여 문단 내 줄바꿈을 <br>로 변환
+    // 일반 텍스트 조각은 `parseInline`을 사용해 <p> 태그 없이 렌더링 + breaks 옵션 추가
     return <span key={i} dangerouslySetInnerHTML={{ __html: marked.parseInline(part, { gfm: true, breaks: true }) as string }} />;
   });
 };
@@ -43,7 +44,6 @@ const renderInlineContent = (text: string) => {
 
 const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   const containerRef = useRef<HTMLDivElement>(null);
-  // ✅ [2단계] 모달의 상태를 관리할 state를 추가합니다. (Mermaid 코드 저장)
   const [modalMermaidCode, setModalMermaidCode] = useState<string | null>(null);
   const modalMermaidRef = useRef<HTMLDivElement>(null);
 
@@ -60,7 +60,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
     }
   }, [content]);
   
-  // ✅ [3단계] 모달이 열리고 내용이 바뀌면, 모달 안의 Mermaid를 렌더링하는 useEffect 추가
+  // 모달이 열리고 내용이 바뀌면, 모달 안의 Mermaid를 렌더링하는 useEffect
   useEffect(() => {
     if (modalMermaidCode && modalMermaidRef.current) {
       modalMermaidRef.current.innerHTML = ''; // 이전 다이어그램 초기화
@@ -79,7 +79,8 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
 
   const renderParts = () => {
     if (!content) return null;
-    
+
+    // 복합적인 마크다운 블록을 먼저 분리 (코드블록, 그 외 텍스트)
     const blockRegex = /(```(?:mermaid|visual|chart|[\s\S]*?)```|[\s\S]+?(?=```|$))/g;
     const blocks = content.match(blockRegex) || [];
 
@@ -89,7 +90,6 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       if (trimmedBlock.startsWith('```mermaid')) {
         const code = trimmedBlock.slice(10, -3).trim();
         return (
-          // ✅ [4단계] Mermaid 래퍼를 클릭 가능한 div로 변경하고 onClick 이벤트 핸들러 추가
           <div 
             className="flex justify-center my-4 cursor-zoom-in" 
             key={i}
@@ -109,11 +109,12 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
           return <pre key={i} style={{ color: 'red' }}>Visual JSON Error</pre>;
         }
       }
+       // 일반 코드 블록 및 기타 마크다운 처리
       if (trimmedBlock.startsWith('```')) {
-         // ✅ [수정] 일반 코드 블록에도 gfm과 breaks 옵션을 추가하여 일관성 유지
          return <div key={i} dangerouslySetInnerHTML={{ __html: marked(block, { gfm: true, breaks: true }) as string }} />;
       }
       
+      // 일반 텍스트 덩어리는 문단(\n\n)별로 나누어 처리
       if (trimmedBlock) {
         return trimmedBlock.split(/\n\n+/).map((paragraph, j) => (
           <p key={`${i}-${j}`}>{renderInlineContent(paragraph)}</p>
@@ -125,7 +126,6 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   }; 
 
   return (
-    // ✅ [5단계] 컴포넌트의 최종 리턴값에 모달 JSX 추가
     <div ref={containerRef}>
       {renderParts()}
 
