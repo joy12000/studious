@@ -32,7 +32,6 @@ class handler(BaseHTTPRequestHandler):
             history = body.get('history', [])
             note_context = body.get('noteContext', '')
             model_identifier = body.get('model', 'gemini-2.5-flash') # 기본 모델 변경
-            use_gemini_direct = body.get('useGeminiDirect', False)
 
             if not history:
                 raise ValueError("대화 내용이 비어있습니다.")
@@ -43,7 +42,7 @@ class handler(BaseHTTPRequestHandler):
             messages = self.prepare_messages(history)
 
             # API 공급자 선택 및 실행
-            if use_gemini_direct:
+            if model_identifier.startswith('gemini-'):
                 self.execute_gemini_direct(model_identifier, messages, system_prompt_text, valid_keys)
             else:
                 self.execute_openrouter(model_identifier, messages, system_prompt_text, valid_keys)

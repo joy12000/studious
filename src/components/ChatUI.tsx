@@ -200,7 +200,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
                           key={model.id} variant="ghost" className="w-full justify-start h-auto py-2"
                           onClick={() => { setSelectedModel(model.id); setIsPopoverOpen(false); }}
                         >
-                          <Check className={`mr-2 h-4 w-4 ${selectedModel === model.id && !useGeminiDirect ? 'opacity-100' : 'opacity-0'}`} />
+                          <Check className={`mr-2 h-4 w-4 ${selectedModel === model.id ? 'opacity-100' : 'opacity-0'}`} />
                           <span className="whitespace-normal text-left">{model.name}</span>
                         </Button>
                       ))}
