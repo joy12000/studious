@@ -1,3 +1,4 @@
+// src/components/MarkdownRenderer.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import { marked } from 'marked';
 import { InlineMath, BlockMath } from 'react-katex';
@@ -12,7 +13,7 @@ interface Props {
   content: string;
 }
 
-/** 인라인 수식/텍스트 렌더 */
+/** 문단 내부 인라인(수식/텍스트) 렌더 */
 const renderInlineContent = (text: string) => {
   if (!text) return null;
   const regex = /(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g;
@@ -29,12 +30,11 @@ const renderInlineContent = (text: string) => {
       return <InlineMath key={i}>{part.slice(1, -1)}</InlineMath>;
     }
 
-    // marked v5+: marked.parseInline 권장
     return (
       <span
         key={i}
         dangerouslySetInnerHTML={{
-          __html: marked.parseInline(part, { gfm: true, breaks: true }) as string
+          __html: marked.parseInline(part, { gfm: true, breaks: true }) as string,
         }}
       />
     );
@@ -46,84 +46,72 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   const [modalMermaidCode, setModalMermaidCode] = useState<string | null>(null);
   const modalMermaidRef = useRef<HTMLDivElement>(null);
 
-  /** ✅ Mermaid 전역 초기화: 한 번만 */
+  /** ✅ Mermaid 전역 초기화: 한 번만 실행 */
   useEffect(() => {
     mermaid.initialize({
       startOnLoad: false,
-      // 라벨 줄바꿈은 \n(리터럴)로 처리하기 위해 htmlLabels:false
-      flowchart: { htmlLabels: false },
-      // 필요 시 보안/테마
-      securityLevel: 'loose', // HTML 라벨을 쓰지 않아도 loose가 더 관용적
-      theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default'
+      flowchart: { htmlLabels: false }, // 라벨 줄바꿈은 \n(리터럴) 처리
+      securityLevel: 'loose',
+      theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
     });
   }, []);
 
-  /** 코드 검증용: 어디서 깨지는지 즉시 확인 */
+  /** 파싱 사전검증: 어디서 깨지는지 바로 확인 */
   const tryParseMermaid = (code: string): string | null => {
     try {
       mermaid.parse(code);
       return null;
     } catch (e: any) {
-      // e?.str(mermaid 9.x) 또는 e?.message(mermaid 10.x)
       return e?.str || e?.message || 'Unknown mermaid parse error';
     }
   };
 
-  /** 코드블록 내 mermaid 렌더 */
+  /** 본문 내 mermaid 코드블록 렌더 */
   useEffect(() => {
-    const renderMermaidDiagrams = () => {
-      if (!containerRef.current) return;
+    if (!containerRef.current) return;
 
-      // 아직 처리 안 한 것만 잡음
-      const mermaidElements = containerRef.current.querySelectorAll<HTMLElement>(
-        'pre.mermaid:not([data-processed])'
-      );
-      if (mermaidElements.length === 0) return;
+    const mermaidElements = containerRef.current.querySelectorAll<HTMLElement>(
+      'pre.mermaid:not([data-processed])'
+    );
+    if (mermaidElements.length === 0) return;
 
-      // DOM 반영 직후 실행
-      requestAnimationFrame(async () => {
-        try {
-          // 렌더 전에 각 코드블록을 정규화(normalize)하고, 검증(parse)까지 수행
-          const nodes: HTMLElement[] = [];
-          mermaidElements.forEach((pre) => {
-            const codeEl = pre.querySelector('code');
-            // 코드 저장 위치: <pre class="mermaid"><code>...</code></pre>
-            const raw = (codeEl?.textContent || '').trim();
+    // DOM 반영 직후 실행
+    requestAnimationFrame(async () => {
+      const nodes: HTMLElement[] = [];
 
-            // 후보정(유틸)
-            const fixed = normalizeMermaidCode(raw);
+      mermaidElements.forEach((el) => {
+        // 원문 코드 문자열
+        const raw = (el.textContent || '').trim();
 
-            // ✅ HTML이 아니라 "순수 텍스트"로 넣어야 엔티티/태그 혼동 없음
-            if (codeEl) codeEl.textContent = fixed;
-            else pre.textContent = fixed;
+        // 후보정(유틸)
+        const fixed = normalizeMermaidCode(raw);
 
-            // 빠른 파서 검증
-            const err = tryParseMermaid(fixed);
-            if (err) {
-              // 실패한 블록은 즉시 에러 출력하고 렌더 목록에서 제외
-              pre.innerHTML = `<div style="color:red;text-align:center;white-space:pre-wrap;">다이어그램 파싱 오류:\n${err}</div>`;
-              pre.setAttribute('data-processed', 'true');
-            } else {
-              nodes.push(pre);
-            }
-          });
+        // ✅ 순수 텍스트로 주입 (HTML 섞임 방지)
+        el.textContent = fixed;
 
-          if (nodes.length > 0) {
-            await mermaid.run({ nodes });
-            nodes.forEach((n) => n.setAttribute('data-processed', 'true'));
-          }
-        } catch (error) {
-          console.error('Mermaid 렌더링 실패:', error);
-          mermaidElements.forEach((el) => {
-            el.innerHTML = '다이어그램 렌더링 오류';
-            el.setAttribute('style', 'color: red; text-align: center;');
-            el.setAttribute('data-processed', 'true');
-          });
+        // 빠른 파서 검증
+        const err = tryParseMermaid(fixed);
+        if (err) {
+          el.innerHTML = `<div style="color:red;text-align:center;white-space:pre-wrap;">다이어그램 파싱 오류:\n${err}</div>`;
+          el.setAttribute('data-processed', 'true');
+        } else {
+          nodes.push(el);
         }
       });
-    };
 
-    renderMermaidDiagrams();
+      if (nodes.length > 0) {
+        try {
+          await mermaid.run({ nodes });
+        } catch (error) {
+          console.error('Mermaid 렌더링 실패:', error);
+          nodes.forEach((el) => {
+            el.innerHTML = '다이어그램 렌더링 오류';
+          });
+        } finally {
+          nodes.forEach((n) => n.setAttribute('data-processed', 'true'));
+        }
+      }
+    });
   }, [content]);
 
   /** 모달 내 렌더 */
@@ -135,11 +123,10 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       const pre = document.createElement('pre');
       pre.className = 'mermaid';
 
-      // ✅ 모달에서도 항상 textContent로 넣기
+      // ✅ 모달도 텍스트로 주입
       const fixed = normalizeMermaidCode(modalMermaidCode);
       pre.textContent = fixed;
 
-      // 빠른 검증
       const err = tryParseMermaid(fixed);
       if (err) {
         modalMermaidRef.current.innerHTML =
@@ -159,11 +146,11 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
     renderModalMermaid();
   }, [modalMermaidCode]);
 
-  /** 마크다운을 “블록” 단위로 나눠 렌더 */
+  /** 마크다운을 “블록” 단위로 분리 렌더 */
   const renderParts = () => {
     if (!content) return null;
 
-    // 코드블록/디테일 블록/일반 텍스트를 덩어리로 분리
+    // 코드블록/디테일/일반 텍스트 분리
     const blockRegex =
       /(```(?:mermaid|visual|chart|[\s\S]*?)```|<details[\s\S]*?<\/details>|[\s\S]+?(?=```|<details|$))/g;
     const blocks = content.match(blockRegex) || [];
@@ -172,7 +159,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       const trimmedBlock = block.trim();
 
       if (trimmedBlock.startsWith('```mermaid')) {
-        // ```mermaid + 개행 = 길이 11이지만, 안전하게 첫 개행 위치로 자르는 쪽이 확실
+        // 첫 줄(펜스+언어) 분리 후 본문만 추출
         const firstNL = trimmedBlock.indexOf('\n');
         const code = trimmedBlock.slice(firstNL + 1, -3).trim();
 
@@ -183,8 +170,8 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
             onClick={() => setModalMermaidCode(code)}
             title="클릭하여 크게 보기"
           >
-            {/* 원본 코드는 여기선 그대로 넣고, useEffect에서 normalize + render */}
-            <pre className="mermaid"><code>{code}</code></pre>
+            {/* 원본 코드는 여기서 그대로 넣고, useEffect에서 normalize + render */}
+            <pre className="mermaid">{code}</pre>
           </div>
         );
       }
@@ -220,15 +207,13 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
         const mainContentMatch = trimmedBlock.match(/<\/summary>([\s\S]*)<\/details>/);
         let mainContent = mainContentMatch ? mainContentMatch[1] : '';
         mainContent = mainContent.trim().replace(/^<div>/, '').replace(/<\/div>$/, '').trim();
+
         return (
-          <details
-            key={i}
-            className="prose dark:prose-invert max-w-none my-4 border rounded-lg"
-          >
+          <details className="prose dark:prose-invert max-w-none my-4 border rounded-lg" key={i}>
             <summary
               className="cursor-pointer p-4 font-semibold"
               dangerouslySetInnerHTML={{
-                __html: marked.parseInline(summaryContent, { gfm: true, breaks: true })
+                __html: marked.parseInline(summaryContent, { gfm: true, breaks: true }),
               }}
             />
             <div className="p-4 border-t">

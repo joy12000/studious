@@ -46,10 +46,10 @@ const renderContentWithLatex = (text: string) => {
 
   return parts.map((part, i) => {
     if (part.startsWith('$$') && part.endsWith('$$')) {
-      return <BlockMath key={i}>{part.slice(2, -2)}</BlockMath>;
+      return <BlockMath key={i} strict={false}>{part.slice(2, -2)}</BlockMath>;
     }
     if (part.startsWith('$') && part.endsWith('$')) {
-      return <InlineMath key={i}>{part.slice(1, -1)}</InlineMath>;
+      return <InlineMath key={i} strict={false}>{part.slice(1, -1)}</InlineMath>;
     }
     return part;
   });
