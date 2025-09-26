@@ -19,7 +19,7 @@ export const useSidebar = () => {
   return context;
 };
 
-const NavLink = ({ to, icon, children, isCollapsed }: { to: string, icon: React.ReactNode, children: React.ReactNode, isCollapsed: boolean }) => {
+const NavLink = ({ to, icon, children, isCollapsed, onClick }: { to: string, icon: React.ReactNode, children: React.ReactNode, isCollapsed: boolean, onClick?: () => void }) => {
     const location = useLocation();
     const isActive = location.pathname === to;
     
@@ -30,14 +30,14 @@ const NavLink = ({ to, icon, children, isCollapsed }: { to: string, icon: React.
     );
 
     return (
-      <Link to={to} title={isCollapsed ? String(children) : undefined} className={linkClasses}>
+      <Link to={to} title={isCollapsed ? String(children) : undefined} className={linkClasses} onClick={onClick}>
         {icon}
         {!isCollapsed && <span className="truncate">{children}</span>}
       </Link>
     );
 };
 
-const SidebarContent = ({ isCollapsed }: { isCollapsed: boolean }) => {
+const SidebarContent = ({ isCollapsed, onCollapse, isMobile, onMobileCollapse, onLinkClick }: { isCollapsed: boolean, onCollapse?: () => void, isMobile?: boolean, onMobileCollapse?: () => void, onLinkClick?: () => void }) => {
     const { setIsSidebarOpen } = useSidebar();
     return (
       <div className="flex h-full max-h-screen flex-col">
@@ -52,14 +52,25 @@ const SidebarContent = ({ isCollapsed }: { isCollapsed: boolean }) => {
         </div>
         <div className="flex-1 overflow-auto py-4">
             <nav className="grid items-start px-2 text-sm font-medium gap-1">
-                <NavLink to="/" icon={<Home className="h-5 w-5" />} isCollapsed={isCollapsed}>Home</NavLink>
-                <NavLink to="/dashboard" icon={<LayoutDashboard className="h-5 w-5" />} isCollapsed={isCollapsed}>대시보드</NavLink>
-                <NavLink to="/review-deck" icon={<BrainCircuit className="h-5 w-5" />} isCollapsed={isCollapsed}>오늘의 복습</NavLink>
-                <NavLink to="/notes" icon={<List className="h-5 w-5" />} isCollapsed={isCollapsed}>노트 목록</NavLink>
-                <NavLink to="/schedule" icon={<Calendar className="h-5 w-5" />} isCollapsed={isCollapsed}>시간표</NavLink>
-                <NavLink to="/assignment" icon={<GraduationCap className="h-5 w-5" />} isCollapsed={isCollapsed}>AI 과제</NavLink>
-                <NavLink to="/settings" icon={<Settings className="h-5 w-5" />} isCollapsed={isCollapsed}>Settings</NavLink>
+                <NavLink to="/" icon={<Home className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>Home</NavLink>
+                <NavLink to="/dashboard" icon={<LayoutDashboard className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>대시보드</NavLink>
+                <NavLink to="/review-deck" icon={<BrainCircuit className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>오늘의 복습</NavLink>
+                <NavLink to="/notes" icon={<List className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>노트 목록</NavLink>
+                <NavLink to="/schedule" icon={<Calendar className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>시간표</NavLink>
+                <NavLink to="/assignment" icon={<GraduationCap className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>AI 과제</NavLink>
+                <NavLink to="/settings" icon={<Settings className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>Settings</NavLink>
             </nav>
+        </div>
+        <div className="mt-auto p-4 border-t">
+        {isMobile ? (
+          <Button variant="ghost" size="icon" className="w-full" onClick={onMobileCollapse}>
+            <Menu className="h-5 w-5" />
+          </Button>
+        ) : (
+          <Button variant="ghost" size="icon" className="w-full hidden md:block" onClick={onCollapse}>
+            <Menu className="h-5 w-5" />
+          </Button>
+        )}
         </div>
       </div>
     );
@@ -67,10 +78,20 @@ const SidebarContent = ({ isCollapsed }: { isCollapsed: boolean }) => {
 
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(true); // 기본 상태를 '접힘'으로 변경
+  const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(true);
+  const [isMobileNavCollapsed, setIsMobileNavCollapsed] = useState(true);
 
-  const desktopAsideWidth = isCollapsed ? "md:w-[70px]" : "md:w-[256px]";
-  const desktopMainContentMargin = isCollapsed ? "md:ml-[70px]" : "md:ml-[256px]";
+  const location = useLocation();
+
+  const handleLinkClick = () => {
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  };
+
+  const desktopAsideWidth = isDesktopCollapsed ? "md:w-[70px]" : "md:w-[256px]";
+  const desktopMainContentMargin = isDesktopCollapsed ? "md:ml-[70px]" : "md:ml-[256px]";
+  const mobileAsideWidth = isMobileNavCollapsed ? "w-[70px]" : "w-[200px]";
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, setIsSidebarOpen }}>
@@ -84,13 +105,17 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             )}
 
             {/* Sidebar */}
-                        <aside 
-                            className={`fixed inset-y-0 left-0 z-40 border-r transition-all duration-300 ease-in-out bg-muted dark:bg-background
-                            ${isSidebarOpen ? 'translate-x-0 w-[256px]' : '-translate-x-full'}
-                            md:translate-x-0 ${desktopAsideWidth}`}
-                            onMouseEnter={() => setIsCollapsed(false)}                onMouseLeave={() => setIsCollapsed(true)}
-            >
-                <SidebarContent isCollapsed={isCollapsed} />
+            <aside 
+                className={`fixed inset-y-0 left-0 z-40 border-r transition-all duration-300 ease-in-out bg-muted dark:bg-background
+                ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+                md:translate-x-0 ${desktopAsideWidth} ${mobileAsideWidth}`}>
+                <SidebarContent 
+                    isCollapsed={isDesktopCollapsed} 
+                    onCollapse={() => setIsDesktopCollapsed(!isDesktopCollapsed)} 
+                    isMobile={true}
+                    onMobileCollapse={() => setIsMobileNavCollapsed(!isMobileNavCollapsed)}
+                    onLinkClick={handleLinkClick}
+                />
             </aside>
 
             {/* Main Content */}
@@ -106,7 +131,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
                 {/* Page Content */}
                 <main className={`flex-1 flex flex-col p-4 sm:p-6 ${
-                    ['/notes', '/review-deck', '/assignment', '/schedule'].includes(useLocation().pathname)
+                    ['/notes', '/review-deck', '/assignment', '/schedule'].includes(location.pathname)
                         ? 'overflow-y-auto'
                         : ''
                 }`}>

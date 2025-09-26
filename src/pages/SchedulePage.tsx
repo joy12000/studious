@@ -206,6 +206,46 @@ const MonthlyCalendarView = () => {
     );
 };
 
+import { addDays, subDays } from 'date-fns';
+
+const MobileWeeklyCalendarView = ({ onEventClick }: { onEventClick: (event: ScheduleEvent) => void }) => {
+    const { schedule, allSubjects, notes } = useNotes();
+    const [currentDay, setCurrentDay] = useState(new Date());
+
+    const dayOfWeekMap: { [key: string]: number } = { '월': 1, '화': 2, '수': 3, '목': 4, '금': 5, '토': 6, '일': 0 };
+
+    const eventsForDay = useMemo(() => {
+        const dayIndex = getDay(currentDay);
+        const dayOfWeekStr = Object.keys(dayOfWeekMap).find(key => dayOfWeekMap[key] === dayIndex);
+        return schedule.filter(e => e.dayOfWeek === dayOfWeekStr).sort((a,b) => a.startTime.localeCompare(b.startTime));
+    }, [schedule, currentDay]);
+
+    const timeSlots = Array.from({ length: 15 }, (_, i) => `${i + 8}:00`); // 8 AM to 10 PM
+
+    return (
+        <div className="flex-1 flex flex-col bg-card p-4 rounded-lg shadow-inner">
+            <div className="flex items-center justify-between mb-4">
+                <Button variant="outline" size="icon" onClick={() => setCurrentDay(subDays(currentDay, 1))}><ChevronLeft className="h-4 w-4" /></Button>
+                <h2 className="text-lg font-semibold">{format(currentDay, 'yyyy년 M월 d일 (eee)', { locale: ko })}</h2>
+                <Button variant="outline" size="icon" onClick={() => setCurrentDay(addDays(currentDay, 1))}><ChevronRight className="h-4 w-4" /></Button>
+            </div>
+            <div className="flex-1 flex overflow-hidden">
+                <div className="flex flex-col text-xs text-muted-foreground text-center">
+                    {timeSlots.map(time => <div key={time} className="h-16 flex-shrink-0 pr-2 pt-[-4px]">{time}</div>)}
+                </div>
+                <div className="flex-1 grid grid-cols-1 border-l">
+                    <div className="relative flex-1 bg-grid [background-size:100%_4rem]">
+                        {Array.from({ length: 15 }).map((_, i) => <div key={i} className="h-16 border-b"></div>)}
+                        {eventsForDay.map(event => (
+                            <WeeklyEventCard key={event.id} event={event} subjects={allSubjects} notes={notes} onClick={() => onEventClick(event)} />
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 // --- Main Page Component ---
 export default function SchedulePage() {
   const [view, setView] = useState<'weekly' | 'monthly'>('weekly');
@@ -216,6 +256,15 @@ export default function SchedulePage() {
   const [portalNotes, setPortalNotes] = useState<Note[]>([]);
   const [contextSubject, setContextSubject] = useState<Subject | undefined>();
   const [contextDate, setContextDate] = useState<Date | undefined>(); // ✨ [추가] 날짜 컨텍스트 상태
+  const [isMobile, setIsMobile] = useState(window.matchMedia("(max-width: 768px)").matches);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 768px)");
+    const handleResize = () => setIsMobile(mediaQuery.matches);
+
+    mediaQuery.addEventListener('change', handleResize);
+    return () => mediaQuery.removeEventListener('change', handleResize);
+  }, []);
 
   const handleClosePortal = useCallback(() => {
     setIsPortalOpen(false);
@@ -248,7 +297,7 @@ export default function SchedulePage() {
         </div>
         
         {view === 'weekly' 
-            ? <WeeklyCalendarView onEventClick={handleEventClick} /> 
+            ? (isMobile ? <MobileWeeklyCalendarView onEventClick={handleEventClick} /> : <WeeklyCalendarView onEventClick={handleEventClick} />) 
             : <MonthlyCalendarView />}
 
         <ClassPortalModal 
