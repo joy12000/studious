@@ -96,7 +96,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             {/* Main Content */}
             <div className={`flex flex-col flex-1 h-full transition-all duration-300 ease-in-out ${desktopMainContentMargin}`}>
                 {/* Mobile Header */}
-                <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6 md:hidden">
+                <header className="flex h-12 items-center gap-2 border-b bg-background px-2 lg:h-[60px] lg:px-6 md:hidden">
                     <Button variant="outline" size="icon" className="shrink-0" onClick={() => setIsSidebarOpen(true)}>
                         <Menu className="h-5 w-5" />
                         <span className="sr-only">Toggle navigation menu</span>
