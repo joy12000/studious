@@ -74,7 +74,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, setIsSidebarOpen }}>
-        <div className="flex flex-col h-screen w-full overflow-hidden">
+        <div className="flex flex-col h-screen w-full">
             {/* Mobile Overlay */}
             {isSidebarOpen && (
                 <div 
@@ -94,7 +94,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
             </aside>
 
             {/* Main Content */}
-            <div className={`flex flex-col flex-1 transition-all duration-300 ease-in-out ${desktopMainContentMargin}`}>
+            <div className={`flex flex-col flex-1 h-full transition-all duration-300 ease-in-out ${desktopMainContentMargin}`}>
                 {/* Mobile Header */}
                 <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6 md:hidden">
                     <Button variant="outline" size="icon" className="shrink-0" onClick={() => setIsSidebarOpen(true)}>
