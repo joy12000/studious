@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { useNotes } from '../lib/useNotes';
 import { ScheduleEvent, Subject, Note } from '../lib/types';
 import { Button } from '@/components/ui/button';
