@@ -145,11 +145,14 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId }) 
 
       if (useGeminiDirect) {
         const data = await response.json();
-        setMessages(prev => prev.map(msg => 
-            msg.id === botMessage.id 
-                ? { ...msg, text: data.answer, followUp: data.followUp } 
-                : msg
-        ));
+        console.log("DEBUG Frontend: Received non-streaming Gemini Direct response data:", data);
+        setMessages(prev => prev.map(msg => {
+            if (msg.id === botMessage.id) {
+                console.log("DEBUG Frontend: Updating bot message with data:", data.answer, data.followUp);
+                return { ...msg, text: data.answer, followUp: data.followUp };
+            }
+            return msg;
+        }));
       } else { // OpenRouter streaming logic
         if (!response.body) {
           throw new Error('API 응답 본문이 없습니다.');
