@@ -139,8 +139,8 @@ export function normalizeMermaidCode(input: string, opts: NormalizeOptions = {})
     }
   }
 
-  // 임시 개행 마커 복원
-  let final = out.join('\n').replace(/\\n/g, '\n');
+  // 라벨 내부 줄바꿈은 \n(리터럴)로 유지해야 Mermaid가 줄바꿈 처리합니다.
+  let final = out.join('\n');
 
   // 경고를 주석으로 첨부(옵션)
   if (O.attachWarningsAsComments && warnings.length) {
