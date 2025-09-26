@@ -3,6 +3,7 @@ import React from 'react';
 import ShadowHost from './ShadowHost';
 import { InlineMath, BlockMath } from 'react-katex';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from './ui/card';
+import { icons } from 'lucide-react'; // Import icons
 import appCss from '../index.css?raw';
 
 // --- Type Definitions ---
@@ -15,6 +16,18 @@ type NodeConfig = {
 interface Props {
   config?: NodeConfig;
 }
+
+// --- Icon Component ---
+// Dynamically renders a Lucide icon based on the 'name' prop.
+const LucideIcon = ({ name, ...props }: { name: string }) => {
+  const Icon = icons[name as keyof typeof icons];
+  if (!Icon) {
+    console.warn(`Icon "${name}" not found in lucide-react.`);
+    return <span style={{ color: 'red' }}>[Icon: {name}? ]</span>;
+  }
+  return <Icon {...props} />;
+};
+
 
 // --- Component & Tag Mappings ---
 const SVG_TAGS = new Set([
@@ -35,6 +48,7 @@ const COMPONENT_MAP: Record<string, React.ComponentType<any>> = {
   'card-title': CardTitle,
   'card-description': CardDescription,
   'card-footer': CardFooter,
+  icon: LucideIcon, // Add icon to the map
 };
 
 // --- Utility Functions ---
