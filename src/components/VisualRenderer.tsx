@@ -2,8 +2,10 @@
 import React from 'react';
 import ShadowHost from './ShadowHost';
 import { InlineMath, BlockMath } from 'react-katex';
+import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from './ui/card';
 import appCss from '../index.css?raw';
 
+// --- Type Definitions ---
 type NodeConfig = {
   type: string;
   props?: Record<string, any>;
@@ -14,27 +16,33 @@ interface Props {
   config?: NodeConfig;
 }
 
+// --- Component & Tag Mappings ---
 const SVG_TAGS = new Set([
   'svg','g','defs','marker','path','rect','circle','ellipse','line','polyline','polygon','text',
   'linearGradient','radialGradient','stop','pattern','clipPath','mask','foreignObject','style'
 ]);
 
 const HTML_TAG_MAP: Record<string, string> = {
-  box: 'div', p: 'p', span: 'span', img: 'img', div: 'div',
+  container: 'div', box: 'div', p: 'p', span: 'span', img: 'img', div: 'div',
   h1: 'h1', h2: 'h2', h3: 'h3', ul: 'ul', li: 'li', strong: 'strong',
-  text: 'span' // 'text' 타입을 'span'으로 매핑
+  text: 'span'
 };
 
+const COMPONENT_MAP: Record<string, React.ComponentType<any>> = {
+  card: Card,
+  'card-header': CardHeader,
+  'card-content': CardContent,
+  'card-title': CardTitle,
+  'card-description': CardDescription,
+  'card-footer': CardFooter,
+};
+
+// --- Utility Functions ---
 function ensureVisibleDefaults(type: string, props: Record<string, any>) {
   const p = { ...props };
   if (SVG_TAGS.has(type)) {
-    if (p.stroke == null && p.fill == null) {
-      p.stroke = 'currentColor';
-      p.fill = 'none';
-    }
-    if (p.strokeWidth == null && (type === 'path' || type === 'line' || type === 'polyline' || type === 'polygon')) {
-      p.strokeWidth = 2;
-    }
+    if (p.stroke == null && p.fill == null) p.stroke = 'currentColor';
+    if (p.strokeWidth == null && ['path', 'line', 'polyline', 'polygon'].includes(type)) p.strokeWidth = 2;
   }
   return p;
 }
@@ -44,11 +52,7 @@ const unicodeToLatex = (text: string): string => {
     '²': '^2', '³': '^3', '¹': '^1', '⁴': '^4', '⁵': '^5', '⁶': '^6', '⁷': '^7', '⁸': '^8', '⁹': '^9', '⁰': '^0',
     '₀': '_0', '₁': '_1', '₂': '_2', '₃': '_3', '₄': '_4', '₅': '_5', '₆': '_6', '₇': '_7', '₈': '_8', '₉': '_9',
   };
-  let result = text;
-  for (const char in replacements) {
-    result = result.replace(new RegExp(char, 'g'), replacements[char]);
-  }
-  return result;
+  return Object.entries(replacements).reduce((acc, [char, latex]) => acc.replace(new RegExp(char, 'g'), latex), text);
 };
 
 const renderContentWithLatex = (text: string) => {
@@ -69,6 +73,7 @@ const renderContentWithLatex = (text: string) => {
   });
 };
 
+// --- Main Renderer Component ---
 const VisualRenderer: React.FC<Props> = ({ config }) => {
   if (!config) return null;
 
@@ -76,28 +81,36 @@ const VisualRenderer: React.FC<Props> = ({ config }) => {
     if (!node) return null;
 
     const { type, props = {}, children: structuralChildren = [] } = node;
-    
-    // ✅ [수정] props에서 content와 children을 모두 확인하도록 변경
     const { content, innerHTML, style, className, children: propsChildren, ...rest0 } = props;
-    
-    const isSvg = SVG_TAGS.has(type);
-    const componentType = isSvg ? type : (HTML_TAG_MAP[type] ?? 'div');
 
+    // 1. Determine the component type to render
+    const CustomComponent = COMPONENT_MAP[type];
+    const isSvg = SVG_TAGS.has(type);
+    const componentType = CustomComponent || (isSvg ? type : (HTML_TAG_MAP[type] ?? 'div'));
+
+    // 2. Handle special 'latex' type
+    if (type === 'latex') {
+      const latexContent = unicodeToLatex(content || '');
+      return props.block
+        ? <BlockMath strict={false}>{latexContent}</BlockMath>
+        : <InlineMath strict={false}>{latexContent}</InlineMath>;
+    }
+
+    // 3. Prepare props
     const rest = ensureVisibleDefaults(type, rest0);
     const styleObj = (typeof style === 'object' && style) ? style : undefined;
 
-    // ✅ [수정] 렌더링할 자식 요소를 결정하는 로직 강화
-    let finalChildren;
+    // 4. Determine children to render
+    let finalChildren: React.ReactNode = null;
     const textualContent = typeof propsChildren === 'string' ? propsChildren : content;
 
     if (typeof textualContent === 'string') {
-      // 텍스트 내용이 props.children 또는 props.content에 있는 경우
       finalChildren = renderContentWithLatex(textualContent);
     } else if (Array.isArray(structuralChildren) && structuralChildren.length > 0) {
-      // 중첩된 노드가 최상위 children 배열에 있는 경우
       finalChildren = structuralChildren.map((c, i) => <React.Fragment key={i}>{renderNode(c)}</React.Fragment>);
     }
 
+    // 5. Create and return the element
     if (innerHTML) {
       return React.createElement(componentType, {
         ...rest, style: styleObj, className,
