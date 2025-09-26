@@ -171,10 +171,11 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId }) 
           buffer = lines.pop() || '';
 
           for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                  const jsonStr = line.slice(6);
-                  if (jsonStr === '[DONE]') continue;
-                  try {
+                          if (line.startsWith('data: ')) {
+                              const jsonStr = line.slice(6);
+                              console.log("DEBUG Frontend Stream Line:", line);
+                              console.log("DEBUG Frontend Stream jsonStr:", jsonStr);
+                              if (jsonStr === '[DONE]') continue;                  try {
                       const data = JSON.parse(jsonStr);
                                           if (data.token) {
                                               fullResponseText += data.token;
