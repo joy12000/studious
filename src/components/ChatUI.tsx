@@ -226,7 +226,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId }) 
                         size="sm"
                         onClick={() => {
                           setUseGeminiDirect(true);
-                          setSelectedModel('gemini-pro'); // Set default Gemini model
+                          setSelectedModel('gemini-2.5-flash'); // Set default Gemini model
                           setIsPopoverOpen(false);
                           sendNewMessage(inputValue); // Trigger send with current input
                         }}
