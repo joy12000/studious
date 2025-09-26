@@ -1,4 +1,5 @@
 {
+  "outputDirectory": "dist",
   "functions": {
     "api/summarize_youtube.py": {
       "maxDuration": 300
