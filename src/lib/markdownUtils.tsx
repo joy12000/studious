@@ -151,6 +151,10 @@ export function normalizeMermaidCode(input: string, opts: NormalizeOptions = {})
     final = enforceSafetyNewlinesFlow(final);
   }
 
+  // ▷ 추가: 라인 시작에 튀어나온 중복 클로저 제거 + 고아 세미콜론 제거
+  final = stripDuplicateClosersAtLineStart(final);
+  final = stripLoneSemicolons(final);
+
   if (opts.attachWarningsAsComments && warnings.length) {
     final = ['%% WARN: ' + warnings.join(' | '), final].join('\n');
   }
@@ -331,6 +335,7 @@ function needsQuotes(text: string): boolean {
 }
 function escapeQuotes(s: string): string { return s.replace(/"/g, '&quot;'); }
 
+/** 엣지 라벨 보정 (flow 전용) */
 function normalizeFlowEdgeLabels(line: string): string {
   line = line.replace(/--\s*\|([^|]+)\|\s*--/g, (_m, label) => `-- "${escapeQuotes(label.trim())}" --`);
   line = line.replace(/--\s*\|([^|]+)\|\s*-->/g, (_m, label) => `-- "${escapeQuotes(label.trim())}" -->`);
@@ -352,8 +357,9 @@ function normalizeFlowEdgeLabels(line: string): string {
  * 노드 정의 보정 (flow 전용)
  * - ID + 여는 토큰( [ [[ ( (( { {{ {> )을 인식
  * - 내용이 멀티라인(\n 리터럴 포함)이고 형태가 ()이면 []로 강제 전환 (htmlLabels:false 안정화)
- * - 이미 따옴표로 감싼 경우 내부의 추가 따옴표는 &quot;로 이스케이프
- * - 닫힘 괄호 뒤 tail이 다음 명령/식별자로 시작하면 **바로 줄바꿈 삽입**  ← ★ 이번 추가
+ * - 라벨에 " 가 하나라도 있으면 () → []로 강제 전환 (")") 패턴 차단  ← ★ 추가
+ * - 라벨은 필요 시 항상 "..."로 감싸고, 내부 " 는 &quot; 로 이스케이프  ← ★ 강화
+ * - 닫힘 괄호 뒤 tail이 명령/식별자 등으로 시작하면 즉시 줄바꿈 삽입  ← ★ 유지
  */
 function normalizeFlowNodeDefinition(
   line: string,
@@ -381,44 +387,54 @@ function normalizeFlowNodeDefinition(
   let content = endIdx === -1 ? rest.trim() : rest.slice(0, endIdx);
   let tail = endIdx === -1 ? '' : rest.slice(endIdx + close.length);
 
-  const rawContent = content;
-  const isQuoted = rawContent.startsWith('"') && rawContent.endsWith('"');
-  const inner = isQuoted ? rawContent.slice(1, -1) : rawContent;
+  // 내용 파싱 (겉따옴표 제거)
+  const wasQuoted = content.startsWith('"') && content.endsWith('"');
+  let inner = wasQuoted ? content.slice(1, -1) : content;
 
   const isMultiline = /\\n/.test(inner) || /\n/.test(inner);
+  const hasQuotedChar = /"|&quot;|&#34;|&#x22;/i.test(inner);
 
+  // () 노드에서 멀티라인 또는 " 가 포함되면 [] 로 강제 전환  ← ★ 핵심
   let effOpen = open;
   let effClose = close;
-  if (opt.transformParenMultilineToBracket && (open === '(' || open === '((') && isMultiline) {
-    effOpen = open.replace(/\(/g, '[');
+  const isParenOpen = (open === '(' || open === '((');
+  if ((opt.transformParenMultilineToBracket && isMultiline) || (isParenOpen && hasQuotedChar)) {
+    effOpen = open.startsWith('((') ? '[[' : '[';
     effClose = effOpen === '[[' ? ']]' : ']';
   }
 
-  const shouldQuote =
-    isMultiline ||
-    SPECIAL_CHARS_REGEX.test(inner) ||
-    MERMAID_KEYWORDS.has(inner.trim().toLowerCase()) ||
-    /^\s|\s$/.test(inner);
+  // 최종 라벨: 내부 " → &quot; , 그리고 필요 시 "..."로 감싸기
+  const innerEscaped = inner.replace(/"/g, '&quot;');
+  const mustQuote =
+    wasQuoted || isMultiline || needsQuotes(inner) || hasQuotedChar || /^\s|\s$/.test(innerEscaped);
 
-  let normalizedInner = inner;
-  if (isQuoted) {
-    normalizedInner = inner.replace(/"/g, '&quot;');
-  } else if (shouldQuote) {
-    normalizedInner = `"${escapeQuotes(inner)}"`;
-  }
+  const normalizedInner = mustQuote ? `"${innerEscaped}"` : innerEscaped;
 
-  // ★★★ 노드 닫힘 뒤 tail이 명령/식별자 등으로 즉시 시작하면 바로 줄바꿈 해 분리
+  // 닫힘 뒤 tail이 명령/식별자 등으로 바로 시작하면 바로 줄바꿈
   if (tail) {
-    const t = tail; // 원형 유지
+    const t = tail;
     const startsWithCmdOrId =
       /^\s*(?:subgraph|style|linkStyle|classDef|click|direction)\b/i.test(t) ||
-      /^\s*[A-Za-z_][\w-]*\s*(?:\[\[?|\(\(?|\{\{?|\{>)/.test(t); // 바로 새 노드
-    if (startsWithCmdOrId) {
-      tail = '\n' + t.trim();
-    }
+      /^\s*[A-Za-z_][\w-]*\s*(?:\[\[?|\(\(?|\{\{?|\{>)/.test(t);
+    if (startsWithCmdOrId) tail = '\n' + t.trim();
   }
 
   return `${id}${ws}${effOpen}${normalizedInner}${effClose}${tail}`;
+}
+
+/* ---------- Line-start cleanup (신규) ---------- */
+/** 라인 시작의 중복 클로저 제거: `") --`, `]linkStyle 1 ...`, `"}> style ...` 등 */
+function stripDuplicateClosersAtLineStart(s: string): string {
+  return s
+    // 연속된 클로저(전 라인 끝 + 다음 라인 시작) → 시작 쪽 클로저 제거
+    .replace(/(^|\n)\s*["']?(\]|\)|\}>)(?=\s*(?:--|-\.)|(?:subgraph|style|linkStyle|classDef|click|direction)\b|[A-Za-z_])/gi, '$1')
+    // 드물게 클로저만 라인에 남은 경우 제거
+    .replace(/(^|\n)\s*["']?(\]|\)|\}>)\s*$/gm, '$1');
+}
+
+/** 고아 세미콜론만 있는 라인 제거 */
+function stripLoneSemicolons(s: string): string {
+  return s.replace(/(^|\n)\s*;\s*(?=$|\n)/g, '$1');
 }
 
 /* ---------- non-flow minimal ---------- */
