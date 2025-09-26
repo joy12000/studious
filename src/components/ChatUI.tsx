@@ -18,7 +18,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
     id: number;
     text: string;
     sender: 'user' | 'bot';
-    followUp?: string[];
   }
   interface GeminiHistory {
     role: 'user' | 'model';
@@ -29,11 +28,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
     id: Date.now(),
     text: '현재 노트 내용을 바탕으로 무엇이든 물어보세요!',
     sender: 'bot',
-    followUp: [
-      '이 노트의 핵심 내용을 세 문장으로 요약해줘.',
-      '여기서 더 깊이 탐구할 만한 주제는 뭐가 있을까?',
-      '이 개념을 실제 사례에 적용해서 설명해줘.'
-    ]
   });
 
   interface ChatUIProps {
@@ -159,17 +153,10 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
                   if (jsonStr.trim() === '[DONE]') continue;
                   try {
                       const data = JSON.parse(jsonStr);
-
                       if (data.token) {
                           setMessages(prev => prev.map(msg =>
                               msg.id === botMessage.id
                                   ? { ...msg, text: msg.text + data.token }
-                                  : msg
-                          ));
-                      } else if (data.followUp) {
-                          setMessages(prev => prev.map(msg =>
-                              msg.id === botMessage.id
-                                  ? { ...msg, followUp: data.followUp }
                                   : msg
                           ));
                       }
@@ -278,16 +265,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
                       )}
                     </div>
                   </div>
-                  {msg.sender === 'bot' && !isLoading && msg.followUp && msg.followUp.length > 0 && (
-                    <div className="mt-4 ml-11 flex flex-wrap gap-2">
-                      {msg.followUp.map((q, i) => (
-                        <Button key={i} variant="outline" size="sm" className="h-auto py-1.5" onClick={() =>
-  handleSendMessage(q)}>
-                          {q}
-                        </Button>
-                      ))}
-                    </div>
-                  )}
+                  {/* Follow-up questions removed */}
                 </div>
               ))}
               {isLoading && (
