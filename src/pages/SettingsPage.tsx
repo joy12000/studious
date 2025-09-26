@@ -142,25 +142,6 @@ export default function SettingsPage(){
 
   return (
     <div className="flex h-full flex-col">
-      <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b p-4 pt-4">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="md:hidden"
-              onClick={() => setIsSidebarOpen(true)}
-            >
-              <Menu className="h-6 w-6" />
-            </Button>
-            <div>
-              <h1 className="text-xl font-semibold tracking-tight">앱 설정</h1>
-              <p className="text-sm text-muted-foreground">테마, 데이터 관리, 백업 등을 설정합니다.</p>
-            </div>
-          </div>
-        </div>
-      </header>
-
       <main className="flex-1 overflow-y-auto p-4">
         <div className="max-w-4xl mx-auto space-y-6">
           <div className="flex items-center gap-2 flex-wrap">

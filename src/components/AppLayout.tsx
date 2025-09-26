@@ -89,8 +89,8 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const desktopAsideWidth = isDesktopCollapsed ? "md:w-[70px]" : "md:w-[256px]";
-  const desktopMainContentMargin = isDesktopCollapsed ? "md:ml-[70px]" : "md:ml-[256px]";
+  const desktopAsideWidth = isDesktopCollapsed ? "md:w-[70px]" : "md:w-[180px]";
+  const desktopMainContentMargin = isDesktopCollapsed ? "md:ml-[70px]" : "md:ml-[180px]";
   const mobileAsideWidth = isMobileNavCollapsed ? "w-[70px]" : "w-[200px]";
 
   return (
@@ -120,17 +120,13 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
             {/* Main Content */}
             <div className={`flex flex-col flex-1 h-full transition-all duration-300 ease-in-out ${desktopMainContentMargin}`}>
-                {/* Mobile Header */}
-                <header className="flex h-12 items-center gap-2 border-b bg-background px-2 lg:h-[60px] lg:px-6 md:hidden">
-                    <Button variant="outline" size="icon" className="shrink-0" onClick={() => setIsSidebarOpen(true)}>
-                        <Menu className="h-5 w-5" />
-                        <span className="sr-only">Toggle navigation menu</span>
-                    </Button>
-                    <Link to="/" className="text-lg font-semibold">Studious</Link>
-                </header>
+                <Button variant="outline" size="icon" className="shrink-0 md:hidden absolute top-2 left-2 z-50" onClick={() => setIsSidebarOpen(true)}>
+                    <Menu className="h-5 w-5" />
+                    <span className="sr-only">Toggle navigation menu</span>
+                </Button>
 
                 {/* Page Content */}
-                <main className={`flex-1 flex flex-col p-4 sm:p-6 ${
+                <main className={`flex-1 flex flex-col p-4 pt-12 sm:p-6 ${
                     ['/notes', '/review-deck', '/assignment', '/schedule'].includes(location.pathname)
                         ? 'overflow-y-auto'
                         : ''
