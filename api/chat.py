@@ -97,7 +97,28 @@ class handler(BaseHTTPRequestHandler):
             # 💬 대화 규칙
             1.  **명확성:** 학생의 질문에 명확하고 구조적으로 답변합니다.
             2.  **후속 질문:** 답변 마지막에 학생의 사고를 확장할 수 있는 좋은 후속 질문 3개를 제안합니다.
-            3.  **JSON 출력:** 최종 결과는 반드시 `{"answer": "...", "followUp": ["...", "...", "..."]}` 형식의 JSON 객체로만 응답해야 합니다.
+            3.  **JSON 출력:** 최종 결과는 반드시 아래 JSON 스키마를 엄격히 준수하는 JSON 객체로만 응답해야 합니다.
+                ```json
+                {
+                  "type": "object",
+                  "properties": {
+                    "answer": {
+                      "type": "string",
+                      "description": "사용자의 질문에 대한 답변 내용 (마크다운 형식)"
+                    },
+                    "followUp": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "description": "사용자의 사고를 확장할 수 있는 후속 질문 3가지"
+                      },
+                      "minItems": 3,
+                      "maxItems": 3
+                    }
+                  },
+                  "required": ["answer", "followUp"]
+                }
+                ```
 
             """
 
