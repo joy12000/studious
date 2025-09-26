@@ -8,14 +8,14 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
   import { useNotes } from '../lib/useNotes';
 
   const models = [ 
-      { id: 'gemini-2-5-pro', name: 'gemini-2-5-pro' },
-      { id: 'gemini-2.5-flash', name: 'gemini-2.5-flash' },
-      { id: 'openai/gpt-oss-20b:free', name: '🧠 모두가 아는 그 gpt' },
-      { id: 'x-ai/grok-4-fast:free', name: '🚀화성 갈끄니까 Grok' },
-      { id: 'meta-llama/llama-4-maverick:free', name: '라마 🦙귀여운 Llama Ai' },
-      { id: 'gemini-2.5-flash-lite', name: 'gemini-2.5-flash-lite' },
-      { id: 'gemini-2.0-flash', name: 'gemini-2.0-flash' },
-      { id: 'deepseek/deepseek-chat-v3.1:free', name: '✨ deepseek..성능은 좋음' },
+      { id: 'gemini-2-5-pro', name: '✨ Gemini 2.5 Pro' },
+      { id: 'gemini-2.5-flash', name: '⚡ Gemini 2.5 Flash' },
+      { id: 'openai/gpt-oss-20b:free', name: '🧠 챗 GPT' },
+      { id: 'x-ai/grok-4-fast:free', name: '🚀 Grok' },
+      { id: 'meta-llama/llama-4-maverick:free', name: '🦙 AI Llama' },
+      { id: 'gemini-2.5-flash-lite', name: '💡 Gemini 2.5 Flash Lite' },
+      { id: 'gemini-2.0-flash', name: '🌟 Gemini 2.0 Flash' },
+      { id: 'deepseek/deepseek-chat-v3.1:free', name: '🔍 Deepseek v3.1' },
   ];
 
   export interface Message {
