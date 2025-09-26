@@ -64,8 +64,8 @@ const WeeklyCalendarView = ({ onEventClick }: { onEventClick: (event: ScheduleEv
     const timeSlots = Array.from({ length: 15 }, (_, i) => `${i + 8}:00`); // 8 AM to 10 PM
 
     return (
-        <div className="flex-1 flex flex-col bg-card p-4 rounded-lg shadow-inner">
-            <div className="flex items-center justify-between mb-4">
+        <div className="flex-1 flex flex-col bg-card rounded-lg shadow-inner">
+            <div className="flex items-center justify-between mb-4 px-4 pt-4">
                 <Button variant="outline" size="icon" onClick={() => setCurrentWeek(subWeeks(currentWeek, 1))}><ChevronLeft className="h-4 w-4" /></Button>
                 <h2 className="text-lg font-semibold">{format(startOfWeek(currentWeek, { weekStartsOn: 1 }), 'yyyy년 M월', { locale: ko })}</h2>
                 <Button variant="outline" size="icon" onClick={() => setCurrentWeek(addWeeks(currentWeek, 1))}><ChevronRight className="h-4 w-4" /></Button>
@@ -223,8 +223,8 @@ const MobileWeeklyCalendarView = ({ onEventClick }: { onEventClick: (event: Sche
     const timeSlots = Array.from({ length: 15 }, (_, i) => `${i + 8}:00`); // 8 AM to 10 PM
 
     return (
-        <div className="flex-1 flex flex-col bg-card p-4 rounded-lg shadow-inner">
-            <div className="flex items-center justify-between mb-4">
+        <div className="flex-1 flex flex-col bg-card rounded-lg shadow-inner">
+            <div className="flex items-center justify-between mb-4 px-4 pt-4">
                 <Button variant="outline" size="icon" onClick={() => setCurrentDay(subDays(currentDay, 1))}><ChevronLeft className="h-4 w-4" /></Button>
                 <h2 className="text-lg font-semibold">{format(currentDay, 'yyyy년 M월 d일 (eee)', { locale: ko })}</h2>
                 <Button variant="outline" size="icon" onClick={() => setCurrentDay(addDays(currentDay, 1))}><ChevronRight className="h-4 w-4" /></Button>
@@ -284,8 +284,8 @@ export default function SchedulePage() {
   };
 
   return (
-    <div className="p-4 h-full flex flex-col">
-        <div className="flex items-center justify-between mb-4">
+    <div className="h-full flex flex-col">
+        <div className="flex items-center justify-between mb-4 px-4 pt-4">
             <h1 className="text-2xl font-bold">시간표</h1>
             <div className="flex items-center gap-4">
               <ScheduleImportButton />

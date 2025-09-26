@@ -8,7 +8,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
   import { useNotes } from '../lib/useNotes';
 
   const models = [ 
-      { id: 'gemini-2-5-pro', name: '✨ Gemini 2.5 Pro' },
+      { id: 'gemini-pro', name: '✨ Gemini 2.5 Pro' },
       { id: 'gemini-2.5-flash', name: '⚡ Gemini 2.5 Flash' },
       { id: 'openai/gpt-oss-20b:free', name: '🧠 챗 GPT' },
       { id: 'x-ai/grok-4-fast:free', name: '🚀 Grok' },
