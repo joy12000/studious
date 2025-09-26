@@ -184,8 +184,9 @@ class handler(BaseHTTPRequestHandler):
         try:
             for chunk in response_iterator:
                 if chunk.text:
-                    # Gemini가 보내주는 텍스트 조각을 그대로 data 이벤트로 전송
-                    self.wfile.write(f"data: {chunk.text}\n\n".encode('utf-8'))
+                    # 토큰을 포함한 JSON 객체를 생성하여 전송
+                    token_json = json.dumps({"token": chunk.text})
+                    self.wfile.write(f"data: {token_json}\n\n".encode('utf-8'))
                     self.wfile.flush()
         except Exception as e:
             print(f"ERROR: 스트리밍 중 오류 발생: {e}")
@@ -202,27 +203,34 @@ class handler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'text/event-stream; charset=utf-8')
         self.end_headers()
 
-        buffer = ""
-        for line in response.iter_lines():
-            if line:
-                decoded_line = line.decode('utf-8')
-                if decoded_line.startswith('data: '):
-                    json_str = decoded_line[len('data: '):]
-                    if json_str.strip() == '[DONE]':
-                        break
-                    try:
-                        data = json.loads(json_str)
-                        if 'choices' in data and data['choices']:
-                            delta = data['choices'][0].get('delta', {})
-                            content = delta.get('content')
-                            if content:
-                                buffer += content
-                    except json.JSONDecodeError:
-                        continue
-        
-        # 스트림이 끝나면 버퍼에 있는 전체 JSON을 전송
-        if buffer:
-            self.wfile.write(f"data: {buffer}\n\n".encode('utf-8'))
+        try:
+            for line in response.iter_lines():
+                if line:
+                    decoded_line = line.decode('utf-8')
+                    if decoded_line.startswith('data: '):
+                        json_str = decoded_line[len('data: '):].strip()
+                        if json_str == '[DONE]':
+                            break
+                        if not json_str:
+                            continue
+                        
+                        try:
+                            data = json.loads(json_str)
+                            if 'choices' in data and data['choices']:
+                                delta = data['choices'][0].get('delta', {})
+                                content = delta.get('content')
+                                if content:
+                                    # 토큰을 포함한 JSON 객체를 생성하여 전송
+                                    token_json = json.dumps({"token": content})
+                                    self.wfile.write(f"data: {token_json}\n\n".encode('utf-8'))
+                                    self.wfile.flush()
+                        except json.JSONDecodeError:
+                            print(f"WARN: OpenRouter 스트림의 JSON 파싱 실패: {json_str}")
+                            continue
+        except Exception as e:
+            print(f"ERROR: OpenRouter 스트리밍 중 오류 발생: {e}")
+            error_json = json.dumps({"error": "스트리밍 중 오류 발생", "details": str(e)})
+            self.wfile.write(f"data: {error_json}\n\n".encode('utf-8'))
             self.wfile.flush()
 
         self.wfile.write('data: [DONE]\n\n'.encode('utf-8'))
