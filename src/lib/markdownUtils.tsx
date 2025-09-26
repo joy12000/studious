@@ -185,6 +185,14 @@ export function normalizeMermaidCode(input: string, opts: NormalizeOptions = {})
   // ✳️ 라벨 내부 줄바꿈은 \n(리터럴)로 유지해야 Mermaid가 줄바꿈 처리하므로 replace(/\\n/,'\n') 금지
   let final = resultLines.join('\n');
 
+  // 타입별 세이프티 개행 보강
+  if (header === 'sequenceDiagram') {
+    final = enforceSafetyNewlinesSequence(final);
+  } else if (header === 'flowchart' || header === 'graph' || header === 'unknown') {
+    final = enforceSafetyNewlinesFlow(final);
+  }
+
+  // 라벨의 \n(리터럴)은 그대로 유지해야 하므로, \\n -> 실제 개행 치환은 절대 하지 않음
   if (opts.attachWarningsAsComments && warnings.length) {
     final = ['%% WARN: ' + warnings.join(' | '), final].join('\n');
   }
@@ -195,6 +203,31 @@ export function normalizeMermaidCode(input: string, opts: NormalizeOptions = {})
 /* --------------------------------------------------------------------------------
  * 내부 유틸/핵심 로직
  * -------------------------------------------------------------------------------- */
+
+
+
+/** sequenceDiagram용: 메시지(: …) 뒤에 다음 메시지/키워드가 붙었으면 개행 보강 */
+function enforceSafetyNewlinesSequence(s: string): string {
+  return s
+    // 1) "A->>B: 메시지" 바로 뒤에 다음 라인이 붙으면 개행 삽입
+    .replace(
+      /(:[^\n]*?)(?=\s*(?:[A-Za-z_][\w-]*\s*(?:-{1,2}(?:>>|>)|-{1,2}(?:x|X)|-{1,2}(?:o|O)|\*|—)|Note\b|alt\b|opt\b|loop\b|par\b|rect\b|critical\b|end\b))/g,
+      '$1\n'
+    )
+    // 2) 'end' 뒤에 뭔가 붙어 있으면 개행
+    .replace(/(^|\n)\s*(end)\s*(?=\S)/gi, '$1$2\n')
+    // 3) Note/alt/opt/loop/par/rect/critical 앞 경계 보강
+    .replace(/([^\n])\s*(?=(Note|alt|opt|loop|par|rect|critical|end)\b)/g,
+      (m, prev) => (/\n$/.test(prev) ? m : prev + '\n'));
+}
+
+function enforceSafetyNewlinesFlow(s: string): string {
+  return s
+    .replace(/(^|\n)\s*(end)\s*(?=\S)/gi, '$1$2\n')
+    .replace(/(\]|\}|\))\s*(?=((?:subgraph|style|linkStyle|classDef)\b|[A-Za-z_[\({]))/g, '$1\n')
+    .replace(/([^\n])\s*(?=(subgraph)\b)/gi, (m, prev) => (/\n$/.test(prev) ? m : prev + '\n'))
+    .replace(/([^\n])\s*(?=(style|linkStyle|classDef)\b)/gi, (m, prev) => (/\n$/.test(prev) ? m : prev + '\n'));
+}
 
 function fence(s: string) {
   return '```mermaid\n' + s + '\n```';
