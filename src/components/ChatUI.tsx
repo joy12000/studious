@@ -159,18 +159,17 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
                   if (jsonStr.trim() === '[DONE]') continue;
                   try {
                       const data = JSON.parse(jsonStr);
-                      // 이제 data는 { answer: "...", followUp: ["..."] } 형태의 완전한 객체
-                      if (data.answer || data.followUp) {
-                           setMessages(prev => prev.map(msg =>
-                              msg.id === botMessage.id
-                                  ? { ...msg, text: data.answer || msg.text, followUp: data.followUp ||
-  msg.followUp }
-                                  : msg
-                          ));
-                      } else if (data.token) { // 개별 토큰 스트리밍 (OpenRouter 구 버전 호환)
+
+                      if (data.token) {
                           setMessages(prev => prev.map(msg =>
                               msg.id === botMessage.id
                                   ? { ...msg, text: msg.text + data.token }
+                                  : msg
+                          ));
+                      } else if (data.followUp) {
+                          setMessages(prev => prev.map(msg =>
+                              msg.id === botMessage.id
+                                  ? { ...msg, followUp: data.followUp }
                                   : msg
                           ));
                       }

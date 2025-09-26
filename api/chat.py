@@ -69,25 +69,11 @@ class handler(BaseHTTPRequestHandler):
         # 💬 대화 규칙
         1.  **명확성:** 학생의 질문에 명확하고 구조적으로 답변합니다.
         2.  **후속 질문:** 답변 마지막에 학생의 사고를 확장할 수 있는 좋은 후속 질문 3개를 제안합니다.
-        3.  **JSON 출력:** 최종 결과는 반드시 아래 JSON 스키마를 엄격히 준수하는 단일 JSON 객체로만 응답해야 합니다. 다른 텍스트 없이 순수한 JSON만 출력하세요.
-            ```json
-            {
-              "type": "object",
-              "properties": {
-                "answer": {
-                  "type": "string",
-                  "description": "사용자의 질문에 대한 답변 내용 (마크다운 형식)"
-                },
-                "followUp": {
-                  "type": "array",
-                  "items": { "type": "string" },
-                  "minItems": 3,
-                  "maxItems": 3
-                }
-              },
-              "required": ["answer", "followUp"]
-            }
-            ```
+        3.  **출력 형식:** 당신의 최종 답변은 반드시 다음 형식을 엄격하게 따라야 합니다.
+            - 1단계: 사용자의 질문에 대한 답변 전체를 마크다운 형식으로 먼저 출력합니다.
+            - 2단계: 답변 출력이 완전히 끝나면, 그 즉시 줄바꿈 없이 특수 구분자인 `|||END_OF_ANSWER|||`를 출력합니다.
+            - 3단계: 구분자 바로 뒤에, 줄바꿈 없이 후속 질문 3개가 들어있는 순수 JSON 배열을 출력합니다.
+            - 예시: [답변 마크다운]|||END_OF_ANSWER|||["첫 번째 후속 질문", "두 번째 후속 질문", "세 번째 후속 질문"]
         """
         if note_context:
             prompt += f"\n---\n# 참고 자료\n아래는 사용자가 현재 보고 있는 노트의 내용입니다. 이 내용을 바탕으로 답변해주세요.\n\n{note_context}\n---"
@@ -181,20 +167,52 @@ class handler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'text/event-stream; charset=utf-8')
         self.end_headers()
         
+        separator = "|||END_OF_ANSWER|||"
+        buffer = ""
+        separator_found = False
+
         try:
             for chunk in response_iterator:
-                if chunk.text:
-                    # 토큰을 포함한 JSON 객체를 생성하여 전송
-                    token_json = json.dumps({"token": chunk.text})
-                    self.wfile.write(f"data: {token_json}\n\n".encode('utf-8'))
-                    self.wfile.flush()
+                if not chunk.text:
+                    continue
+                
+                buffer += chunk.text
+
+                if separator_found:
+                    continue
+
+                while separator in buffer:
+                    answer_part, rest = buffer.split(separator, 1)
+                    
+                    if answer_part:
+                        token_json = json.dumps({"token": answer_part})
+                        self.wfile.write(f"data: {token_json}\n\n".encode('utf-8'))
+                        self.wfile.flush()
+                    
+                    separator_found = True
+                    buffer = rest
+                    break
+            
+            if not separator_found and buffer:
+                token_json = json.dumps({"token": buffer})
+                self.wfile.write(f"data: {token_json}\n\n".encode('utf-8'))
+                self.wfile.flush()
+
         except Exception as e:
-            print(f"ERROR: 스트리밍 중 오류 발생: {e}")
+            print(f"ERROR: Gemini 스트리밍 중 오류 발생: {e}")
             error_json = json.dumps({"error": "스트리밍 중 오류 발생", "details": str(e)})
             self.wfile.write(f"data: {error_json}\n\n".encode('utf-8'))
             self.wfile.flush()
 
-        # 스트림의 끝을 알리는 [DONE] 메시지 전송
+        if separator_found and buffer:
+            try:
+                follow_up_data = json.loads(buffer)
+                final_payload = json.dumps({"followUp": follow_up_data})
+                self.wfile.write(f"data: {final_payload}\n\n".encode('utf-8'))
+                self.wfile.flush()
+            except json.JSONDecodeError:
+                print(f"ERROR: Gemini 후속 질문 JSON 파싱 실패: {buffer}")
+
         self.wfile.write('data: [DONE]\n\n'.encode('utf-8'))
         self.wfile.flush()
 
@@ -203,35 +221,69 @@ class handler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'text/event-stream; charset=utf-8')
         self.end_headers()
 
+        separator = "|||END_OF_ANSWER|||"
+        buffer = ""
+        separator_found = False
+
         try:
             for line in response.iter_lines():
-                if line:
-                    decoded_line = line.decode('utf-8')
-                    if decoded_line.startswith('data: '):
-                        json_str = decoded_line[len('data: '):].strip()
-                        if json_str == '[DONE]':
-                            break
-                        if not json_str:
-                            continue
+                if not line:
+                    continue
+                
+                decoded_line = line.decode('utf-8')
+                if not decoded_line.startswith('data: '):
+                    continue
+
+                json_str = decoded_line[len('data: '):].strip()
+                if json_str == '[DONE]':
+                    break
+                if not json_str:
+                    continue
+                
+                try:
+                    data = json.loads(json_str)
+                    content = data.get('choices', [{}])[0].get('delta', {}).get('content')
+                    if not content:
+                        continue
+
+                    buffer += content
+
+                    if separator_found:
+                        continue
+
+                    while separator in buffer:
+                        answer_part, rest = buffer.split(separator, 1)
+                        if answer_part:
+                            token_json = json.dumps({"token": answer_part})
+                            self.wfile.write(f"data: {token_json}\n\n".encode('utf-8'))
+                            self.wfile.flush()
                         
-                        try:
-                            data = json.loads(json_str)
-                            if 'choices' in data and data['choices']:
-                                delta = data['choices'][0].get('delta', {})
-                                content = delta.get('content')
-                                if content:
-                                    # 토큰을 포함한 JSON 객체를 생성하여 전송
-                                    token_json = json.dumps({"token": content})
-                                    self.wfile.write(f"data: {token_json}\n\n".encode('utf-8'))
-                                    self.wfile.flush()
-                        except json.JSONDecodeError:
-                            print(f"WARN: OpenRouter 스트림의 JSON 파싱 실패: {json_str}")
-                            continue
+                        separator_found = True
+                        buffer = rest
+                        break
+                
+                except json.JSONDecodeError:
+                    continue # Ignore parsing errors for individual delta chunks
+
+            if not separator_found and buffer:
+                token_json = json.dumps({"token": buffer})
+                self.wfile.write(f"data: {token_json}\n\n".encode('utf-8'))
+                self.wfile.flush()
+
         except Exception as e:
             print(f"ERROR: OpenRouter 스트리밍 중 오류 발생: {e}")
             error_json = json.dumps({"error": "스트리밍 중 오류 발생", "details": str(e)})
             self.wfile.write(f"data: {error_json}\n\n".encode('utf-8'))
             self.wfile.flush()
+
+        if separator_found and buffer:
+            try:
+                follow_up_data = json.loads(buffer)
+                final_payload = json.dumps({"followUp": follow_up_data})
+                self.wfile.write(f"data: {final_payload}\n\n".encode('utf-8'))
+                self.wfile.flush()
+            except json.JSONDecodeError:
+                print(f"ERROR: OpenRouter 후속 질문 JSON 파싱 실패: {buffer}")
 
         self.wfile.write('data: [DONE]\n\n'.encode('utf-8'))
         self.wfile.flush()
