@@ -1,3 +1,4 @@
+// src/lib/markdownUtils.ts
 /* eslint-disable no-useless-escape */
 
 /**
@@ -8,6 +9,7 @@
  * - Flowchart/Graph에만 적극 보정(노드/엣지/레이블/서브그래프 등), 그 외 타입은 보수적 처리.
  * - htmlLabels:false 환경을 기본 가정하여 <br> → \n(리터럴) 보정, 괄호노드 멀티라인 → 대괄호로 전환.
  * - 다이어그램 내부 init 지시어(%%{init:...}%%)는 제거하여 전역 초기화와 충돌 방지.
+ * - 줄 경계가 붙어 생기는 파싱 에러를 줄이기 위한 “세이프티 개행 보강” 포함(타입별).
  */
 
 export type Direction = 'TB' | 'TD' | 'BT' | 'LR' | 'RL';
@@ -81,25 +83,17 @@ const NBSP = /\u00A0/g;
  * Public API
  * -------------------------------------------------------------------------------- */
 
-/**
- * 전체 마크다운에서 ```mermaid 코드블록을 찾아서 개별적으로 정규화합니다.
- * - 마크다운 내에 mermaid 블록이 여러 개 있어도 모두 처리됩니다.
- * - mermaid 아닌 코드블록/본문은 전혀 건드리지 않습니다.
- */
+/** 전체 마크다운에서 ```mermaid 코드블록을 찾아서 개별적으로 정규화 */
 export function normalizeMermaidInMarkdown(markdown: string, opts: NormalizeOptions = {}): string {
   if (!markdown) return markdown;
 
   return markdown.replace(/```mermaid\s*([\s\S]*?)```/gi, (_m, inner) => {
     const fixed = normalizeMermaidCode(String(inner || ''), opts);
-    // code fence는 마크다운에 그대로 남겨야 하므로 다시 감싼다
     return '```mermaid\n' + fixed + '\n```';
   });
 }
 
-/**
- * 단일 Mermaid 코드 문자열을 정규화합니다.
- * - 이 함수의 입력은 **삼중펜스 없이 Mermaid 본문**만 들어온다고 가정합니다.
- */
+/** 단일 Mermaid 코드 문자열 정규화 (삼중펜스 없이 본문만 입력) */
 export function normalizeMermaidCode(input: string, opts: NormalizeOptions = {}): string {
   const O = { ...DEFAULT_OPTS, ...opts };
 
@@ -110,7 +104,7 @@ export function normalizeMermaidCode(input: string, opts: NormalizeOptions = {})
     .replace(NBSP, ' ')
     .trim();
 
-  if (!code) return FLOW_HEADERS.has('graph') ? `graph ${O.defaultFlowDirection}` : '';
+  if (!code) return `graph ${O.defaultFlowDirection}`;
 
   // 1) 멀티라인 주석 → %% 라인 주석화
   code = code.replace(/\/\*([\s\S]*?)\*\//g, (_m, body) =>
@@ -149,7 +143,6 @@ export function normalizeMermaidCode(input: string, opts: NormalizeOptions = {})
     headerSeen = r.headerSeen;
     warnings.push(...r.warnings);
 
-    // 헤더가 끝내 없고 흐름도 시그니처가 충분하면 헤더 보충
     if (!headerSeen && r.shouldAutofillHeader) {
       resultLines.unshift(`graph ${O.defaultFlowDirection}`);
       headerSeen = true;
@@ -157,7 +150,7 @@ export function normalizeMermaidCode(input: string, opts: NormalizeOptions = {})
     }
 
   } else if (NON_FLOW_HEADERS.has(header)) {
-    // ===== 비-flowchart: 매우 보수적 정리만 적용 =====
+    // ===== 비-flowchart: 보수적 정리만 =====
     const r = normalizeNonFlowMinimal(lines, header, {
       enableHeaderAutofill: O.enableHeaderAutofillForNonFlow!,
     });
@@ -168,31 +161,26 @@ export function normalizeMermaidCode(input: string, opts: NormalizeOptions = {})
     // ===== unknown: 최대 보수 =====
     const r = normalizeUnknownVeryConservative(lines);
     resultLines = r.lines;
-    if (r.seemsFlowLike) {
-      // class/state 시그니처가 있으면 flow 헤더 삽입 금지
-      if (!r.hasClassOrStateHints) {
-        resultLines.unshift(`graph ${O.defaultFlowDirection}`);
-        warnings.push('No header found; inferred flowchart. Inserted "graph" header.');
-      } else {
-        warnings.push('Flow-like arrows found but class/state hints present; skipped header insertion.');
-      }
+    if (r.seemsFlowLike && !r.hasClassOrStateHints) {
+      resultLines.unshift(`graph ${O.defaultFlowDirection}`);
+      warnings.push('No header found; inferred flowchart. Inserted "graph" header.');
     } else {
       warnings.push('No explicit header and type unknown; skipped header insertion.');
     }
   }
 
   // 5) 최종 조립
-  // ✳️ 라벨 내부 줄바꿈은 \n(리터럴)로 유지해야 Mermaid가 줄바꿈 처리하므로 replace(/\\n/,'\n') 금지
   let final = resultLines.join('\n');
 
-  // 타입별 세이프티 개행 보강
+  // 타입별 세이프티 개행 보강 (줄경계 붙음 방지)
   if (header === 'sequenceDiagram') {
     final = enforceSafetyNewlinesSequence(final);
-  } else if (header === 'flowchart' || header === 'graph' || header === 'unknown') {
+  } else {
+    // graph/flowchart/unknown 포함: flow 보강을 적용해도 안전
     final = enforceSafetyNewlinesFlow(final);
   }
 
-  // 라벨의 \n(리터럴)은 그대로 유지해야 하므로, \\n -> 실제 개행 치환은 절대 하지 않음
+  // ✳️ 라벨 내부 줄바꿈은 \n(리터럴)로 유지해야 Mermaid가 줄바꿈 처리하므로 replace(/\\n/,'\n') 금지
   if (opts.attachWarningsAsComments && warnings.length) {
     final = ['%% WARN: ' + warnings.join(' | '), final].join('\n');
   }
@@ -203,31 +191,6 @@ export function normalizeMermaidCode(input: string, opts: NormalizeOptions = {})
 /* --------------------------------------------------------------------------------
  * 내부 유틸/핵심 로직
  * -------------------------------------------------------------------------------- */
-
-
-
-/** sequenceDiagram용: 메시지(: …) 뒤에 다음 메시지/키워드가 붙었으면 개행 보강 */
-function enforceSafetyNewlinesSequence(s: string): string {
-  return s
-    // 1) "A->>B: 메시지" 바로 뒤에 다음 라인이 붙으면 개행 삽입
-    .replace(
-      /(:[^\n]*?)(?=\s*(?:[A-Za-z_][\w-]*\s*(?:-{1,2}(?:>>|>)|-{1,2}(?:x|X)|-{1,2}(?:o|O)|\*|—)|Note\b|alt\b|opt\b|loop\b|par\b|rect\b|critical\b|end\b))/g,
-      '$1\n'
-    )
-    // 2) 'end' 뒤에 뭔가 붙어 있으면 개행
-    .replace(/(^|\n)\s*(end)\s*(?=\S)/gi, '$1$2\n')
-    // 3) Note/alt/opt/loop/par/rect/critical 앞 경계 보강
-    .replace(/([^\n])\s*(?=(Note|alt|opt|loop|par|rect|critical|end)\b)/g,
-      (m, prev) => (/\n$/.test(prev) ? m : prev + '\n'));
-}
-
-function enforceSafetyNewlinesFlow(s: string): string {
-  return s
-    .replace(/(^|\n)\s*(end)\s*(?=\S)/gi, '$1$2\n')
-    .replace(/(\]|\}|\))\s*(?=((?:subgraph|style|linkStyle|classDef)\b|[A-Za-z_[\({]))/g, '$1\n')
-    .replace(/([^\n])\s*(?=(subgraph)\b)/gi, (m, prev) => (/\n$/.test(prev) ? m : prev + '\n'))
-    .replace(/([^\n])\s*(?=(style|linkStyle|classDef)\b)/gi, (m, prev) => (/\n$/.test(prev) ? m : prev + '\n'));
-}
 
 function fence(s: string) {
   return '```mermaid\n' + s + '\n```';
@@ -432,11 +395,7 @@ function needsQuotes(text: string): boolean {
 }
 function escapeQuotes(s: string): string { return s.replace(/"/g, '&quot;'); }
 
-/**
- * 엣지 레이블 보정 (flow 전용)
- * - |label| → "label"
- * - 공백/특수문자 포함 시 자동 인용
- */
+/** 엣지 레이블 보정 (flow 전용) */
 function normalizeFlowEdgeLabels(line: string): string {
   // |label| → "label"
   line = line.replace(/--\s*\|([^|]+)\|\s*--/g, (_m, label) => `-- "${escapeQuotes(label.trim())}" --`);
@@ -599,4 +558,39 @@ function normalizeUnknownVeryConservative(lines: string[]) {
   }
 
   return { lines: out, seemsFlowLike: flowHits >= 2, hasClassOrStateHints: classOrState > 0 };
+}
+
+/* ---------- 세이프티 개행 보강 (강화판) ---------- */
+
+/** flowchart/graph용: 줄 경계가 붙어버린 경우 복구 (강화판) */
+function enforceSafetyNewlinesFlow(s: string): string {
+  return s
+    // 0) direction 라인: "direction LR" 뒤에 뭐가 붙으면 개행
+    .replace(/(^|\n)\s*(direction\s+(?:TB|TD|BT|LR|RL))\s*(?=\S)/gi, '$1$2\n')
+
+    // 1) 'end' 뒤에 다음 토큰이 바로 오면 개행 (노드/서브그래프/스타일/클래스/클릭/방향/식별자)
+    .replace(/(^|\n)\s*(end)\s*(?=(?:subgraph|style|linkStyle|classDef|click|direction|[A-Za-z_[(\{]))/gi, '$1$2\n')
+
+    // 2) 닫힘 토큰 ] } ) 뒤에 다음 토큰(식별자/명령)이 바로 오면 개행
+    //   단, -->, -.-, <--> 등 엣지/공백으로 이어지는 경우는 제외
+    .replace(/(\]|\}|\))(?=(?:(?!\s*(?:-|\.|<|\)|\]|\}|$))\S))/g, '$1\n')
+
+    // 3) subgraph/style/linkStyle/classDef/click/direction 앞에 줄바꿈이 없으면 개행
+    .replace(/([^\n])\s*(?=(subgraph|style|linkStyle|classDef|click|direction)\b)/gi,
+      (m, prev) => (/\n$/.test(prev) ? m : prev + '\n'));
+}
+
+/** sequenceDiagram용: 메시지 경계 복구 */
+function enforceSafetyNewlinesSequence(s: string): string {
+  return s
+    // 1) "A->>B: 메시지" 끝에 다음 메시지/키워드가 붙어 있으면 개행
+    .replace(
+      /(:[^\n]*?)(?=\s*(?:[A-Za-z_][\w-]*\s*(?:-{1,2}(?:>>|>)|-{1,2}(?:x|X)|-{1,2}(?:o|O)|\*|—)|Note\b|alt\b|opt\b|loop\b|par\b|rect\b|critical\b|end\b))/g,
+      '$1\n'
+    )
+    // 2) 'end' 뒤에 뭔가 붙어 있으면 개행
+    .replace(/(^|\n)\s*(end)\s*(?=\S)/gi, '$1$2\n')
+    // 3) 제어 키워드 앞 경계 보강
+    .replace(/([^\n])\s*(?=(Note|alt|opt|loop|par|rect|critical|end)\b)/g,
+      (m, prev) => (/\n$/.test(prev) ? m : prev + '\n'));
 }
