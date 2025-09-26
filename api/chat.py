@@ -181,27 +181,19 @@ class handler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'text/event-stream; charset=utf-8')
         self.end_headers()
         
-        buffer = ""
         try:
             for chunk in response_iterator:
-                buffer += chunk.text
+                if chunk.text:
+                    # Gemini가 보내주는 텍스트 조각을 그대로 data 이벤트로 전송
+                    self.wfile.write(f"data: {chunk.text}\n\n".encode('utf-8'))
+                    self.wfile.flush()
         except Exception as e:
             print(f"ERROR: 스트리밍 중 오류 발생: {e}")
-            buffer = f'{{"error": "스트리밍 중 오류 발생", "details": "{str(e)}"}}'
-
-        # 스트림이 끝나면 버퍼에 있는 전체 JSON을 전송
-        if buffer:
-            try:
-                # 최종 JSON이 유효한지 확인
-                json.loads(buffer)
-                self.wfile.write(f"data: {buffer}\n\n".encode('utf-8'))
-            except json.JSONDecodeError:
-                # 파싱 실패 시, 오류를 포함한 JSON을 대신 보냄
-                error_json = json.dumps({"error": "최종 JSON 파싱 실패", "details": buffer})
-                self.wfile.write(f"data: {error_json}\n\n".encode('utf-8'))
-            
+            error_json = json.dumps({"error": "스트리밍 중 오류 발생", "details": str(e)})
+            self.wfile.write(f"data: {error_json}\n\n".encode('utf-8'))
             self.wfile.flush()
 
+        # 스트림의 끝을 알리는 [DONE] 메시지 전송
         self.wfile.write('data: [DONE]\n\n'.encode('utf-8'))
         self.wfile.flush()
 
