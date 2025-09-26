@@ -506,4 +506,37 @@ function normalizeUnknownVeryConservative(lines: string[]) {
 /* ---------- Safety newlines (강화판) ---------- */
 
 /** flowchart/graph: 경계 붙음 강제 분리 — linkStyle/style/classDef/click/direction, end, 닫힘괄호 */
-function enforceSafetyNewlinesFlow(s: string): string {\n  return s\n    // direction 라인 뒤에 토큰 붙으면 개행\n    .replace(/(^|\\n)\\s*(direction\\s+(?:TB|TD|BT|LR|RL))\\s*(?=\\S)/gi, \'$1$2\\n\')\n\n    // end 뒤에 무언가 붙어 있으면 개행\n    .replace(/(^|\\n)\\s*(end)\\s*(?=(?:subgraph|style|linkStyle|classDef|click|direction|[A-Za-z_[(\\{]))/gi, \'$1$2\\n\')\n\n    // 특화: \"]linkStyle\" / \'\"]linkStyle\' 케이스 명시적으로 끊기\n    .replace(/\"\\]\\s*(?=(linkStyle|style|classDef|click|direction)\\b)/gi, \'\"]\\n\')\n    .replace(/\\]\\s*(?=(linkStyle|style|classDef|click|direction)\\b)/gi, \']\\n\')\n\n    // 🔥 추가: \'\"]\' 뒤에 \"새 노드 시작\"이 바로 오면 개행 (예: \"]D_Data[\")\n    .replace(/\"\\](?=\\s*[A-Za-z_][\\w-]*\\s*(\\[\\[?|\\(\\(?|\\{\\{?|\\{>))/g, \'\"\]\\n\')\n\n    // 닫힘 토큰 뒤에 \"새 노드 시작\"이 붙으면 확실히 개행\n    .replace(/(\\]|\\}|\\))(?=\\s*[A-Za-z_][\\w-]*\\s*(\\[\\[?|\\(\\(?|\\{\\{?|\\{>))/g, \'$1\\n\')\n    // 그 외 닫힘 뒤에 토큰이 붙는 일반 케이스(화살표/태그 제외)도 개행\n    .replace(/(\\]|\\}|\\))(?=(?:(?!\\s*(?:-|\\.|<|\\)|\\]|\\}|$))\\S))/g, \'$1\\n\')\n\n    // 명령 키워드 앞에 개행이 없으면 개행\n    .replace(/([^\\n])\\s*(?=(subgraph|style|linkStyle|classDef|click|direction)\\b)/gi,\n      (m, prev) => (/\\n$/.test(prev) ? m : prev + \'\\n\'));\n}\n\n/** sequenceDiagram: 메시지(: …) 끝과 다음 메시지/블록 경계를 분리 */\nfunction enforceSafetyNewlinesSequence(s: string): string {\n  return s\n    // 메시지(: ... ) 다음에 \"참가자(+옵션 공백)+화살표\"가 붙으면,\n    // 화살표만 새 줄로 보내지 말고 \"참가자+화살표\"를 통째로 다음 줄로 이동\n    //  ex)  \"...소진R->>R: 다음\"  →  \"...소진\\nR->>R: 다음\"\n    .replace(\n      /(:[^\\n]*?)\\s*((?:[A-Za-z_][\\w-]*\\s*)?(?:-{1,2}(?:>>|>|x|X)|-{1,2}(?:o|O)|\\*|—))/g,\n      \'$1\\n$2\'\n    )\n    // 블록 키워드 앞 경계 보강\n    .replace(/([^\\n])\\s*(?=(Note|alt|opt|loop|par|rect|critical|end)\\b)/g,\n      (m, prev) => (/\\n$/.test(prev) ? m : prev + \'\\n\'))\n    // end 뒤에 토큰이 붙으면 개행\n    .replace(/(^|\\n)\\s*(end)\\s*(?=\\S)/gi, \'$1$2\\n\');\n}
+function enforceSafetyNewlinesFlow(s: string): string {
+  return s
+    // direction 라인 뒤에 토큰 붙으면 개행
+    .replace(/(^|\n)\s*(direction\s+(?:TB|TD|BT|LR|RL))\s*(?=\S)/gi, '$1$2\n')
+
+    // end 뒤에 무언가 붙어 있으면 개행
+    .replace(/(^|\n)\s*(end)\s*(?=(?:subgraph|style|linkStyle|classDef|click|direction|[A-Za-z_[(\{]))/gi, '$1$2\n')
+
+    // 특화: "]linkStyle" / '"]linkStyle' 케이스 명시적으로 끊기
+    .replace(/"\]\s*(?=(linkStyle|style|classDef|click|direction)\b)/gi, '"]\n')
+    .replace(/\]\s*(?=(linkStyle|style|classDef|click|direction)\b)/gi, ']\n')
+
+    // 닫힘 토큰 뒤에 "새 노드 시작"이 붙으면 확실히 개행  ✅
+    .replace(/(\]|\}|\))(?=\s*[A-Za-z_][\w-]*\s*(\[\[?|\(\(?|\{\{?|\{>))/g, '$1\n')
+    // 그 외 닫힘 뒤에 토큰이 붙는 일반 케이스(화살표/태그 제외)도 개행
+    .replace(/(\]|\}|\))(?=(?:(?!\s*(?:-|\.|<|\)|\]|\}|$))\S))/g, '$1\n')
+
+    // 명령 키워드 앞에 개행이 없으면 개행
+    .replace(/([^\n])\s*(?=(subgraph|style|linkStyle|classDef|click|direction)\b)/gi,
+      (m, prev) => (/\n$/.test(prev) ? m : prev + '\n'));
+}
+
+/** sequenceDiagram: 메시지(: …) 끝과 다음 메시지/블록 경계를 분리 */
+function enforceSafetyNewlinesSequence(s: string): string {
+  return s
+    // 메시지(: ... ) 다음에 참가자 유무와 무관하게 화살표/블록 키워드가 오면 개행
+    .replace(
+      /(:[^\n]*?)(?=\s*(?:(?:[A-Za-z_][\w-]*\s*)?(?:-{1,2}(?:>>|>|x|X)|-{1,2}(?:o|O)|\*|—))|\s*(?:Note|alt|opt|loop|par|rect|critical|end)\b)/g,
+      '$1\n'
+    )
+    .replace(/(^|\n)\s*(end)\s*(?=\S)/gi, '$1$2\n')
+    .replace(/([^\n])\s*(?=(Note|alt|opt|loop|par|rect|critical|end)\b)/g,
+      (m, prev) => (/\n$/.test(prev) ? m : prev + '\n'));
+}
