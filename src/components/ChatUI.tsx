@@ -176,21 +176,26 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId }) 
                   if (jsonStr === '[DONE]') continue;
                   try {
                       const data = JSON.parse(jsonStr);
-                      if (data.token) {
-                          fullResponseText += data.token;
-                          setMessages(prev => prev.map(msg => 
-                              msg.id === botMessage.id 
-                                  ? { ...msg, text: fullResponseText } 
-                                  : msg
-                          ));
-                      } else if (data.followUp) {
-                          setMessages(prev => prev.map(msg => 
-                              msg.id === botMessage.id 
-                                  ? { ...msg, followUp: data.followUp } 
-                                  : msg
-                          ));
-                      }
-                  } catch (e) {
+                                          if (data.token) {
+                                              fullResponseText += data.token;
+                                              setMessages(prev => prev.map(msg => 
+                                                  msg.id === botMessage.id 
+                                                      ? { ...msg, text: fullResponseText } 
+                                                      : msg
+                                              ));
+                                          } else if (data.followUp && data.answer) { // 최종 응답 (answer와 followUp 모두 포함)
+                                              setMessages(prev => prev.map(msg => 
+                                                  msg.id === botMessage.id 
+                                                      ? { ...msg, text: data.answer, followUp: data.followUp } 
+                                                      : msg
+                                              ));
+                                          } else if (data.followUp) { // 후속 질문 데이터만 있으면 (이전 로직 유지)
+                                              setMessages(prev => prev.map(msg => 
+                                                  msg.id === botMessage.id 
+                                                      ? { ...msg, followUp: data.followUp } 
+                                                      : msg
+                                              ));
+                                          }                  } catch (e) {
                       console.error('스트림 데이터 파싱 오류:', e);
                   }
               }
