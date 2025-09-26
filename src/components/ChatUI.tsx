@@ -7,7 +7,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
   import MarkdownRenderer from './MarkdownRenderer';
   import { useNotes } from '../lib/useNotes';
 
-  const models = [ 
+  const models = [
       { id: 'gemini-2.5-pro', name: '✨ Gemini 2.5 Pro' },
       { id: 'gemini-2.5-flash', name: '⚡ Gemini 2.5 Flash' },
       { id: 'openai/gpt-oss-20b:free', name: '🧠 챗 GPT' },
@@ -172,7 +172,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
                         setMessages(prev => prev.map(msg => {
                           if (msg.id === botMessage.id) {
                             const newText = msg.text + data.token;
-                            const suggestionMatch = newText.match(/```suggestion\n([\s\S]*?)\n===>\n([\s\S]*?)```/);
+                            const suggestionMatch = newText.match(/```suggestion\s*\n([\s\S]*?)\s*\n===>\s*\n([\s\S]*?)\s*```/);
                             if (suggestionMatch) {
                               return {
                                 ...msg,
