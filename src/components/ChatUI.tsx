@@ -8,20 +8,24 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
   import { useNotes } from '../lib/useNotes';
 
   const models = [ 
-      { id: 'gemini-2.5-pro', name: 'gemini-2-5-pro' },
-      { id: 'gemini-2.5-flash', name: 'gemini-2.5-flash' },
+      { id: 'gemini-2.5-pro', name: '✨ Gemini 2.5 Pro' },
+      { id: 'gemini-2.5-flash', name: '⚡ Gemini 2.5 Flash' },
       { id: 'openai/gpt-oss-20b:free', name: '🧠 챗 GPT' },
-      { id: 'gemini-2.5-flash-lite', name: 'gemini-2.5-flash-lite' },
-      { id: 'x-ai/grok-4-fast:free', name: '🚀화성 Grok' },
+      { id: 'x-ai/grok-4-fast:free', name: '🚀 Grok' },
       { id: 'meta-llama/llama-4-maverick:free', name: '🦙 AI Llama' },
-      { id: 'gemini-2.0-flash', name: 'gemini-2.0-flash' },
-      { id: 'deepseek/deepseek-chat-v3.1:free', name: 'deepseek-v3.1' },
+      { id: 'gemini-2.5-flash-lite', name: '💡 Gemini 2.5 Flash Lite' },
+      { id: 'gemini-2.0-flash', name: '🌟 Gemini 2.0 Flash' },
+      { id: 'deepseek/deepseek-chat-v3.1:free', name: '🔍 Deepseek v3.1' },
   ];
 
   export interface Message {
     id: number;
     text: string;
     sender: 'user' | 'bot';
+    suggestion?: {
+      old: string;
+      new: string;
+    };
   }
   interface GeminiHistory {
     role: 'user' | 'model';
@@ -94,6 +98,15 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
       }
     }, [noteId, messages, updateNote]);
 
+    const handleApplyChange = async (suggestion: { old: string; new: string }) => {
+      const note = await getNote(noteId);
+      if (note) {
+        const newContent = note.content.replace(suggestion.old, suggestion.new);
+        await updateNote(noteId, { content: newContent });
+        alert('변경 사항이 적용되었습니다.');
+      }
+    };
+
     const handleSendMessage = async (text: string | React.FormEvent) => {
       if (typeof text === 'object') {
           text.preventDefault();
@@ -116,7 +129,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
         id: Date.now() + 1,
         text: '',
         sender: 'bot',
-        followUp: [],
       };
       setMessages(prev => [...prev, botMessage]);
 
@@ -157,11 +169,24 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
                   try {
                       const data = JSON.parse(jsonStr);
                       if (data.token) {
-                          setMessages(prev => prev.map(msg =>
-                              msg.id === botMessage.id
-                                  ? { ...msg, text: msg.text + data.token }
-                                  : msg
-                          ));
+                        setMessages(prev => prev.map(msg => {
+                          if (msg.id === botMessage.id) {
+                            const newText = msg.text + data.token;
+                            const suggestionMatch = newText.match(/```suggestion\n([\s\S]*?)\n===>\n([\s\S]*?)```/);
+                            if (suggestionMatch) {
+                              return {
+                                ...msg,
+                                text: newText,
+                                suggestion: {
+                                  old: suggestionMatch[1],
+                                  new: suggestionMatch[2],
+                                },
+                              };
+                            }
+                            return { ...msg, text: newText };
+                          }
+                          return msg;
+                        }));
                       }
                   } catch (e) {
                       console.error('스트림 데이터 파싱 오류:', e, '원본:', jsonStr);
@@ -238,10 +263,16 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
                     <div className={`relative px-4 py-2 rounded-lg max-w-xl prose dark:prose-invert prose-p:my-0 prose-headings:my-2 ${msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
                       <MarkdownRenderer content={msg.text} />
                       {msg.sender === 'bot' && !isLoading && msg.text && (
-                        <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 h-7 w-7
-  opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleCopy(msg.text)}>
-                          <Copy className="h-4 w-4" />
-                        </Button>
+                        <div className="absolute -top-2 -right-2 flex items-center">
+                          {msg.suggestion && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleApplyChange(msg.suggestion)}>
+                              <Check className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleCopy(msg.text)}>
+                            <Copy className="h-4 w-4" />
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </div>
