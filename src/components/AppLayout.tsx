@@ -37,7 +37,7 @@ const NavLink = ({ to, icon, children, isCollapsed }: { to: string, icon: React.
     );
 };
 
-const SidebarContent = ({ isCollapsed, onCollapse }: { isCollapsed: boolean, onCollapse: () => void }) => {
+const SidebarContent = ({ isCollapsed }: { isCollapsed: boolean }) => {
     const { setIsSidebarOpen } = useSidebar();
     return (
       <div className="flex h-full max-h-screen flex-col">
@@ -61,11 +61,6 @@ const SidebarContent = ({ isCollapsed, onCollapse }: { isCollapsed: boolean, onC
                 <NavLink to="/settings" icon={<Settings className="h-5 w-5" />} isCollapsed={isCollapsed}>Settings</NavLink>
             </nav>
         </div>
-        <div className="mt-auto p-4 border-t">
-            <Button variant="ghost" size="icon" className="w-full hidden md:block" onClick={onCollapse}>
-                <Menu className="h-5 w-5" />
-            </Button>
-        </div>
       </div>
     );
 };
@@ -73,14 +68,9 @@ const SidebarContent = ({ isCollapsed, onCollapse }: { isCollapsed: boolean, onC
 const AppLayout = ({ children }: { children: React.ReactNode }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(true); // 기본 상태를 '접힘'으로 변경
-  const location = useLocation();
 
   const desktopAsideWidth = isCollapsed ? "md:w-[70px]" : "md:w-[256px]";
   const desktopMainContentMargin = isCollapsed ? "md:ml-[70px]" : "md:ml-[256px]";
-  
-  const mainContentOverflow = ['/notes', '/review-deck', '/assignment', '/schedule'].includes(location.pathname)
-    ? 'overflow-y-auto'
-    : '';
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, setIsSidebarOpen }}>
@@ -98,8 +88,9 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                             className={`fixed inset-y-0 left-0 z-40 border-r transition-all duration-300 ease-in-out bg-muted dark:bg-background
                             ${isSidebarOpen ? 'translate-x-0 w-[256px]' : '-translate-x-full'}
                             md:translate-x-0 ${desktopAsideWidth}`}
+                            onMouseEnter={() => setIsCollapsed(false)}                onMouseLeave={() => setIsCollapsed(true)}
             >
-                <SidebarContent isCollapsed={isCollapsed} onCollapse={() => setIsCollapsed(!isCollapsed)} />
+                <SidebarContent isCollapsed={isCollapsed} />
             </aside>
 
             {/* Main Content */}
@@ -114,7 +105,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                 </header>
 
                 {/* Page Content */}
-                <main className={`flex-1 flex flex-col p-4 sm:p-6 ${mainContentOverflow}`}>
+                <main className={`flex-1 flex flex-col p-4 sm:p-6 ${
+                    ['/notes', '/review-deck', '/assignment', '/schedule'].includes(useLocation().pathname)
+                        ? 'overflow-y-auto'
+                        : ''
+                }`}>
                     {children}
                 </main>
             </div>
