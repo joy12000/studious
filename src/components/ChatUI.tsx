@@ -8,14 +8,14 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
   import { useNotes } from '../lib/useNotes';
 
   const models = [ 
-      { id: 'gemini-pro', name: '✨ Gemini 2.5 Pro' },
-      { id: 'gemini-2.5-flash', name: '⚡ Gemini 2.5 Flash' },
+      { id: 'gemini-2.5-pro', name: 'gemini-2-5-pro' },
+      { id: 'gemini-2.5-flash', name: 'gemini-2.5-flash' },
       { id: 'openai/gpt-oss-20b:free', name: '🧠 챗 GPT' },
-      { id: 'x-ai/grok-4-fast:free', name: '🚀 Grok' },
+      { id: 'gemini-2.5-flash-lite', name: 'gemini-2.5-flash-lite' },
+      { id: 'x-ai/grok-4-fast:free', name: '🚀화성 Grok' },
       { id: 'meta-llama/llama-4-maverick:free', name: '🦙 AI Llama' },
-      { id: 'gemini-2.5-flash-lite', name: '💡 Gemini 2.5 Flash Lite' },
-      { id: 'gemini-2.0-flash', name: '🌟 Gemini 2.0 Flash' },
-      { id: 'deepseek/deepseek-chat-v3.1:free', name: '🔍 Deepseek v3.1' },
+      { id: 'gemini-2.0-flash', name: 'gemini-2.0-flash' },
+      { id: 'deepseek/deepseek-chat-v3.1:free', name: 'deepseek-v3.1' },
   ];
 
   export interface Message {
@@ -200,7 +200,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
                           key={model.id} variant="ghost" className="w-full justify-start h-auto py-2"
                           onClick={() => { setSelectedModel(model.id); setIsPopoverOpen(false); }}
                         >
-                          <Check className={`mr-2 h-4 w-4 ${selectedModel === model.id ? 'opacity-100' : 'opacity-0'}`} />
+                          <Check className={`mr-2 h-4 w-4 ${selectedModel === model.id && !useGeminiDirect ? 'opacity-100' : 'opacity-0'}`} />
                           <span className="whitespace-normal text-left">{model.name}</span>
                         </Button>
                       ))}
