@@ -518,7 +518,9 @@ function enforceSafetyNewlinesFlow(s: string): string {
     .replace(/"\]\s*(?=(linkStyle|style|classDef|click|direction)\b)/gi, '"]\n')
     .replace(/\]\s*(?=(linkStyle|style|classDef|click|direction)\b)/gi, ']\n')
 
-    // 닫힘 토큰 ] } ) 뒤에 식별자/명령이 오면 개행 (화살표 등은 제외)
+    // 닫힘 토큰 뒤에 "새 노드 시작"이 붙으면 확실히 개행  ✅
+    .replace(/(\]|\}|\))(?=\s*[A-Za-z_][\w-]*\s*(\[\[?|\(\(?|\{\{?|\{>))/g, '$1\n')
+    // 그 외 닫힘 뒤에 토큰이 붙는 일반 케이스(화살표/태그 제외)도 개행
     .replace(/(\]|\}|\))(?=(?:(?!\s*(?:-|\.|<|\)|\]|\}|$))\S))/g, '$1\n')
 
     // 명령 키워드 앞에 개행이 없으면 개행
@@ -529,8 +531,9 @@ function enforceSafetyNewlinesFlow(s: string): string {
 /** sequenceDiagram: 메시지(: …) 끝과 다음 메시지/블록 경계를 분리 */
 function enforceSafetyNewlinesSequence(s: string): string {
   return s
+    // 메시지(: ... ) 다음에 참가자 유무와 무관하게 화살표/블록 키워드가 오면 개행
     .replace(
-      /(:[^\n]*?)(?=\s*(?:[A-Za-z_][\w-]*\s*(?:-{1,2}(?:>>|>)|-{1,2}(?:x|X)|-{1,2}(?:o|O)|\*|—)|Note\b|alt\b|opt\b|loop\b|par\b|rect\b|critical\b|end\b))/g,
+      /(:[^\n]*?)(?=\s*(?:(?:[A-Za-z_][\w-]*\s*)?(?:-{1,2}(?:>>|>|x|X)|-{1,2}(?:o|O)|\*|—))|\s*(?:Note|alt|opt|loop|par|rect|critical|end)\b)/g,
       '$1\n'
     )
     .replace(/(^|\n)\s*(end)\s*(?=\S)/gi, '$1$2\n')
