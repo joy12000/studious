@@ -173,8 +173,8 @@ class handler(BaseHTTPRequestHandler):
                             answer = parsed_content.get('answer', extracted_json_content)
                             follow_up = parsed_content.get('followUp', [])
                         except json.JSONDecodeError as e:
-                            print(f"WARN: Failed to decode JSON from Gemini response. Using raw content. Error: {e}")
-                            answer = extracted_json_content # Use extracted content if JSON decode fails
+                            print(f"ERROR: Gemini returned malformed JSON. Raw extracted content: {extracted_json_content}. Error: {e}")
+                            answer = "죄송합니다. AI 응답을 처리하는 중 오류가 발생했습니다. (JSON 형식 오류)" # User-friendly error message
                             follow_up = []
     
                         final_response_json = {'answer': answer, 'followUp': follow_up}
