@@ -74,7 +74,7 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, setIsSidebarOpen }}>
-        <div className="min-h-screen w-full">
+        <div className="flex flex-col h-screen w-full overflow-hidden">
             {/* Mobile Overlay */}
             {isSidebarOpen && (
                 <div 
