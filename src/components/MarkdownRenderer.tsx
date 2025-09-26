@@ -53,9 +53,14 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
     });
   }, []);
 
-  const tryParseMermaid = (code: string): string | null => {
-    try { mermaid.parse(code); return null; }
-    catch (e: any) { return e?.str || e?.message || 'Unknown mermaid parse error'; }
+  // 비동기 파싱 (Unhandled Promise Rejection 방지)
+  const tryParseMermaid = async (code: string): Promise<string | null> => {
+    try {
+      await mermaid.parse(code);
+      return null;
+    } catch (e: any) {
+      return e?.str || e?.message || 'Unknown mermaid parse error';
+    }
   };
 
   /* 본문 mermaid 렌더 */
@@ -64,37 +69,40 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
     const mermaidElements = containerRef.current.querySelectorAll<HTMLElement>('pre.mermaid:not([data-processed])');
     if (mermaidElements.length === 0) return;
 
-    requestAnimationFrame(async () => {
-      const nodes: HTMLElement[] = [];
+    const renderDiagrams = async () => {
+      const nodesToRender: HTMLElement[] = [];
 
-      mermaidElements.forEach((el) => {
+      for (const el of Array.from(mermaidElements)) {
         const raw = (el.textContent || '').trim();
         let fixed = normalizeMermaidCode(raw);
         fixed = ensureDiagramHeader(fixed);
-
-        // ✅ 순수 텍스트로 주입
         el.textContent = fixed;
 
-        const err = tryParseMermaid(fixed);
+        const err = await tryParseMermaid(fixed);
+
         if (err) {
           console.warn('[Mermaid parse fail] ----\n', fixed, '\n----');
           el.innerHTML = `<div style="color:red;text-align:center;white-space:pre-wrap;">다이어그램 파싱 오류:\n${err}</div>`;
           el.setAttribute('data-processed', 'true');
         } else {
-          nodes.push(el);
-        }
-      });
-
-      if (nodes.length > 0) {
-        try { await mermaid.run({ nodes }); }
-        catch (error) {
-          console.error('Mermaid 렌더링 실패:', error);
-          nodes.forEach((el) => { el.innerHTML = '다이어그램 렌더링 오류'; });
-        } finally {
-          nodes.forEach((n) => n.setAttribute('data-processed', 'true'));
+          nodesToRender.push(el);
         }
       }
-    });
+
+      if (nodesToRender.length > 0) {
+        try {
+          await mermaid.run({ nodes: nodesToRender });
+        } catch (error) {
+          console.error('Mermaid 렌더링 실패:', error);
+          nodesToRender.forEach((el) => { el.innerHTML = '다이어그램 렌더링 오류'; });
+        } finally {
+          nodesToRender.forEach((n) => n.setAttribute('data-processed', 'true'));
+        }
+      }
+    };
+
+    requestAnimationFrame(() => { renderDiagrams(); });
+
   }, [content]);
 
   /* 모달 mermaid 렌더 */
@@ -109,7 +117,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       fixed = ensureDiagramHeader(fixed);
       pre.textContent = fixed;
 
-      const err = tryParseMermaid(fixed);
+      const err = await tryParseMermaid(fixed);
       if (err) {
         console.warn('[Mermaid parse fail in modal] ----\n', fixed, '\n----');
         modalMermaidRef.current.innerHTML = `<div style="color:red;text-align:center;white-space:pre-wrap;">다이어그램 파싱 오류:\n${err}</div>`;
@@ -117,8 +125,9 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       }
 
       modalMermaidRef.current.appendChild(pre);
-      try { await mermaid.run({ nodes: [pre] }); }
-      catch (e) {
+      try {
+        await mermaid.run({ nodes: [pre] });
+      } catch (e) {
         console.error('모달에서 Mermaid 렌더링 실패:', e);
         modalMermaidRef.current.innerText = '다이어그램 렌더링 오류';
       }

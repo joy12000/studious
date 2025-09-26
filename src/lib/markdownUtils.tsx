@@ -348,6 +348,13 @@ function normalizeFlowEdgeLabels(line: string): string {
   return line;
 }
 
+/**
+ * 노드 정의 보정 (flow 전용)
+ * - ID + 여는 토큰( [ [[ ( (( { {{ {> )을 인식
+ * - 내용이 멀티라인(\n 리터럴 포함)이고 형태가 ()이면 []로 강제 전환 (htmlLabels:false 안정화)
+ * - 이미 따옴표로 감싼 경우 내부의 추가 따옴표는 &quot;로 이스케이프
+ * - 닫힘 괄호 뒤 tail이 다음 명령/식별자로 시작하면 **바로 줄바꿈 삽입**  ← ★ 이번 추가
+ */
 function normalizeFlowNodeDefinition(
   line: string,
   opt: { transformParenMultilineToBracket: boolean }
@@ -372,7 +379,7 @@ function normalizeFlowNodeDefinition(
 
   const endIdx = rest.indexOf(close);
   let content = endIdx === -1 ? rest.trim() : rest.slice(0, endIdx);
-  const tail = endIdx === -1 ? '' : rest.slice(endIdx + close.length);
+  let tail = endIdx === -1 ? '' : rest.slice(endIdx + close.length);
 
   const rawContent = content;
   const isQuoted = rawContent.startsWith('"') && rawContent.endsWith('"');
@@ -398,6 +405,17 @@ function normalizeFlowNodeDefinition(
     normalizedInner = inner.replace(/"/g, '&quot;');
   } else if (shouldQuote) {
     normalizedInner = `"${escapeQuotes(inner)}"`;
+  }
+
+  // ★★★ 노드 닫힘 뒤 tail이 명령/식별자 등으로 즉시 시작하면 바로 줄바꿈 해 분리
+  if (tail) {
+    const t = tail; // 원형 유지
+    const startsWithCmdOrId =
+      /^\s*(?:subgraph|style|linkStyle|classDef|click|direction)\b/i.test(t) ||
+      /^\s*[A-Za-z_][\w-]*\s*(?:\[\[?|\(\(?|\{\{?|\{>)/.test(t); // 바로 새 노드
+    if (startsWithCmdOrId) {
+      tail = '\n' + t.trim();
+    }
   }
 
   return `${id}${ws}${effOpen}${normalizedInner}${effClose}${tail}`;
@@ -480,7 +498,7 @@ function enforceSafetyNewlinesFlow(s: string): string {
     // end 뒤에 무언가 붙어 있으면 개행
     .replace(/(^|\n)\s*(end)\s*(?=(?:subgraph|style|linkStyle|classDef|click|direction|[A-Za-z_[(\{]))/gi, '$1$2\n')
 
-    // *** 특화: "]linkStyle" / '"]linkStyle' 케이스 명시적으로 끊기 ***
+    // 특화: "]linkStyle" / '"]linkStyle' 케이스 명시적으로 끊기
     .replace(/"\]\s*(?=(linkStyle|style|classDef|click|direction)\b)/gi, '"]\n')
     .replace(/\]\s*(?=(linkStyle|style|classDef|click|direction)\b)/gi, ']\n')
 
