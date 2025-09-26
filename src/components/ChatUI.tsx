@@ -181,7 +181,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
    || '모델 선택';
 
     return (
-      <div className="flex flex-col h-full bg-card border-r rounded-r-lg shadow-lg">
+      <div className="flex flex-col h-full bg-card border-r rounded-r-lg shadow-lg pb-4">
                 <div className="p-2 sm:p-4 border-b flex justify-between items-center">
                   <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
                     <PopoverTrigger asChild>
