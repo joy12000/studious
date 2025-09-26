@@ -7,11 +7,15 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
   import MarkdownRenderer from './MarkdownRenderer';
   import { useNotes } from '../lib/useNotes';
 
-  const models = [
+  const models = [ 
+      { id: 'gemini-2-5-pro', name: 'gemini-2-5-pro' },
+      { id: 'gemini-2.5-flash', name: 'gemini-2.5-flash' },
       { id: 'openai/gpt-oss-20b:free', name: '🧠 모두가 아는 그 gpt' },
       { id: 'x-ai/grok-4-fast:free', name: '🚀화성 갈끄니까 Grok' },
-      { id: 'deepseek/deepseek-chat-v3.1:free', name: '✨ deepseek..성능은 좋음' },
       { id: 'meta-llama/llama-4-maverick:free', name: '라마 🦙귀여운 Llama Ai' },
+      { id: 'gemini-2.5-flash-lite', name: 'gemini-2.5-flash-lite' },
+      { id: 'gemini-2.0-flash', name: 'gemini-2.0-flash' },
+      { id: 'deepseek/deepseek-chat-v3.1:free', name: '✨ deepseek..성능은 좋음' },
   ];
 
   export interface Message {
@@ -46,7 +50,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 
     const [selectedModel, setSelectedModel] = useState(models[0].id);
     const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-    const [useGeminiDirect, setUseGeminiDirect] = useState(false);
 
     const scrollToBottom = () => {
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -121,7 +124,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
         const response = await fetch('/api/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ history, model: selectedModel, noteContext, useGeminiDirect }),
+          body: JSON.stringify({ history, model: selectedModel, noteContext }),
         });
 
         if (!response.ok) {
@@ -177,7 +180,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
       }
     };
 
-    const currentModelName = useGeminiDirect ? 'Gemini Direct' : models.find(m => m.id === selectedModel)?.name
+    const currentModelName = models.find(m => m.id === selectedModel)?.name
    || '모델 선택';
 
     return (
@@ -195,8 +198,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
                       {models.map((model) => (
                         <Button
                           key={model.id} variant="ghost" className="w-full justify-start h-auto py-2"
-                          onClick={() => { setSelectedModel(model.id); setIsPopoverOpen(false);
-  setUseGeminiDirect(false); }}
+                          onClick={() => { setSelectedModel(model.id); setIsPopoverOpen(false); }}
                         >
                           <Check className={`mr-2 h-4 w-4 ${selectedModel === model.id && !useGeminiDirect ? 'opacity-100' : 'opacity-0'}`} />
                           <span className="whitespace-normal text-left">{model.name}</span>
@@ -205,29 +207,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
                     </PopoverContent>
                   </Popover>
 
-                  <TooltipProvider>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant={useGeminiDirect ? "default" : "outline"}
-                          size="sm"
-                          onClick={() => {
-                            setUseGeminiDirect(!useGeminiDirect);
-                            if (!useGeminiDirect) {
-                              setSelectedModel('gemini-2.5-flash'); // Gemini Direct 기본 모델
-                            }
-                            setIsPopoverOpen(false);
-                          }}
-                          className="ml-2"
-                        >
-                          Gemini Direct
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>OpenRouter를 거치지 않고 Gemini API를 직접 사용합니다.</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
+                  {/* Gemini Direct button removed */}
 
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="icon" onClick={handleSaveChat} title="현재 노트에 대화 저장">
