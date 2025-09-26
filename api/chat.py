@@ -148,6 +148,7 @@ class handler(BaseHTTPRequestHandler):
                         full_response_content = response.text
     
                         # Extract answer and follow-up from Gemini response
+                        print(f"DEBUG: Gemini raw response.text: {full_response_content}")
                         try:
                             parsed_content = json.loads(full_response_content)
                             answer = parsed_content.get('answer', full_response_content)
@@ -156,10 +157,12 @@ class handler(BaseHTTPRequestHandler):
                             answer = full_response_content
                             follow_up = []
     
+                        final_response_json = {'answer': answer, 'followUp': follow_up}
+                        print(f"DEBUG: Final JSON response to frontend: {json.dumps(final_response_json, ensure_ascii=False)}")
                         self.send_response(200)
                         self.send_header('Content-type', 'application/json; charset=utf-8')
                         self.end_headers()
-                        self.wfile.write(json.dumps({'answer': answer, 'followUp': follow_up}, ensure_ascii=False).encode('utf-8'))
+                        self.wfile.write(json.dumps(final_response_json, ensure_ascii=False).encode('utf-8'))
                         return
     
                     except Exception as e:
