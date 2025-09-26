@@ -176,34 +176,70 @@ class handler(BaseHTTPRequestHandler):
                             # the frontend always sends the last message as user.
                             pass # This case should ideally not happen with current frontend logic
     
-                        # Call Gemini API
-                        response = model.generate_content(gemini_history)
-                        full_response_content = response.text
-    
-                        # Extract answer and follow-up from Gemini response
-                        print(f"DEBUG: Gemini raw response.text: {full_response_content}")
-                        
-                        # Attempt to extract JSON from markdown code block if present
-                        extracted_json_content = full_response_content
-                        if full_response_content.strip().startswith('```json') and full_response_content.strip().endswith('```'):
-                            extracted_json_content = full_response_content.strip()[len('```json'):-len('```')].strip()
-                            print(f"DEBUG: Extracted JSON from markdown: {extracted_json_content}")
+                        # Call Gemini API with streaming
+                        response = model.generate_content(gemini_history, stream=True)
 
-                        try:
-                            parsed_content = json.loads(extracted_json_content)
-                            answer = parsed_content.get('answer', extracted_json_content)
-                            follow_up = parsed_content.get('followUp', [])
-                        except json.JSONDecodeError as e:
-                            print(f"ERROR: Gemini returned malformed JSON. Raw extracted content: {extracted_json_content}. Error: {e}")
-                            answer = "죄송합니다. AI 응답을 처리하는 중 오류가 발생했습니다. (JSON 형식 오류)" # User-friendly error message
-                            follow_up = []
-    
-                        final_response_json = {'answer': answer, 'followUp': follow_up}
-                        print(f"DEBUG: Final JSON response to frontend: {json.dumps(final_response_json, ensure_ascii=False)}")
                         self.send_response(200)
-                        self.send_header('Content-type', 'application/json; charset=utf-8')
+                        self.send_header('Content-type', 'text/event-stream; charset=utf-8')
                         self.end_headers()
-                        self.wfile.write(json.dumps(final_response_json, ensure_ascii=False).encode('utf-8'))
+
+                        full_response_content = ""
+                        for chunk in response:
+                            if chunk.text:
+                                full_response_content += chunk.text
+                                self.wfile.write(f"data: {json.dumps({'token': chunk.text}, ensure_ascii=False)}\n\n".encode('utf-8'))
+                                self.wfile.flush()
+                        
+                        # Generate follow-up questions (similar to OpenRouter logic)
+                        try:
+                            follow_up_prompt = {
+                                "role": "system",
+                                "content": f"사용자의 마지막 질문과 AI의 전체 답변을 바탕으로, 학생의 사고를 확장할 수 있는 좋은 후속 질문 3개를 제안해주세요. 전체 답변: '{full_response_content}'. 반드시 '{{\"followUp\": [\"...\", \"...\", \"...\"]}}' 형식의 JSON 객체로만 응답해야 합니다."
+                            }
+                            
+                            follow_up_payload = {
+                                "model": model_identifier,
+                                "messages": [system_prompt] + messages + [{"role": "assistant", "content": full_response_content}, follow_up_prompt],
+                                "response_format": {"type": "json_object"}
+                            }
+
+                            # Use requests to call Gemini API for follow-up, as genai.GenerativeModel doesn't directly support response_format
+                            # This part needs to be adapted to use genai.GenerativeModel if possible, or keep requests for simplicity
+                            # For now, let's assume a direct call to the API endpoint for follow-up
+                            # This is a placeholder and might need adjustment based on actual Gemini API capabilities for structured output
+                            
+                            # Re-configure genai with the current API key for the follow-up call
+                            genai.configure(api_key=api_key)
+                            follow_up_model = genai.GenerativeModel(model_identifier.replace('google/', ''))
+                            
+                            # Construct history for follow-up call
+                            follow_up_history = []
+                            for msg in gemini_messages:
+                                if msg['role'] == 'user':
+                                    follow_up_history.append({'role': 'user', 'parts': [{'text': p} for p in msg['parts']]})
+                                elif msg['role'] == 'assistant':
+                                    follow_up_history.append({'role': 'model', 'parts': [{'text': p} for p in msg['parts']]})
+                            
+                            follow_up_history.append({'role': 'model', 'parts': [{'text': full_response_content}]})
+                            follow_up_history.append({'role': 'user', 'parts': [{'text': follow_up_prompt['content']}]})
+
+                            follow_up_response = follow_up_model.generate_content(follow_up_history)
+                            follow_up_content = follow_up_response.text
+
+                            # Extract followUp from the JSON response
+                            try:
+                                parsed_follow_up = json.loads(follow_up_content)
+                                if 'followUp' in parsed_follow_up:
+                                    self.wfile.write(f"data: {json.dumps({'followUp': parsed_follow_up['followUp']}, ensure_ascii=False)}\n\n".encode('utf-8'))
+                                    self.wfile.flush()
+                            except json.JSONDecodeError as e:
+                                print(f"WARN: 후속 질문 JSON 파싱 실패: {e}. 원본: {follow_up_content}")
+
+                        except Exception as fu_e:
+                            print(f"WARN: 후속 질문 생성 실패: {fu_e}")
+
+                        self.wfile.write('data: [DONE]\n\n'.encode('utf-8'))
+                        self.wfile.flush()
                         return
     
                     except Exception as e:
