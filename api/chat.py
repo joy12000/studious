@@ -187,7 +187,10 @@ class handler(BaseHTTPRequestHandler):
                         for chunk in response:
                             if chunk.text:
                                 full_response_content += chunk.text
-                                self.wfile.write(f"data: {json.dumps({'token': chunk.text}, ensure_ascii=False)}\n\n".encode('utf-8'))
+                                token_data = {'token': chunk.text}
+                                print(f"DEBUG Backend: chunk.text: {chunk.text}")
+                                print(f"DEBUG Backend: token_data dumped: {json.dumps(token_data, ensure_ascii=False)}")
+                                self.wfile.write(f"data: {json.dumps(token_data, ensure_ascii=False)}\n\n".encode('utf-8'))
                                 self.wfile.flush()
                         
                         # Generate follow-up questions (similar to OpenRouter logic)
