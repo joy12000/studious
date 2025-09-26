@@ -41,6 +41,23 @@ const renderInlineContent = (text: string) => {
   });
 };
 
+/** ✅ 최후 안전장치: 헤더가 없으면 flowchart로 강제 보충 */
+const ensureDiagramHeader = (code: string): string => {
+  const src = code.trim();
+  // 이미 다이어그램 헤더가 있으면 그대로
+  const HEADER_RE = /^(graph|flowchart|sequenceDiagram|gantt|pie|erDiagram|journey|classDiagram|stateDiagram(?:-v2)?|gitGraph|mindmap|timeline|quadrantChart|sankey|requirementDiagram|xychart-beta)\b/i;
+  if (HEADER_RE.test(src)) return code;
+
+  // flowchart로 “보이는” 시그니처면 graph 헤더를 보충
+  const looksFlow =
+    /(^|\n)\s*subgraph\b/i.test(src) ||
+    /(^|\n)\s*[A-Za-z_][\w-]*\s*(\[\[?|\(\(?|\{\{?|\{>)/.test(src) || // ID[...], ID(...), ID{{...}}
+    /(-->|-{2,3}|-\.->|<-->)/.test(src) || // -->, ---, -.->, <-->
+    /(^|\n)\s*(style|linkStyle)\b/i.test(src);
+
+  return looksFlow ? `graph TD\n${code}` : code;
+};
+
 const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [modalMermaidCode, setModalMermaidCode] = useState<string | null>(null);
@@ -83,8 +100,10 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
         // 원문 코드 문자열
         const raw = (el.textContent || '').trim();
 
-        // 후보정(유틸)
-        const fixed = normalizeMermaidCode(raw);
+        // 1) 후보정(유틸)
+        let fixed = normalizeMermaidCode(raw);
+        // 2) 최후 안전장치: 헤더 보강 (normalize가 못 붙였을 경우 대비)
+        fixed = ensureDiagramHeader(fixed);
 
         // ✅ 순수 텍스트로 주입 (HTML 섞임 방지)
         el.textContent = fixed;
@@ -123,8 +142,12 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       const pre = document.createElement('pre');
       pre.className = 'mermaid';
 
+      // 1) 후보정
+      let fixed = normalizeMermaidCode(modalMermaidCode);
+      // 2) 헤더 보강
+      fixed = ensureDiagramHeader(fixed);
+
       // ✅ 모달도 텍스트로 주입
-      const fixed = normalizeMermaidCode(modalMermaidCode);
       pre.textContent = fixed;
 
       const err = tryParseMermaid(fixed);
@@ -170,7 +193,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
             onClick={() => setModalMermaidCode(code)}
             title="클릭하여 크게 보기"
           >
-            {/* 원본 코드는 여기서 그대로 넣고, useEffect에서 normalize + render */}
+            {/* 원본 코드는 여기서 그대로 넣고, useEffect에서 normalize + header 보강 + render */}
             <pre className="mermaid">{code}</pre>
           </div>
         );
