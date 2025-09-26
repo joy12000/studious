@@ -214,7 +214,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
                           onClick={() => {
                             setUseGeminiDirect(!useGeminiDirect);
                             if (!useGeminiDirect) {
-                              setSelectedModel('gemini-2.5-flash-lite'); // Gemini Direct 기본 모델
+                              setSelectedModel('gemini-2.5-flash'); // Gemini Direct 기본 모델
                             }
                             setIsPopoverOpen(false);
                           }}
