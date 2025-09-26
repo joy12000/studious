@@ -161,12 +161,20 @@ class handler(BaseHTTPRequestHandler):
     
                         # Extract answer and follow-up from Gemini response
                         print(f"DEBUG: Gemini raw response.text: {full_response_content}")
+                        
+                        # Attempt to extract JSON from markdown code block if present
+                        extracted_json_content = full_response_content
+                        if full_response_content.strip().startswith('```json') and full_response_content.strip().endswith('```'):
+                            extracted_json_content = full_response_content.strip()[len('```json'):-len('```')].strip()
+                            print(f"DEBUG: Extracted JSON from markdown: {extracted_json_content}")
+
                         try:
-                            parsed_content = json.loads(full_response_content)
-                            answer = parsed_content.get('answer', full_response_content)
+                            parsed_content = json.loads(extracted_json_content)
+                            answer = parsed_content.get('answer', extracted_json_content)
                             follow_up = parsed_content.get('followUp', [])
-                        except json.JSONDecodeError:
-                            answer = full_response_content
+                        except json.JSONDecodeError as e:
+                            print(f"WARN: Failed to decode JSON from Gemini response. Using raw content. Error: {e}")
+                            answer = extracted_json_content # Use extracted content if JSON decode fails
                             follow_up = []
     
                         final_response_json = {'answer': answer, 'followUp': follow_up}
