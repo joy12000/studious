@@ -66,8 +66,8 @@ export default function NoteListPage() {
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-2">
-                <div className="flex-1 relative">
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <div className="flex-1 relative w-full sm:w-auto">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <input
                         value={localSearch}
@@ -85,7 +85,7 @@ export default function NoteListPage() {
                     type="single" 
                     value={filters.noteType} 
                     onValueChange={(value) => handleNoteTypeFilter(value as any)}
-                    className="justify-start"
+                    className="justify-start w-full sm:w-auto"
                 >
                     <ToggleGroupItem value="textbook" aria-label="Textbooks"><BrainCircuit className="h-4 w-4 mr-1.5"/>참고서</ToggleGroupItem>
                     <ToggleGroupItem value="review" aria-label="Reviews"><Notebook className="h-4 w-4 mr-1.5"/>복습</ToggleGroupItem>
