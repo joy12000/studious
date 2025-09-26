@@ -1,12 +1,17 @@
+/* eslint-disable no-useless-escape */
+
 /**
- * Mermaid Normalize/Sanitize (flowchart-safe, multi-diagram aware)
- * - 1) 다이어그램 타입 감지(명시/추론)
- * - 2) 타입별 보수적 정규화
- * - 3) flowchart/graph 계열에만 공격적 보정(노드/엣지/서브그래프/헤더 보충)
+ * markdownUtils.ts
+ *
+ * - 마크다운 전체에서 ```mermaid 코드블록을 찾아 안정적으로 정규화합니다.
+ * - 단일 Mermaid 코드 문자열을 정규화하는 함수도 제공합니다.
+ * - Flowchart/Graph에만 적극 보정(노드/엣지/레이블/서브그래프 등), 그 외 타입은 보수적 처리.
+ * - htmlLabels:false 환경을 기본 가정하여 <br> → \n(리터럴) 보정, 괄호노드 멀티라인 → 대괄호로 전환.
+ * - 다이어그램 내부 init 지시어(%%{init:...}%%)는 제거하여 전역 초기화와 충돌 방지.
  */
 
-type Direction = 'TB' | 'TD' | 'BT' | 'LR' | 'RL';
-type DiagramHeader =
+export type Direction = 'TB' | 'TD' | 'BT' | 'LR' | 'RL';
+export type DiagramHeader =
   | 'graph'
   | 'flowchart'
   | 'sequenceDiagram'
@@ -26,11 +31,21 @@ type DiagramHeader =
   | 'xychart-beta'
   | 'unknown';
 
-interface NormalizeOptions {
-  defaultFlowDirection?: Direction;      // flowchart/graph 기본 방향
-  wrapInCodeFence?: boolean;             // 결과를 ```mermaid 펜스로 감쌀지
-  attachWarningsAsComments?: boolean;    // 경고를 %%로 붙일지
-  enableHeaderAutofillForNonFlow?: boolean; // sequence 등에도 헤더 자동보충 허용(기본 false: 보수적)
+export interface NormalizeOptions {
+  /** flowchart/graph 기본 방향 (헤더 자동 보충이 필요한 경우에만 사용) */
+  defaultFlowDirection?: Direction;
+  /** 결과를 ```mermaid 펜스로 감쌀지 (단일 코드 정규화에만 해당) */
+  wrapInCodeFence?: boolean;
+  /** 경고를 %% 주석으로 결과에 첨부 */
+  attachWarningsAsComments?: boolean;
+  /** (비권장) 비-flow 타입에도 헤더 자동 보충 허용 */
+  enableHeaderAutofillForNonFlow?: boolean;
+  /** (보수) subgraph "타이틀" → subgraph 타이틀 (따옴표 제거) */
+  stripQuotedSubgraphTitle?: boolean;
+  /** (권장) 다이어그램 내부의 %%{init:...}%% 지시어 제거 */
+  stripInlineInitDirective?: boolean;
+  /** (권장) 멀티라인 라벨을 괄호노드로 쓴 경우 []로 강제 전환 */
+  transformParenMultilineToBracket?: boolean;
 }
 
 const DEFAULT_OPTS: NormalizeOptions = {
@@ -38,6 +53,9 @@ const DEFAULT_OPTS: NormalizeOptions = {
   wrapInCodeFence: false,
   attachWarningsAsComments: false,
   enableHeaderAutofillForNonFlow: false,
+  stripQuotedSubgraphTitle: false,
+  stripInlineInitDirective: true,
+  transformParenMultilineToBracket: true,
 };
 
 const FLOW_HEADERS = new Set<DiagramHeader>(['graph', 'flowchart']);
@@ -56,113 +74,139 @@ const MERMAID_KEYWORDS = new Set([
 ]);
 
 const SPECIAL_CHARS_REGEX = /[(),;:]/;
-const INVISIBLE_CHARS = /[\u200B-\u200D\uFEFF]/g;
+const INVISIBLE_CHARS = /[\u200B-\u200D\uFEFF]/g; // zero-width chars
 const NBSP = /\u00A0/g;
 
-/** 공개 API */
+/* --------------------------------------------------------------------------------
+ * Public API
+ * -------------------------------------------------------------------------------- */
+
+/**
+ * 전체 마크다운에서 ```mermaid 코드블록을 찾아서 개별적으로 정규화합니다.
+ * - 마크다운 내에 mermaid 블록이 여러 개 있어도 모두 처리됩니다.
+ * - mermaid 아닌 코드블록/본문은 전혀 건드리지 않습니다.
+ */
+export function normalizeMermaidInMarkdown(markdown: string, opts: NormalizeOptions = {}): string {
+  if (!markdown) return markdown;
+
+  return markdown.replace(/```mermaid\s*([\s\S]*?)```/gi, (_m, inner) => {
+    const fixed = normalizeMermaidCode(String(inner || ''), opts);
+    // code fence는 마크다운에 그대로 남겨야 하므로 다시 감싼다
+    return '```mermaid\n' + fixed + '\n```';
+  });
+}
+
+/**
+ * 단일 Mermaid 코드 문자열을 정규화합니다.
+ * - 이 함수의 입력은 **삼중펜스 없이 Mermaid 본문**만 들어온다고 가정합니다.
+ */
 export function normalizeMermaidCode(input: string, opts: NormalizeOptions = {}): string {
   const O = { ...DEFAULT_OPTS, ...opts };
 
-  // 0) 래퍼 제거 + 숨은 문자 정리
-  let code = stripFencesAndHtml((input || '').trim())
+  // 0) 전처리: BOM/인비저블/nbsp 제거
+  let code = (input || '')
     .replace(/^\uFEFF/, '')
     .replace(INVISIBLE_CHARS, '')
     .replace(NBSP, ' ')
     .trim();
 
-  if (!code) {
-    const base = `graph ${O.defaultFlowDirection}`;
-    return O.wrapInCodeFence ? fence(base) : base;
-  }
+  if (!code) return FLOW_HEADERS.has('graph') ? `graph ${O.defaultFlowDirection}` : '';
 
   // 1) 멀티라인 주석 → %% 라인 주석화
   code = code.replace(/\/\*([\s\S]*?)\*\//g, (_m, body) =>
     body.split('\n').map(s => '%% ' + s.trim()).join('\n')
   );
 
-  // 2) 라인 분해 + 순회 준비
+  // 2) 라인 분해 + 기본 클린업
   const rawLines = code.split(/\r?\n/);
-  const lines = rawLines.map(s => s.trim()).filter(Boolean);
+  let lines = rawLines.map(s => s.trim()).filter(Boolean);
 
-  // 3) 다이어그램 헤더 감지(명시)
-  const detectExplicit = detectExplicitHeader(lines);
-  let header: DiagramHeader = detectExplicit?.header ?? 'unknown';
-  let headerSeen = !!detectExplicit;
-
-  // 4) 명시 헤더 없으면 “약한 추론” (보수적)
-  if (!headerSeen) {
-    header = inferDiagramHeader(lines);
+  // 2-1) 다이어그램 내부 init 지시어 제거 (전역 initialize와 충돌 방지)
+  if (O.stripInlineInitDirective) {
+    lines = lines.filter(l => !/^%%\s*\{init:/i.test(l));
   }
 
-  const warnings: string[] = [];
+  // 3) 헤더 감지(명시)
+  const explicit = detectExplicitHeader(lines);
+  let header: DiagramHeader = explicit?.header ?? 'unknown';
+  let headerSeen = !!explicit;
 
-  // 5) 타입별 정규화 파이프라인
-  let out: string[] = [];
+  // 4) 명시 헤더 없으면 보수적 추론
+  if (!headerSeen) header = inferDiagramHeader(lines);
+
+  const warnings: string[] = [];
+  let resultLines: string[] = [];
 
   if (FLOW_HEADERS.has(header)) {
-    // ===== flowchart/graph 계열 =====
-    const result = normalizeFlowchartLike(lines, {
+    // ===== flowchart/graph 계열: 적극 보정 =====
+    const r = normalizeFlowchartLike(lines, {
       headerSeen,
       defaultDir: O.defaultFlowDirection!,
+      stripQuotedSubgraphTitle: O.stripQuotedSubgraphTitle!,
+      transformParenMultilineToBracket: O.transformParenMultilineToBracket!,
     });
-    out = result.lines;
-    headerSeen = result.headerSeen;
-    warnings.push(...result.warnings);
+    resultLines = r.lines;
+    headerSeen = r.headerSeen;
+    warnings.push(...r.warnings);
 
-    // 헤더가 끝내 없고 flowchart 특성이 강하면 보수적 한도 내에서만 삽입
-    if (!headerSeen && result.shouldAutofillHeader) {
-      out.unshift(`graph ${O.defaultFlowDirection}`);
+    // 헤더가 끝내 없고 흐름도 시그니처가 충분하면 헤더 보충
+    if (!headerSeen && r.shouldAutofillHeader) {
+      resultLines.unshift(`graph ${O.defaultFlowDirection}`);
       headerSeen = true;
       warnings.push('Inserted default "graph" header for flowchart-like content.');
     }
 
   } else if (NON_FLOW_HEADERS.has(header)) {
-    // ===== 비-flowchart 계열: 매우 보수적 정리만 =====
-    const result = normalizeNonFlowMinimal(lines, header, {
-      enableHeaderAutofill: O.enableHeaderAutofillForNonFlow,
+    // ===== 비-flowchart: 매우 보수적 정리만 적용 =====
+    const r = normalizeNonFlowMinimal(lines, header, {
+      enableHeaderAutofill: O.enableHeaderAutofillForNonFlow!,
     });
-    out = result.lines;
-    // 비-flow에서는 기본적으로 자동 헤더 삽입 안 함(옵션으로만)
-    if (result.warning) warnings.push(result.warning);
+    resultLines = r.lines;
+    if (r.warning) warnings.push(r.warning);
 
   } else {
-    // ===== 알 수 없음: 최대 보수 모드 =====
-    const result = normalizeUnknownVeryConservative(lines);
-    out = result.lines;
-    if (result.seemsFlowLike) {
-      // flowchart signature가 뚜렷할 때만(노드/엣지 패턴 다수) 헤더 삽입
-      out.unshift(`graph ${O.defaultFlowDirection}`);
-      warnings.push('No header found; inferred flowchart. Inserted "graph" header.');
+    // ===== unknown: 최대 보수 =====
+    const r = normalizeUnknownVeryConservative(lines);
+    resultLines = r.lines;
+    if (r.seemsFlowLike) {
+      // class/state 시그니처가 있으면 flow 헤더 삽입 금지
+      if (!r.hasClassOrStateHints) {
+        resultLines.unshift(`graph ${O.defaultFlowDirection}`);
+        warnings.push('No header found; inferred flowchart. Inserted "graph" header.');
+      } else {
+        warnings.push('Flow-like arrows found but class/state hints present; skipped header insertion.');
+      }
     } else {
-      // 절대 헤더 삽입하지 않음
       warnings.push('No explicit header and type unknown; skipped header insertion.');
     }
   }
 
-  // 라벨 내부 줄바꿈은 \n(리터럴)로 유지해야 Mermaid가 줄바꿈 처리합니다.
-  let final = out.join('\n');
+  // 5) 최종 조립
+  // ✳️ 라벨 내부 줄바꿈은 \n(리터럴)로 유지해야 Mermaid가 줄바꿈 처리하므로 replace(/\\n/,'\n') 금지
+  let final = resultLines.join('\n');
 
-  // 경고를 주석으로 첨부(옵션)
-  if (O.attachWarningsAsComments && warnings.length) {
+  if (opts.attachWarningsAsComments && warnings.length) {
     final = ['%% WARN: ' + warnings.join(' | '), final].join('\n');
   }
 
-  return O.wrapInCodeFence ? fence(final) : final;
+  return opts.wrapInCodeFence ? fence(final) : final;
 }
 
-/* ================= 내부 유틸/로직 ================= */
+/* --------------------------------------------------------------------------------
+ * 내부 유틸/핵심 로직
+ * -------------------------------------------------------------------------------- */
 
 function fence(s: string) {
   return '```mermaid\n' + s + '\n```';
 }
 
-function stripFencesAndHtml(s: string): string {
-  s = s.trim();
-  const fenceMatch = s.match(/```(?:mermaid)?\s*([\s\S]*?)```/i);
-  if (fenceMatch) return fenceMatch[1].trim();
-  const htmlMatch = s.match(/<div[^>]*class=["']?mermaid["']?[^>]*>([\s\S]*?)<\/div>/i);
-  if (htmlMatch) return htmlMatch[1].trim();
-  return s;
+function escapeReg(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function stripComment(line: string): string {
+  if (/^%%/.test(line)) return '';
+  return line.replace(/\s*;+\s*$/, ''); // 말미 세미콜론 제거
 }
 
 function detectExplicitHeader(lines: string):
@@ -172,9 +216,9 @@ function detectExplicitHeader(lines: string):
   for (let i = 0; i < lines.length; i++) {
     const L = stripComment(lines[i]);
     if (!L) continue;
-    // flowchart/graph + 방향
-    if (/^(graph|flowchart)\b/i.test(L)) return { header: L.split(/\s+/)[0] as DiagramHeader, index: i };
-    // 기타 헤더
+    if (/^(graph|flowchart)\b/i.test(L)) {
+      return { header: L.split(/\s+/)[0] as DiagramHeader, index: i };
+    }
     const heads: DiagramHeader[] = [
       'sequenceDiagram','gantt','pie','erDiagram','journey','classDiagram',
       'stateDiagram-v2','stateDiagram','gitGraph','mindmap','timeline',
@@ -189,48 +233,52 @@ function detectExplicitHeader(lines: string):
 }
 
 function inferDiagramHeader(lines: string): DiagramHeader {
-  // 강한 힌트가 있으면 flowchart/sequence를 추정
-  let flowHits = 0;
-  let seqHits = 0;
+  // 오인식 최소화: flow 화살표는 -->, -.->, <--> 만 카운트 (class의 <|-- 등 제외)
+  let flowHits = 0, seqHits = 0, classHits = 0, stateHits = 0;
 
   for (const raw of lines) {
     const L = stripComment(raw);
     if (!L) continue;
 
-    // flowchart signature: ID[...] or A -- B, A -.-> B, subgraph 등
+    // flow: 전형적 노드/서브그래프/명확한 화살표
     if (/^[A-Za-z_][\w-]*\s*(\[\[?|\(\(?|\{\{?|\{>)/.test(L)) flowHits++;
+    if (/(^|[^<])(-->|-\.->|<-->)/.test(L)) flowHits++;
     if (/\bsubgraph\b/i.test(L)) flowHits++;
-    if (/-->|-{2,3}|-\.->/.test(L)) flowHits++;
 
-    // sequence signature: actor/participant/message/Note/alt/opt/loop
+    // sequence
     if (/^\s*(actor|participant)\b/i.test(L)) seqHits++;
-    if (/\-\>\>|\-\>|\<\<\-/.test(L) && /:/.test(L)) seqHits++;
-    if (/^\s*Note\b/i.test(L)) seqHits++;
-    if (/^\s*(alt|opt|loop|par|rect|critical)\b/i.test(L)) seqHits++;
+    if (/-{1,2}>{1,2}[^:]*:/.test(L)) seqHits++; // Alice->>John: Hello!
+
+    // class
+    if (/\<\|--|--\|>|\*--|o--|--\*|--o/.test(L)) classHits++;
+
+    // state
+    if (/^\s*\[\*\]\s*-->|-->\s*\[\*\]/.test(L) || /^\s*state\s+/i.test(L)) stateHits++;
   }
 
-  if (flowHits >= 2 && flowHits >= seqHits + 1) return 'flowchart';
-  if (seqHits >= 2 && seqHits >= flowHits + 1) return 'sequenceDiagram';
+  if (classHits >= 2 && classHits >= flowHits + seqHits) return 'classDiagram';
+  if (stateHits >= 2 && stateHits >= flowHits + seqHits) return 'stateDiagram';
+  if (flowHits  >= 2 && flowHits  >= seqHits + 1)      return 'flowchart';
+  if (seqHits   >= 2 && seqHits   >= flowHits + 1)     return 'sequenceDiagram';
   return 'unknown';
-}
-
-function stripComment(line: string): string {
-  if (/^%%/.test(line)) return '';
-  return line.replace(/\s*;+\s*$/, ''); // 말미 세미콜론 제거
 }
 
 /* ---------- flowchart 파이프라인 ---------- */
 
 function normalizeFlowchartLike(
   lines: string[],
-  opts: { headerSeen: boolean; defaultDir: Direction }
+  opts: {
+    headerSeen: boolean;
+    defaultDir: Direction;
+    stripQuotedSubgraphTitle: boolean;
+    transformParenMultilineToBracket: boolean;
+  }
 ): { lines: string[]; headerSeen: boolean; shouldAutofillHeader: boolean; warnings: string[] } {
 
   const warnings: string[] = [];
   const out: string[] = [];
   let headerSeen = opts.headerSeen;
   let subgraphDepth = 0;
-
   let sawFlowSignature = false;
 
   for (let raw of lines) {
@@ -253,26 +301,29 @@ function normalizeFlowchartLike(
       continue; // 중복 헤더는 버림
     }
 
-    // <br> → \n (후단에서 실제 개행으로 복원)
+    // <br> → \n(리터럴) (후단에서 실제 개행으로 치환하지 않음)
     line = line.replace(/<br\s*\/?>/gi, '\\n');
 
-    // subgraph 제목 인용 및 균형
+    // subgraph 제목 처리
     if (/^subgraph\b/i.test(line)) {
       const m = line.match(/^subgraph\s+(.+)$/i);
-      const title = m ? m[1].trim() : '';
-      if (title) {
-        if (title.startsWith('"') && title.endsWith('"')) {
-          out.push(`subgraph ${title}`);
-        } else if (/\s/.test(title)) {
-          out.push(`subgraph "${escapeQuotes(title)}"`);
-        } else {
-          out.push(`subgraph ${title}`);
+      const titleRaw = m ? m[1].trim() : '';
+      if (titleRaw) {
+        let title = titleRaw;
+        if (opts.stripQuotedSubgraphTitle && /^".+"$/.test(titleRaw)) {
+          // 옵션이 켜진 경우: 따옴표 제거
+          title = titleRaw.replace(/^"(.+)"$/, '$1');
+        } else if (!opts.stripQuotedSubgraphTitle && /\s/.test(titleRaw) && !/^".+"$/.test(titleRaw)) {
+          // 공백 포함인데 인용 안했으면 인용
+          title = `"${escapeQuotes(titleRaw)}"`;
         }
+        out.push(`subgraph ${title}`);
         subgraphDepth++;
         sawFlowSignature = true;
         continue;
       }
     }
+
     if (/^end$/i.test(line)) {
       if (subgraphDepth === 0) { warnings.push('Orphan "end" found.'); continue; }
       subgraphDepth--; out.push('end'); continue;
@@ -287,9 +338,9 @@ function normalizeFlowchartLike(
     line = normalizeFlowEdgeLabels(line);
     if (line !== beforeLabels) sawFlowSignature = true;
 
-    // 노드 정의(대괄호/소괄호/중괄호 등) 내부 인용 보정
+    // 노드 정의(괄호/대괄호/중괄호)
     const beforeNode = line;
-    line = normalizeFlowNodeDefinition(line);
+    line = normalizeFlowNodeDefinition(line, { transformParenMultilineToBracket: opts.transformParenMultilineToBracket });
     if (line !== beforeNode) sawFlowSignature = true;
 
     // style/linkStyle/classDef
@@ -313,7 +364,7 @@ function normalizeFlowchartLike(
     warnings.push('Inserted missing "end" for subgraph.');
   }
 
-  // 헤더가 없고 flowchart signature가 충분하면 헤더 보충 권고
+  // 헤더가 없고 flowchart signature가 충분하면 헤더 보충
   const shouldAutofillHeader = !headerSeen && sawFlowSignature;
 
   return { lines: out, headerSeen, shouldAutofillHeader, warnings };
@@ -343,6 +394,16 @@ function normalizeFlowArrows(line: string): string {
   return line;
 }
 
+function needsQuotes(text: string): boolean {
+  return /\s/.test(text) || SPECIAL_CHARS_REGEX.test(text) || MERMAID_KEYWORDS.has(text.toLowerCase());
+}
+function escapeQuotes(s: string): string { return s.replace(/"/g, '&quot;'); }
+
+/**
+ * 엣지 레이블 보정 (flow 전용)
+ * - |label| → "label"
+ * - 공백/특수문자 포함 시 자동 인용
+ */
 function normalizeFlowEdgeLabels(line: string): string {
   // |label| → "label"
   line = line.replace(/--\s*\|([^|]+)\|\s*--/g, (_m, label) => `-- "${escapeQuotes(label.trim())}" --`);
@@ -353,7 +414,7 @@ function normalizeFlowEdgeLabels(line: string): string {
   line = line.replace(
     /(--|-{3}|-\.->)\s*([^\s"->][^->]*?)\s*(-->|--|-\.\->)/g,
     (_m, left, text, right) => {
-      const t = text.trim();
+      const t = String(text).trim();
       if (!t) return `${left} ${right}`;
       if (needsQuotes(t)) return `${left} "${escapeQuotes(t)}" ${right}`;
       return `${left} ${t} ${right}`;
@@ -362,8 +423,17 @@ function normalizeFlowEdgeLabels(line: string): string {
   return line;
 }
 
-function normalizeFlowNodeDefinition(line: string): string {
-  // 라인 시작: ID + 여는 토큰
+/**
+ * 노드 정의 보정 (flow 전용)
+ * - ID + 여는 토큰( [ [[ ( (( { {{ {> )을 인식
+ * - 내용이 멀티라인(\n 리터럴 포함)이고 형태가 ()이면 []로 강제 전환 (htmlLabels:false 안정화)
+ * - 이미 따옴표로 감싼 경우 내부의 추가 따옴표는 &quot;로 이스케이프
+ * - 인용이 필요하면 내용만 "..."로 감싸되, 원래 괄호 모양은 유지
+ */
+function normalizeFlowNodeDefinition(
+  line: string,
+  opt: { transformParenMultilineToBracket: boolean }
+): string {
   const idMatch = line.match(/^([A-Za-z_][\w-]*)(\s*)(\[\[?|\(\(?|\{\{?|\{>)/);
   if (!idMatch) return line;
 
@@ -386,19 +456,38 @@ function normalizeFlowNodeDefinition(line: string): string {
   let content = endIdx === -1 ? rest.trim() : rest.slice(0, endIdx);
   const tail = endIdx === -1 ? '' : rest.slice(endIdx + close.length);
 
-  const rawContent = content.replace(/\\n/g, '\n');
+  // \n 리터럴 유지
+  const rawContent = content;
 
+  const isQuoted = rawContent.startsWith('"') && rawContent.endsWith('"');
+  const inner = isQuoted ? rawContent.slice(1, -1) : rawContent;
+
+  const isMultiline = /\\n/.test(inner) || /\n/.test(inner);
+
+  // () 노드에서 멀티라인 라벨이면 [] 노드로 강제 전환 (안정성)
+  let effOpen = open;
+  let effClose = close;
+  if (opt.transformParenMultilineToBracket && (open === '(' || open === '((') && isMultiline) {
+    effOpen = open.replace(/\(/g, '['); // '(' 또는 '((' → '[' 또는 '[['
+    effClose = effOpen === '[[' ? ']]' : ']';
+  }
+
+  // 인용 필요성 판단
   const shouldQuote =
-    /\n/.test(rawContent) ||
-    SPECIAL_CHARS_REGEX.test(rawContent) ||
-    MERMAID_KEYWORDS.has(rawContent.trim().toLowerCase()) ||
-    /^\s|\s$/.test(rawContent);
+    isMultiline ||
+    SPECIAL_CHARS_REGEX.test(inner) ||
+    MERMAID_KEYWORDS.has(inner.trim().toLowerCase()) ||
+    /^\s|\s$/.test(inner);
 
-  const inner = shouldQuote && !(rawContent.startsWith('"') && rawContent.endsWith('"'))
-    ? `"${escapeQuotes(rawContent)}"`
-    : rawContent;
+  // 이미 인용된 경우: 내부의 추가 따옴표를 &quot;로 이스케이프
+  let normalizedInner = inner;
+  if (isQuoted) {
+    normalizedInner = inner.replace(/"/g, '&quot;');
+  } else if (shouldQuote) {
+    normalizedInner = `"${escapeQuotes(inner)}"`;
+  }
 
-  return `${id}${ws}${open}${inner}${close}${tail}`;
+  return `${id}${ws}${effOpen}${normalizedInner}${effClose}${tail}`;
 }
 
 /* ---------- 비-flowchart 파이프라인(보수적) ---------- */
@@ -422,26 +511,23 @@ function normalizeNonFlowMinimal(
       continue;
     }
 
-    // 헤더가 있으면 대소문자 표준화만
+    // 헤더 표준화
     if (new RegExp('^' + escapeReg(header) + '\\b', 'i').test(line)) {
       if (!sawHeader) {
-        out.push(header); // 표기 통일
+        out.push(header);
         sawHeader = true;
       }
       continue; // 중복 헤더는 무시
     }
 
-    // 공통 정리: 말미 세미콜론 제거, <br> → \n (메시지 텍스트를 줄바꿈으로 보존)
+    // 공통 정리: 말미 세미콜론 제거, <br> → \n(리터럴)
     line = line.replace(/;+\s*$/,'').replace(/<br\s*\/?>/gi, '\\n');
 
-    // !!! 중요: 비-flow에서는 화살표/노드/스타일 보정 "금지"
-    // sequenceDiagram 예: Alice->>John: Hello! 를 절대 건드리지 않음
-
+    // 비-flow: 엣지/노드/스타일 보정 금지 (문법 파괴 방지)
     out.push(line);
   }
 
   if (!sawHeader && opts.enableHeaderAutofill) {
-    // 사용자가 명시적으로 허용한 경우에만 자동 보충
     out.unshift(header);
     return { lines: out, warning: `Inserted missing "${header}" header (opt-in).` };
   }
@@ -454,6 +540,7 @@ function normalizeNonFlowMinimal(
 function normalizeUnknownVeryConservative(lines: string[]) {
   const out: string[] = [];
   let flowHits = 0;
+  let classOrState = 0;
 
   for (let raw of lines) {
     let line = raw.trim();
@@ -466,21 +553,17 @@ function normalizeUnknownVeryConservative(lines: string[]) {
 
     line = line.replace(/;+\s*$/,'').replace(/<br\s*\/?>/gi, '\\n');
 
-    // 흐름도 시그니처만 카운트(적용은 안 함)
+    // 흐름도 시그니처
     if (/^[A-Za-z_][\w-]*\s*(\[\[?|\(\(?|\{\{?|\{>)/.test(line)) flowHits++;
-    if (/-->|-{2,3}|-\.->/.test(line)) flowHits++;
+    if (/(^|[^<])(-->|-\.->|<-->)/.test(line)) flowHits++;
     if (/\bsubgraph\b/i.test(line)) flowHits++;
+
+    // class/state 힌트
+    if (/\<\|--|--\|>|\*--|o--|--\*|--o/.test(line)) classOrState++;
+    if (/^\s*\[\*\]\s*-->|-->\s*\[\*\]/.test(line) || /^\s*state\s+/i.test(line)) classOrState++;
 
     out.push(line);
   }
 
-  return { lines: out, seemsFlowLike: flowHits >= 2 };
+  return { lines: out, seemsFlowLike: flowHits >= 2, hasClassOrStateHints: classOrState > 0 };
 }
-
-/* ---------- 공통 ---------- */
-
-function needsQuotes(text: string): boolean {
-  return /\s/.test(text) || SPECIAL_CHARS_REGEX.test(text) || MERMAID_KEYWORDS.has(text.toLowerCase());
-}
-function escapeQuotes(s: string): string { return s.replace(/"/g, '&quot;'); }
-function escapeReg(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
