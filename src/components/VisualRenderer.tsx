@@ -3,6 +3,7 @@ import React from 'react';
 import ShadowHost from './ShadowHost';
 import { InlineMath, BlockMath } from 'react-katex';
 import 'katex/dist/katex.min.css';
+import 'katex/dist/katex.min.css';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter } from './ui/card';
 
 // ---- 변경: lucide-react를 와일드카드로 가져와 동적으로 조회하도록 변경 ----
