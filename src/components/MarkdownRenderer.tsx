@@ -11,156 +11,183 @@ import 'katex/dist/katex.min.css';
 
 interface Props { content: string; }
 
-/* ────────────────────────────────────────────────────────────────────────────
-   수식 내 유니코드 지수 등을 ASCII 지수로 정규화 (KaTeX 경고 완화)
-   ──────────────────────────────────────────────────────────────────────────── */
-const normalizeMathUnicode = (s: string) =>
-  s.replace(/\u00B2/g, '^2') // ²
-   .replace(/\u00B3/g, '^3'); // ³
+/* ---------------------------- helpers ---------------------------- */
 
-/* ────────────────────────────────────────────────────────────────────────────
-   인라인 텍스트/수식 렌더
-   ──────────────────────────────────────────────────────────────────────────── */
+const normalizeMathUnicode = (s: string) =>
+  s.replace(/\u00B2/g, '^2').replace(/\u00B3/g, '^3');
+
 const renderInlineContent = (text: string) => {
   if (!text) return null;
   const regex = /(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g;
   const parts = text.split(regex);
-
   return parts.map((part, i) => {
     if (!part) return null;
     const t = part.trim();
-
-    if (t.startsWith('$$') && t.endsWith('$$')) {
-      return <BlockMath key={i}>{normalizeMathUnicode(part.slice(2, -2))}</BlockMath>;
-    }
-    if (t.startsWith('$') && t.endsWith('$')) {
-      return <InlineMath key={i}>{normalizeMathUnicode(part.slice(1, -1))}</InlineMath>;
-    }
-
-    return (
-      <span
-        key={i}
-        dangerouslySetInnerHTML={{
-          __html: marked.parseInline(part, { gfm: true, breaks: true }) as string
-        }}
-      />
-    );
+    if (t.startsWith('$$') && t.endsWith('$$')) return <BlockMath key={i}>{normalizeMathUnicode(part.slice(2, -2))}</BlockMath>;
+    if (t.startsWith('$') && t.endsWith('$')) return <InlineMath key={i}>{normalizeMathUnicode(part.slice(1, -1))}</InlineMath>;
+    return <span key={i} dangerouslySetInnerHTML={{ __html: marked.parseInline(part, { gfm: true, breaks: true }) as string }} />;
   });
 };
 
-/* ────────────────────────────────────────────────────────────────────────────
-   Mermaid 유틸: 타입 감지 및 파싱 체크
-   ──────────────────────────────────────────────────────────────────────────── */
-const FLOW_HEADER_RE = /^(graph|flowchart)\b/i;
-const ANY_HEADER_RE =
-  /^(graph|flowchart|sequenceDiagram|gantt|pie|erDiagram|journey|classDiagram|stateDiagram(?:-v2)?|gitGraph|mindmap|timeline|quadrantChart|sankey|requirementDiagram|xychart-beta)\b/i;
+const firstMeaningfulLine = (s: string) => (s || '').split(/\r?\n/).map(l => l.trim()).find(Boolean) || '';
+const isSequenceDiagram = (code: string) => /^sequenceDiagram\b/i.test(firstMeaningfulLine(code));
+const isFlowchartLike = (code: string) =>
+  /(^|\n)\s*subgraph\b/i.test(code) ||
+  /(^|\n)\s*[A-Za-z_][\w-]*\s*(\[\[?|\(\(?|\{\{?|\{>)/.test(code) ||
+  /(-->|-{2,3}|-\.->|<-->)/.test(code) ||
+  /(^|\n)\s*(style|linkStyle)\b/i.test(code);
 
-const isFlowchartOrGraph = (code: string): boolean => {
-  const first = String(code || '').trimStart().split('\n')[0].trim();
-  const m = first.match(ANY_HEADER_RE);
-  return !!(m && FLOW_HEADER_RE.test(m[0]));
-};
+/* 안전 최소 변환 (원문 그대로 실패했을 때 한 번만 시도) */
+function minimalSafeTransforms(code: string): string {
+  // 1) <br> 계열을 self-closing으로 (많은 Mermaid 구현에서 <br/> 권장)
+  let out = code.replace(/<br\s*\/?>/gi, '<br/>');
 
-const tryParseMermaid = async (code: string): Promise<string | null> => {
+  // 2) HTML 엔티티(최소) -> 디코드 (예: &quot; -> ")
+  // (주의: 너무 많은 치환은 원문 의도를 바꿀 수 있으니 최소한만)
+  out = out.replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+
+  // 3) 흔한 잘못된 화살표 스페이싱 보정 (--- > 등)
+  out = out.replace(/---\s+>/g, '--->').replace(/-\s*-\s*>/g, '-->').replace(/-\s*\.->/g, '-.->');
+
+  return out;
+}
+
+/* mermaid.parse 검사(에러 메시지 반환 or null) */
+async function tryParseMermaid(code: string): Promise<string | null> {
   try {
+    // some mermaid versions throw big exceptions — we still try/catch, but be aware.
     await mermaid.parse(code);
     return null;
   } catch (e: any) {
-    return e?.str || e?.message || 'Mermaid parse error';
+    // e.str 에 파서 친화적 문구가 들어오는 경우가 많음
+    return e?.str || e?.message || String(e);
   }
-};
+}
 
-/* ────────────────────────────────────────────────────────────────────────────
-   컴포넌트
-   ──────────────────────────────────────────────────────────────────────────── */
+/* ---------------------------- component ---------------------------- */
+
 const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Mermaid 전역 초기화 (문서 권장: initialize → run). startOnLoad:false 후 수동 run 사용.
   useEffect(() => {
     mermaid.initialize({
       startOnLoad: false,
-      // 줄바꿈 정책:
-      // - htmlLabels: true (기본값) → 라벨에서 <br> 사용
-      // - htmlLabels: false → 라벨에서 \n(리터럴) 사용
-      // 팀 정책에 맞게 선택하세요. (여기서는 false 가정)
-      flowchart: { htmlLabels: false },
-      securityLevel: 'loose',
+      flowchart: { htmlLabels: false }, // 필요시 true로 바꿀 수 있음
+      securityLevel: 'loose', // HTML 레이블 또는 <br/>을 사용하려면 'loose' 권장. (주의: 보안 영향)
       theme: document.documentElement.classList.contains('dark') ? 'dark' : 'default',
     });
   }, []);
 
-  // Mermaid 블록 렌더
   useEffect(() => {
     if (!containerRef.current) return;
-    const mermaidBlocks = containerRef.current.querySelectorAll<HTMLElement>('pre.mermaid:not([data-processed])');
-    if (mermaidBlocks.length === 0) return;
+    const pres = containerRef.current.querySelectorAll<HTMLPreElement>('pre.mermaid:not([data-processed])');
+    if (pres.length === 0) return;
 
     (async () => {
-      const renderables: HTMLElement[] = [];
+      const toRender: HTMLElement[] = [];
 
-      for (const el of Array.from(mermaidBlocks)) {
-        // 원문 코드 확보 (pre.mermaid 내부 텍스트)
-        const raw = (el.textContent || '').trim();
+      for (const pre of Array.from(pres)) {
+        const raw = (pre.textContent || '').trim();
+        console.debug('[Mermaid] raw block:', raw);
 
-        // flowchart/graph 인 경우에만 최소 후보정 적용
-        const candidate = isFlowchartOrGraph(raw) ? normalizeMermaidCode(raw) : raw;
+        // 1) 후보정 경로: flowchart-like만 normalizeMermaidCode 적용
+        let candidate = raw;
+        let usedNormalization = false;
 
-        // 1차: 후보정 버전 파싱 시도
-        let err = await tryParseMermaid(candidate);
-        if (!err) {
-          el.textContent = candidate;   // 원문 대신 후보정 코드로 교체
-          renderables.push(el);
+        if (isSequenceDiagram(raw)) {
+          // 시퀀스는 후보정 대상에서 제외 — 대신 최소한의 <br/> 정리만 적용
+          candidate = raw.replace(/<br\s*\/?>/gi, '<br/>');
+          console.debug('[Mermaid] sequence -> skip heavy normalize, applied <br/> normalization');
+        } else if (isFlowchartLike(raw)) {
+          try {
+            candidate = normalizeMermaidCode(raw);
+            usedNormalization = true;
+            console.debug('[Mermaid] flowchart candidate after normalizeMermaidCode:', candidate);
+          } catch (err) {
+            console.warn('[Mermaid] normalizeMermaidCode threw, falling back to raw:', err);
+            candidate = raw;
+            usedNormalization = false;
+          }
+        } else {
+          // unknown: leave as-is but try minimal transforms later if needed
+          candidate = raw;
+        }
+
+        // 2) 후보정 코드로 파싱 시도
+        const errCand = await tryParseMermaid(candidate);
+        if (!errCand) {
+          pre.textContent = candidate;
+          toRender.push(pre);
           continue;
         }
 
-        // 2차: 원문 그대로 파싱 시도 (후보정이 오히려 해친 경우 대비)
-        err = await tryParseMermaid(raw);
-        if (!err) {
-          el.textContent = raw;         // 원문 유지
-          renderables.push(el);
+        console.warn('[Mermaid] candidate parse failed:', errCand);
+
+        // 3) 후보정 실패 -> 즉시 원문으로 파싱 재시도 (폴백)
+        const errRaw = await tryParseMermaid(raw);
+        if (!errRaw) {
+          console.debug('[Mermaid] raw parsed successfully after candidate failed — using raw');
+          pre.textContent = raw;
+          toRender.push(pre);
           continue;
         }
 
-        // 3차: 실패 표시 + 원문 출력
-        el.innerHTML = `<div style="color:red;text-align:center;white-space:pre-wrap;">
-Mermaid 파싱 오류:
-${String(err)}
+        console.warn('[Mermaid] raw parse also failed:', errRaw);
+
+        // 4) 원문도 실패 -> 안전 최소 변환 시도 (한 번만)
+        const minimal = minimalSafeTransforms(raw);
+        if (minimal !== raw) {
+          const errMin = await tryParseMermaid(minimal);
+          if (!errMin) {
+            console.debug('[Mermaid] minimal transforms fixed it — using minimal-transformed text');
+            pre.textContent = minimal;
+            toRender.push(pre);
+            continue;
+          } else {
+            console.warn('[Mermaid] minimal transforms still failed:', errMin);
+          }
+        }
+
+        // 5) 모든 시도 실패 -> 에러 UI (원문과 마지막 파서 메시지 노출)
+        pre.innerHTML = `<div style="color:red;text-align:left;white-space:pre-wrap;padding:8px;border:1px solid #f5c6cb;border-radius:6px;background:#fff0f0;">
+Mermaid 파싱 실패
+--- 원문 ---
+${escapeHtml(raw).slice(0, 2000)}
+--- 파서 메시지 ---
+${escapeHtml(String(errCand || errRaw))}
 </div>`;
-        el.setAttribute('data-processed', 'true');
+        pre.setAttribute('data-processed', 'true');
       }
 
-      if (renderables.length > 0) {
+      // 실제 렌더링 시도
+      if (toRender.length > 0) {
         try {
-          await mermaid.run({ nodes: renderables }); // v10+ 권장 API
+          await mermaid.run({ nodes: toRender });
         } catch (e) {
-          // run 중 실패 (렌더 단계 에러)
-          renderables.forEach((el) => {
-            el.innerHTML = `<div style="color:red;text-align:center;">다이어그램 렌더링 오류</div>`;
+          console.error('Mermaid.run error:', e);
+          toRender.forEach((n) => {
+            n.innerHTML = `<div style="color:red;text-align:center;">다이어그램 렌더링 오류</div>`;
+            n.setAttribute('data-processed', 'true');
           });
         } finally {
-          renderables.forEach((el) => el.setAttribute('data-processed', 'true'));
+          toRender.forEach((n) => n.setAttribute('data-processed', 'true'));
         }
       }
     })();
   }, [content]);
 
-  /* 블록 분리 렌더 */
+  /* renderParts: 기존 로직 최대한 유지 (mermaid 블록은 원문을 <pre.mermaid>에 넣음) */
   const renderParts = () => {
     if (!content) return null;
-
-    const blockRegex =
-      /(```(?:mermaid|visual|chart|[\s\S]*?)```|<details[\s\S]*?<\/details>|[\s\S]+?(?=```|<details|$))/g;
+    const blockRegex = /(```(?:mermaid|visual|chart|[\s\S]*?)```|<details[\s\S]*?<\/details>|[\s\S]+?(?=```|<details|$))/g;
     const blocks = content.match(blockRegex) || [];
 
     return blocks.map((block, i) => {
       const trimmed = block.trim();
 
-      // Mermaid 다이어그램: <pre class="mermaid">에 "그대로" 텍스트를 넣는다 (code 태그 사용 X)
-      // 공식 권장: .mermaid 요소를 수집하여 mermaid.run 호출. :contentReference[oaicite:0]{index=0}
       if (trimmed.startsWith('```mermaid')) {
         const firstNL = trimmed.indexOf('\n');
-        const code = trimmed.slice(firstNL + 1, -3).trim();
+        const code = trimmed.slice(firstNL + 1, -3); // 원문 그대로 (후보정은 useEffect에서 처리)
         return (
           <div className="flex justify-center my-4" key={i}>
             <pre className="mermaid">{code}</pre>
@@ -168,29 +195,22 @@ ${String(err)}
         );
       }
 
-      // 비주얼 시각화 컴포넌트
       if (trimmed.startsWith('```visual')) {
         const firstNL = trimmed.indexOf('\n');
         const jsonText = trimmed.slice(firstNL + 1, -3).trim();
         try {
           const visualData = JSON.parse(jsonText);
-          return (
-            <div className="my-4" key={i}>
-              <VisualRenderer config={visualData} />
-            </div>
-          );
+          return <div className="my-4" key={i}><VisualRenderer config={visualData} /></div>;
         } catch {
           return <pre key={i} style={{ color: 'red' }}>Visual JSON Error</pre>;
         }
       }
 
-      // 기타 코드블록/마크다운
       if (trimmed.startsWith('```')) {
         const html = marked.parse(trimmed, { gfm: true, breaks: true }) as string;
         return <div key={i} dangerouslySetInnerHTML={{ __html: html }} />;
       }
 
-      // details/summary
       if (trimmed.startsWith('<details')) {
         const summaryMatch = trimmed.match(/<summary>([\s\S]*?)<\/summary>/);
         const summaryContent = summaryMatch ? summaryMatch[1] : '자세히 보기';
@@ -200,12 +220,7 @@ ${String(err)}
 
         return (
           <details key={i} className="prose dark:prose-invert max-w-none my-4 border rounded-lg">
-            <summary
-              className="cursor-pointer p-4 font-semibold"
-              dangerouslySetInnerHTML={{
-                __html: marked.parseInline(summaryContent, { gfm: true, breaks: true })
-              }}
-            />
+            <summary className="cursor-pointer p-4 font-semibold" dangerouslySetInnerHTML={{ __html: marked.parseInline(summaryContent, { gfm: true, breaks: true }) }} />
             <div className="p-4 border-t">
               <MarkdownRenderer content={mainContent} />
             </div>
@@ -213,11 +228,8 @@ ${String(err)}
         );
       }
 
-      // 일반 문단
       if (trimmed) {
-        return trimmed.split(/\n\n+/).map((p, j) => (
-          <p key={`${i}-${j}`}>{renderInlineContent(p)}</p>
-        ));
+        return trimmed.split(/\n\n+/).map((p, j) => (<p key={`${i}-${j}`}>{renderInlineContent(p)}</p>));
       }
       return null;
     });
@@ -227,3 +239,11 @@ ${String(err)}
 };
 
 export default MarkdownRenderer;
+
+/* ---------------------------- utilities ---------------------------- */
+function escapeHtml(s: string) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
