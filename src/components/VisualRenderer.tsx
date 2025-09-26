@@ -39,6 +39,18 @@ function ensureVisibleDefaults(type: string, props: Record<string, any>) {
   return p;
 }
 
+const unicodeToLatex = (text: string): string => {
+  const replacements: { [key: string]: string } = {
+    '²': '^2', '³': '^3', '¹': '^1', '⁴': '^4', '⁵': '^5', '⁶': '^6', '⁷': '^7', '⁸': '^8', '⁹': '^9', '⁰': '^0',
+    '₀': '_0', '₁': '_1', '₂': '_2', '₃': '_3', '₄': '_4', '₅': '_5', '₆': '_6', '₇': '_7', '₈': '_8', '₉': '_9',
+  };
+  let result = text;
+  for (const char in replacements) {
+    result = result.replace(new RegExp(char, 'g'), replacements[char]);
+  }
+  return result;
+};
+
 const renderContentWithLatex = (text: string) => {
   if (!text) return null;
   const regex = /(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g;
@@ -46,10 +58,12 @@ const renderContentWithLatex = (text: string) => {
 
   return parts.map((part, i) => {
     if (part.startsWith('$$') && part.endsWith('$$')) {
-      return <BlockMath key={i} strict={false}>{part.slice(2, -2)}</BlockMath>;
+      const latexContent = unicodeToLatex(part.slice(2, -2));
+      return <BlockMath key={i} strict={false}>{latexContent}</BlockMath>;
     }
     if (part.startsWith('$') && part.endsWith('$')) {
-      return <InlineMath key={i} strict={false}>{part.slice(1, -1)}</InlineMath>;
+      const latexContent = unicodeToLatex(part.slice(1, -1));
+      return <InlineMath key={i} strict={false}>{latexContent}</InlineMath>;
     }
     return part;
   });
