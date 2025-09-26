@@ -31,7 +31,7 @@ class handler(BaseHTTPRequestHandler):
             
             history = body.get('history', [])
             note_context = body.get('noteContext', '')
-            model_identifier = body.get('model', 'google/gemini-pro') # 기본 모델 변경
+            model_identifier = body.get('model', 'gemini-2.5-flash-lite') # 기본 모델 변경
             use_gemini_direct = body.get('useGeminiDirect', False)
 
             if not history:
