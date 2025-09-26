@@ -138,48 +138,60 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId }) 
         body: JSON.stringify({ history, model: selectedModel, noteContext, useGeminiDirect }), // Include useGeminiDirect flag
       });
 
-      if (!response.ok || !response.body) {
+      if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.details || 'API 요청 실패');
       }
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      let fullResponseText = '';
+      if (useGeminiDirect) {
+        const data = await response.json();
+        setMessages(prev => prev.map(msg => 
+            msg.id === botMessage.id 
+                ? { ...msg, text: data.answer, followUp: data.followUp } 
+                : msg
+        ));
+      } else { // OpenRouter streaming logic
+        if (!response.body) {
+          throw new Error('API 응답 본문이 없습니다.');
+        }
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let fullResponseText = '';
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
 
-        for (const line of lines) {
-            if (line.startsWith('data: ')) {
-                const jsonStr = line.slice(6);
-                if (jsonStr === '[DONE]') continue;
-                try {
-                    const data = JSON.parse(jsonStr);
-                    if (data.token) {
-                        fullResponseText += data.token;
-                        setMessages(prev => prev.map(msg => 
-                            msg.id === botMessage.id 
-                                ? { ...msg, text: fullResponseText } 
-                                : msg
-                        ));
-                    } else if (data.followUp) {
-                        setMessages(prev => prev.map(msg => 
-                            msg.id === botMessage.id 
-                                ? { ...msg, followUp: data.followUp } 
-                                : msg
-                        ));
-                    }
-                } catch (e) {
-                    console.error('스트림 데이터 파싱 오류:', e);
-                }
-            }
+          for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                  const jsonStr = line.slice(6);
+                  if (jsonStr === '[DONE]') continue;
+                  try {
+                      const data = JSON.parse(jsonStr);
+                      if (data.token) {
+                          fullResponseText += data.token;
+                          setMessages(prev => prev.map(msg => 
+                              msg.id === botMessage.id 
+                                  ? { ...msg, text: fullResponseText } 
+                                  : msg
+                          ));
+                      } else if (data.followUp) {
+                          setMessages(prev => prev.map(msg => 
+                              msg.id === botMessage.id 
+                                  ? { ...msg, followUp: data.followUp } 
+                                  : msg
+                          ));
+                      }
+                  } catch (e) {
+                      console.error('스트림 데이터 파싱 오류:', e);
+                  }
+              }
+          }
         }
       }
 
