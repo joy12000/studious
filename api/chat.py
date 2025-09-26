@@ -1,361 +1,257 @@
 from http.server import BaseHTTPRequestHandler
-import json
-import os
-import requests
-import traceback
-import google.generativeai as genai # Reintroduce Gemini API
-import google.ai.generativelanguage as glm # For multimodal parts
-import io # For image handling
-from PIL import Image # For image handling
+  import json
+  import os
+  import requests
+  import traceback
+  import google.generativeai as genai
 
-class handler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        api_keys = [
-            os.environ.get('OPENROUTER_API_KEY_PRIMARY'),
-            os.environ.get('OPENROUTER_API_KEY_SECONDARY'),
-            os.environ.get('OPENROUTER_API_KEY_TERTIARY'),
-            os.environ.get('OPENROUTER_API_KEY_QUATERNARY'),
-            os.environ.get('OPENROUTER_API_KEY_QUINARY'),
-            os.environ.get('GEMINI_API_KEY_PRIMARY'), # Add Gemini API keys
-            os.environ.get('GEMINI_API_KEY_SECONDARY'),
-            os.environ.get('GEMINI_API_KEY_TERTIARY'),
-            os.environ.get('GEMINI_API_KEY_QUATERNARY')
-        ]
-        valid_keys = [key for key in api_keys if key]
+  class handler(BaseHTTPRequestHandler):
+      def do_POST(self):
+          # API 키 목록을 환경 변수에서 가져옵니다.
+          api_keys = [
+              os.environ.get('OPENROUTER_API_KEY_PRIMARY'),
+              os.environ.get('OPENROUTER_API_KEY_SECONDARY'),
+              os.environ.get('OPENROUTER_API_KEY_TERTIARY'),
+              os.environ.get('OPENROUTER_API_KEY_QUATERNARY'),
+              os.environ.get('OPENROUTER_API_KEY_QUINARY'),
+              os.environ.get('GEMINI_API_KEY_PRIMARY'),
+              os.environ.get('GEMINI_API_KEY_SECONDARY'),
+              os.environ.get('GEMINI_API_KEY_TERTIARY'),
+              os.environ.get('GEMINI_API_KEY_QUATERNARY')
+          ]
+          valid_keys = [key for key in api_keys if key]
 
-        if not valid_keys:
-            return self.handle_error(ValueError("설정된 OpenRouter API 키가 없습니다."), "API 키 설정 오류", 500)
+          if not valid_keys:
+              return self.handle_error(ValueError("설정된 API 키가 없습니다."), "API 키 설정 오류", 500)
 
-        last_error = None
-        last_error_text = ""
+          try:
+              content_length = int(self.headers['Content-Length'])
+              post_data = self.rfile.read(content_length)
+              body = json.loads(post_data.decode('utf-8'))
 
-        try:
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            body = json.loads(post_data.decode('utf-8'))
-            history = body.get('history', [])
-            note_context = body.get('noteContext', '')
-            model_identifier = body.get('model', 'gemini-2.5-flash')
-            use_gemini_direct = body.get('useGeminiDirect', False) # New flag
+              history = body.get('history', [])
+              note_context = body.get('noteContext', '')
+              model_identifier = body.get('model', 'google/gemini-pro') # 기본 모델 변경
+              use_gemini_direct = body.get('useGeminiDirect', False)
 
-            if not history:
-                raise ValueError("대화 내용이 비어있습니다.")
+              if not history:
+                  raise ValueError("대화 내용이 비어있습니다.")
 
-            # --- [프롬프트 강화] ---
-            system_prompt_text = r"""
-            당신은 학생의 학습을 돕는 유능한 AI 튜터입니다. 당신의 답변은 반드시 아래 규칙을 따라야 합니다.
+              # --- [프롬프트 강화] ---
+              system_prompt_text = self.get_system_prompt(note_context)
 
-            # 🎨 출력 서식 규칙 (★★★★★ 가장 중요)
-            당신이 생성하는 모든 텍스트는 아래 규칙을 **반드시** 따라야 합니다.
-            
-            1.  **수학 수식 (LaTeX):** 모든 수학 기호, 변수, 방정식은 **반드시** KaTeX 문법으로 감싸야 합니다.
-                -   인라인 수식: `$`로 감쌉니다. 예: `$\frac{dT}{dx} = f(x, T)$`
-                -   블록 수식: `$$`로 감쌉니다. 예: `$$\mu = e^{\int P(x)dx}$$`
-            
-            2.  **코드 (Code Block):** 모든 소스 코드는 **반드시** 언어를 명시한 코드 블록으로 작성해야 합니다.
-                -   예시: ```python\nprint("Hello")\n```
-            
-            3.  **핵심 용어 (Tooltip):** 중요한 전공 용어는 **반드시** `<dfn>` 태그로 감싸 설명을 제공해야 합니다.
-                -   예시: `<dfn title="상미분 방정식(Ordinary Differential Equation)은 하나의 독립 변수에 대한 함수와 그 도함수들을 포함하는 방정식입니다.">상미분 방정식 (ODE)</dfn>`
+              messages = self.prepare_messages(history)
 
-            # 🖼️ 절대 규칙: 모든 시각 자료는 반드시 지정된 언어의 코드 블록 안에 포함하여 출력해야 합니다. 이 규칙은 선택이 아닌 필수입니다. 코드 블록 바깥에 순수한 JSON이나 다이어그램 코드를 절대로 출력해서는 안 됩니다. 이 규칙을 위반한 출력은 실패한 것으로 간주됩니다.
+              # API 공급자 선택 및 실행
+              if use_gemini_direct:
+                  self.execute_gemini_direct(model_identifier, messages, system_prompt_text, valid_keys)
+              else:
+                  self.execute_openrouter(model_identifier, messages, system_prompt_text, valid_keys)
 
-            Mermaid (mermaid): 순서도, 타임라인 등을 시각화할 때 사용합니다.
-        - **따옴표 규칙:** 노드 이름, 링크 텍스트, subgraph 제목에 줄바꿈, 공백, 또는 특수문자 `( ) ,`가 포함될 경우, 반드시 전체 내용을 큰따옴표(`"`)로 감싸야 합니다.
-        - **줄바꿈:** 노드 안에서 줄을 바꾸려면 `<br>` 태그 대신, 반드시 전체 텍스트를 큰따옴표(`"`)로 감싸고 실제 엔터 키로 줄을 나눠야 합니다.
-        - **수식 사용 금지:** Mermaid 노드 안에서는 LaTeX 수식을 렌더링할 수 없으니, `ΔP`와 같은 간단한 텍스트나 유니코드 기호만 사용하세요.
+          except Exception as e:
+              self.handle_error(e, "API 요청 처리 중 오류 발생")
 
-        - **올바른 예시:**
-         A["첫 번째 줄
-        두 번째 줄"]
-        B["노드 이름 (특수문자)"]
-        C -- "링크 텍스트" --> D
-        subgraph "서브그래프 제목"
-        
--       **잘못된 예시:**
-        A[첫 번째 줄<br>두 번째 줄]
-        B[노드 이름 (특수문자)]
-        C -- 링크 텍스트 --> D
-        subgraph 서브그래프 제목  
+      def get_system_prompt(self, note_context):
+          prompt = r"""
+          당신은 학생의 학습을 돕는 유능한 AI 튜터입니다. 당신의 답변은 반드시 아래 규칙을 따라야 합니다.
 
-            자유 시각화 (visual): 복잡한 개념, 비교, 구조 등을 설명해야 할 때, 아래 규칙에 따라 가상의 UI 컴포넌트 구조를 JSON으로 설계하여 시각화할 수 있습니다. 코드 블록의 언어는 **visual**로 지정해야 합니다.
+          # 🎨 출력 서식 규칙 (★★★★★ 가장 중요)
+          당신이 생성하는 모든 텍스트는 아래 규칙을 반드시 따라야 합니다.
+          1.  수학 수식 (LaTeX): 모든 수학 기호, 변수, 방정식은 반드시 KaTeX 문법으로 감싸야 합니다. (인라인:
+  $, 블록: $$)
+          2.  코드 (Code Block): 모든 소스 코드는 반드시 언어를 명시한 코드 블록으로 작성해야 합니다. (예:
+  `python\nprint("Hello")\n
+  `)
+          3.  핵심 용어 (Tooltip): 중요한 전공 용어는 반드시 <dfn> 태그로 감싸 설명을 제공해야 합니다. (예:
+  <dfn title="설명">용어</dfn>)
 
-            ### visual JSON 생성 규칙 (★★★★★ 반드시 준수)
-            1.  **텍스트 내용**: 텍스트를 표시할 때는 반드시 `props` 객체 안에 `content` 속성을 사용해야 합니다.
-                -   **올바른 예시:** `{ "type": "text", "props": { "content": "내용" } }`
-                -   **잘못된 예시:** `{ "type": "text", "props": { "children": "내용" } }`
+          # 🖼️ 시각 자료 규칙
+          모든 시각 자료(Mermaid, visual JSON)는 반드시 지정된 언어의 코드 블록 안에 포함해야 합니다.
+          - Mermaid: 순서도, 타임라인 등. 노드 이름이나 링크에 특수문자/공백이 있으면 큰따옴표(")로 감싸세요.
+          - visual JSON: 복잡한 개념 시각화. props에 content 사용, 자식은 children 배열, 스타일은 인라인 style
+  객체를 사용하세요.
 
-            2.  **요소 중첩**: 다른 요소를 자식으로 포함할 때는 반드시 최상위 레벨의 `children` 배열을 사용해야 합니다.
-                -   **올바른 예시:** `{ "type": "box", "children": [ { "type": "text", ... } ] }`
-                -   **잘못된 예시:** `{ "type": "box", "props": { "children": [ ... ] } }`
-
-            3.  **스타일링**: 스타일은 `className`을 사용하지 말고, 반드시 CSS 속성을 직접 포함하는 인라인 `style` 객체를 사용해야 합니다.
-                -   **올바른 예시:** `{ "props": { "style": { "color": "blue", "fontSize": "16px" } } }`
-                -   **잘못된 예시:** `{ "props": { "className": "text-blue-500 text-base" } }`
-
-
-            # 💬 대화 규칙
-            1.  **명확성:** 학생의 질문에 명확하고 구조적으로 답변합니다.
-            2.  **후속 질문:** 답변 마지막에 학생의 사고를 확장할 수 있는 좋은 후속 질문 3개를 제안합니다.
-            3.  **JSON 출력:** 최종 결과는 반드시 아래 JSON 스키마를 엄격히 준수하는 JSON 객체로만 응답해야 합니다.
-                ```json
-                {
-                  "type": "object",
-                  "properties": {
-                    "answer": {
-                      "type": "string",
-                      "description": "사용자의 질문에 대한 답변 내용 (마크다운 형식)"
-                    },
-                    "followUp": {
-                      "type": "array",
-                      "items": {
-                        "type": "string",
-                        "description": "사용자의 사고를 확장할 수 있는 후속 질문 3가지"
-                      },
-                      "minItems": 3,
-                      "maxItems": 3
-                    }
+          # 💬 대화 규칙
+          1.  명확성: 학생의 질문에 명확하고 구조적으로 답변합니다.
+          2.  후속 질문: 답변 마지막에 학생의 사고를 확장할 수 있는 좋은 후속 질문 3개를 제안합니다.
+          3.  JSON 출력: 최종 결과는 반드시 아래 JSON 스키마를 엄격히 준수하는 단일 JSON 객체로만 응답해야
+  합니다. 다른 텍스트 없이 순수한 JSON만 출력하세요.
+              `json
+              {
+                "type": "object",
+                "properties": {
+                  "answer": {
+                    "type": "string",
+                    "description": "사용자의 질문에 대한 답변 내용 (마크다운 형식)"
                   },
-                  "required": ["answer", "followUp"]
-                }
-                ```
+                  "followUp": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "minItems": 3,
+                    "maxItems": 3
+                  }
+                },
+                "required": ["answer", "followUp"]
+              }
 
-            """
+  `
+          """
+          if note_context:
+              prompt += f"\n---\n# 참고 자료\n아래는 사용자가 현재 보고 있는 노트의 내용입니다. 이 내용을
+  바탕으로 답변해주세요.\n\n{note_context}\n---"
+          return prompt
 
-            if note_context:
-                system_prompt_text += f"""
-                ---
-                # 참고 자료
-                아래는 사용자가 현재 보고 있는 노트의 내용입니다. 이 내용을 바탕으로 답변해주세요.
+      def prepare_messages(self, history):
+          messages = []
+          for msg in history:
+              role = 'user' if msg['role'] == 'user' else 'assistant'
+              # 이전 대화에서 봇의 답변에 포함된 후속 질문은 제외하고 순수 텍스트만 사용
+              content = msg.get('text', msg.get('parts', [{}])[0].get('text', ''))
+              messages.append({"role": role, "content": content})
+          return messages
 
-                {note_context}
-                ---
-                """
-            
-            system_prompt = { "role": "system", "content": system_prompt_text}
-            messages = [{"role": "user" if msg['role'] == 'user' else "assistant", "content": msg['parts'][0]['text']} for msg in history]
+      def execute_gemini_direct(self, model_identifier, messages, system_prompt_text, valid_keys):
+          gemini_api_keys = [key for key in valid_keys if key and key.startswith('AIza')]
+          if not gemini_api_keys:
+              raise ValueError("설정된 Gemini API 키가 없습니다.")
 
-            if use_gemini_direct:
-                gemini_api_keys = [key for key in valid_keys if key and key.startswith('AIza')] # Assuming Gemini keys start with AIza
-                if not gemini_api_keys:
-                    raise ValueError("설정된 Gemini API 키가 없습니다.")
-                
-                for i, api_key in enumerate(gemini_api_keys):
-                    try:
-                        print(f"INFO: Gemini Direct 모델 '{model_identifier}' / API 키 #{i + 1} (으)로 호출 시도...")
-                        genai.configure(api_key=api_key)
-                        model = genai.GenerativeModel(model_identifier.replace('google/', '')) # Remove 'google/' prefix for direct call
-    
-                        # Prepare contents for Gemini API
-                        gemini_messages = []
-                        for msg in messages:
-                            parts = []
-                            if 'parts' in msg and msg['parts']:
-                                for part in msg['parts']:
-                                    if 'text' in part:
-                                        parts.append(part['text'])
-                                    # Add handling for image/pdf parts if needed for direct Gemini
-                            gemini_messages.append({'role': msg['role'], 'parts': parts})
-                        
-                        # Add system prompt as first user message for Gemini
-                        gemini_messages.insert(0, {'role': 'user', 'parts': [system_prompt_text]})
-                        gemini_messages.insert(1, {'role': 'model', 'parts': ['네, 알겠습니다.']}) # Acknowledge system prompt
-    
-                        # Convert history to Gemini format
-                        gemini_history = []
-                        for msg in gemini_messages:
-                            if msg['role'] == 'user':
-                                gemini_history.append({'role': 'user', 'parts': [{'text': p} for p in msg['parts']]})
-                            elif msg['role'] == 'assistant':
-                                gemini_history.append({'role': 'model', 'parts': [{'text': p} for p in msg['parts']]})
-    
-                        # Ensure the last message is from the user for generate_content
-                        if gemini_history and gemini_history[-1]['role'] == 'model':
-                            # If the last message is from the model, we need to add a dummy user message
-                            # or re-evaluate the history construction. For now, let's assume
-                            # the frontend always sends the last message as user.
-                            pass # This case should ideally not happen with current frontend logic
-    
-                        # Call Gemini API with streaming
-                        response = model.generate_content(gemini_history, stream=True)
+          last_error = None
+          for i, api_key in enumerate(gemini_api_keys):
+              try:
+                  print(f"INFO: Gemini Direct 모델 '{model_identifier}' / API 키 #{i + 1} 호출 시도...")
+                  genai.configure(api_key=api_key)
 
-                        self.send_response(200)
-                        self.send_header('Content-type', 'text/event-stream; charset=utf-8')
-                        self.end_headers()
+                  # 모델 이름에서 'google/' 접두사 제거
+                  clean_model_id = model_identifier.replace('google/', '')
+                  model = genai.GenerativeModel(clean_model_id)
 
-                        full_response_content = ""
-                        for chunk in response:
-                            if chunk.text:
-                                full_response_content += chunk.text
-                                token_data = {'token': chunk.text}
-                                print(f"DEBUG Backend: chunk.text: {chunk.text}")
-                                print(f"DEBUG Backend: token_data dumped: {json.dumps(token_data, ensure_ascii=False)}")
-                                self.wfile.write(f"data: {json.dumps(token_data, ensure_ascii=False)}\n\n".encode('utf-8'))
-                                self.wfile.flush()
-                        
-                        # Generate follow-up questions (similar to OpenRouter logic)
-                        try:
-                            follow_up_prompt = {
-                                "role": "system",
-                                "content": f"사용자의 마지막 질문과 AI의 전체 답변을 바탕으로, 학생의 사고를 확장할 수 있는 좋은 후속 질문 3개를 제안해주세요. 전체 답변: '{full_response_content}'. 반드시 '{{\"followUp\": [\"...\", \"...\", \"...\"]}}' 형식의 JSON 객체로만 응답해야 합니다."
-                            }
-                            
-                            follow_up_payload = {
-                                "model": model_identifier,
-                                "messages": [system_prompt] + messages + [{"role": "assistant", "content": full_response_content}, follow_up_prompt],
-                                "response_format": {"type": "json_object"}
-                            }
+                  # Gemini API는 별도의 시스템 프롬프트를 지원하지 않으므로 메시지 목록에 추가합니다.
+                  gemini_messages = [
+                      {'role': 'user', 'parts': [system_prompt_text]},
+                      {'role': 'model', 'parts': ['네, 알겠습니다. 규칙을 모두 확인했으며, 반드시 JSON
+  형식으로만 답변하겠습니다.']}
+                  ] + self.convert_to_gemini_format(messages)
 
-                            # Use requests to call Gemini API for follow-up, as genai.GenerativeModel doesn't directly support response_format
-                            # This part needs to be adapted to use genai.GenerativeModel if possible, or keep requests for simplicity
-                            # For now, let's assume a direct call to the API endpoint for follow-up
-                            # This is a placeholder and might need adjustment based on actual Gemini API capabilities for structured output
-                            
-                            # Re-configure genai with the current API key for the follow-up call
-                            genai.configure(api_key=api_key)
-                            follow_up_model = genai.GenerativeModel(model_identifier.replace('google/', ''))
-                            
-                            # Construct history for follow-up call
-                            follow_up_history = []
-                            for msg in gemini_messages:
-                                if msg['role'] == 'user':
-                                    follow_up_history.append({'role': 'user', 'parts': [{'text': p} for p in msg['parts']]})
-                                elif msg['role'] == 'assistant':
-                                    follow_up_history.append({'role': 'model', 'parts': [{'text': p} for p in msg['parts']]})
-                            
-                            follow_up_history.append({'role': 'model', 'parts': [{'text': full_response_content}]})
-                            follow_up_history.append({'role': 'user', 'parts': [{'text': follow_up_prompt['content']}]})
+                  response = model.generate_content(gemini_messages, stream=True,
 
-                            follow_up_response = follow_up_model.generate_content(follow_up_history)
-                            follow_up_content = follow_up_response.text
+  generation_config=genai.types.GenerationConfig(response_mime_type="application/json"))
 
-                            # Extract followUp from the JSON response
-                            try:
-                                parsed_follow_up = json.loads(follow_up_content)
-                                if 'followUp' in parsed_follow_up:
-                                    self.wfile.write(f"data: {json.dumps({'followUp': parsed_follow_up['followUp']}, ensure_ascii=False)}\n\n".encode('utf-8'))
-                                    self.wfile.flush()
-                            except json.JSONDecodeError as e:
-                                print(f"WARN: 후속 질문 JSON 파싱 실패: {e}. 원본: {follow_up_content}")
+                  self.stream_json_response(response)
+                  return
+              except Exception as e:
+                  last_error = e
+                  print(f"WARN: Gemini Direct API 키 #{i + 1} 사용 실패. 다음 키로 폴백합니다. 오류: {e}")
+          raise ConnectionError(f"모든 Gemini API 키로 요청에 실패했습니다.") from last_error
 
-                        except Exception as fu_e:
-                            print(f"WARN: 후속 질문 생성 실패: {fu_e}")
+      def convert_to_gemini_format(self, messages):
+          gemini_history = []
+          for msg in messages:
+              role = 'model' if msg['role'] == 'assistant' else 'user'
+              gemini_history.append({'role': role, 'parts': [{'text': msg['content']}]})
+          return gemini_history
 
-                        self.wfile.write('data: [DONE]\n\n'.encode('utf-8'))
-                        self.wfile.flush()
-                        return
-    
-                    except Exception as e:
-                        last_error = e
-                        print(f"WARN: Gemini Direct API 키 #{i + 1} 사용 실패. 다음 키로 폴백합니다. 오류: {e}")
-                        continue
-                raise ConnectionError(f"모든 Gemini API 키로 요청에 실패했습니다. 마지막 오류: {last_error_text}") from last_error
-            else: # Use OpenRouter
-                openrouter_api_keys = [key for key in valid_keys if key and not key.startswith('AIza')] # Assuming OpenRouter keys don't start with AIza
-                if not openrouter_api_keys:
-                    raise ValueError("설정된 OpenRouter API 키가 없습니다.")
-    
-                for i, api_key in enumerate(openrouter_api_keys):
-                    try:
-                        print(f"INFO: OpenRouter 모델 '{model_identifier}' / API 키 #{i + 1} (으)로 호출 시도...")
-                        payload = {
-                            "model": model_identifier,
-                            "messages": [system_prompt] + messages,
-                            "stream": True
-                        }
-                        if model_identifier.startswith('google/'):
-                            payload["response_format"] = {"type": "json_object"}
-    
-                        response = requests.post(
-                            url="https://openrouter.ai/api/v1/chat/completions",
-                            headers={
-                                "Authorization": f"Bearer {api_key}",
-                                "Content-Type": "application/json",
-                                "HTTP-Referer": "https://studious.app",
-                                "X-Title": "Studious"
-                            },
-                            json=payload,
-                            stream=True
-                        )
-                        response.raise_for_status()
-                        
-                        self.send_response(200)
-                        self.send_header('Content-type', 'text/event-stream; charset=utf-8')
-                        self.end_headers()
-    
-                        full_response_content = ""
-                        for line in response.iter_lines():
-                            if line:
-                                decoded_line = line.decode('utf-8')
-                                if decoded_line.startswith('data: '):
-                                    json_str = decoded_line[len('data: '):]
-                                    if json_str.strip() == '[DONE]':
-                                        break
-                                    try:
-                                        data = json.loads(json_str)
-                                        if 'choices' in data and data['choices']:
-                                            delta = data['choices'][0].get('delta', {})
-                                            content = delta.get('content')
-                                            if content:
-                                                full_response_content += content
-                                                self.wfile.write(f"data: {json.dumps({'token': content}, ensure_ascii=False)}\n\n".encode('utf-8'))
-                                                self.wfile.flush()
-                                    except json.JSONDecodeError:
-                                        print(f"WARN: 스트림에서 유효하지 않은 JSON 수신: {json_str}")
-                                        continue
-                        
-                        try:
-                            follow_up_prompt = {
-                                "role": "system",
-                                "content": f"사용자의 마지막 질문과 AI의 전체 답변을 바탕으로, 학생의 사고를 확장할 수 있는 좋은 후속 질문 3개를 제안해주세요. 전체 답변: '{full_response_content}'. 반드시 '{{\"followUp\": [\"...\", \"...\", \"...\"]}}' 형식의 JSON 객체로만 응답해야 합니다."
-                            }
-                            
-                            follow_up_payload = {
-                                "model": model_identifier,
-                                "messages": [system_prompt] + messages + [{"role": "assistant", "content": full_response_content}, follow_up_prompt],
-                                "response_format": {"type": "json_object"}
-                            }
-    
-                            follow_up_response = requests.post(
-                                url="https://openrouter.ai/api/v1/chat/completions",
-                                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                                json=follow_up_payload,
-                                timeout=60
-                            )
-                            follow_up_response.raise_for_status()
-                            follow_up_data = follow_up_response.json()
-                            follow_up_content = follow_up_data['choices'][0]['message']['content']
-                            
-                            self.wfile.write(f"data: {follow_up_content}\n\n".encode('utf-8'))
-                            self.wfile.flush()
-    
-                        except Exception as fu_e:
-                            print(f"WARN: 후속 질문 생성 실패: {fu_e}")
-    
-                        self.wfile.write('data: [DONE]\n\n'.encode('utf-8'))
-                        self.wfile.flush()
-                        return
-    
-                    except requests.exceptions.RequestException as e:
-                        last_error = e
-                        if e.response is not None:
-                            last_error_text = e.response.text
-                        print(f"WARN: API 키 #{i + 1} 사용 실패. 다음 키로 폴백합니다. 오류: {e}")
-                        continue
-    
-                raise ConnectionError(f"모든 OpenRouter API 키로 요청에 실패했습니다. 마지막 오류: {last_error_text}") from last_error
-        except Exception as e:
-            self.handle_error(e, "API 요청 처리 중 오류 발생")
+      def execute_openrouter(self, model_identifier, messages, system_prompt_text, valid_keys):
+          openrouter_api_keys = [key for key in valid_keys if not (key and key.startswith('AIza'))]
+          if not openrouter_api_keys:
+              raise ValueError("설정된 OpenRouter API 키가 없습니다.")
 
-    def handle_error(self, e, message="오류 발생", status_code=500):
-        print(f"ERROR: {message}: {e}")
-        traceback.print_exc()
-        if not hasattr(self, '_headers_sent') or not self._headers_sent:
-            try:
-                self.send_response(status_code)
-                self.send_header('Content-type', 'application/json')
-                self.end_headers()
-                error_details = {"error": message, "details": str(e)}
-                self.wfile.write(json.dumps(error_details).encode('utf-8'))
-            except Exception as write_error:
-                print(f"FATAL: 오류 응답을 보내는 중 추가 오류 발생: {write_error}")
+          last_error = None
+          for i, api_key in enumerate(openrouter_api_keys):
+              try:
+                  print(f"INFO: OpenRouter 모델 '{model_identifier}' / API 키 #{i + 1} 호출 시도...")
+                  payload = {
+                      "model": model_identifier,
+                      "messages": [{"role": "system", "content": system_prompt_text}] + messages,
+                      "stream": True,
+                      "response_format": {"type": "json_object"}
+                  }
+
+                  response = requests.post(
+                      url="https://openrouter.ai/api/v1/chat/completions",
+                      headers={
+                          "Authorization": f"Bearer {api_key}",
+                          "Content-Type": "application/json",
+                          "HTTP-Referer": "https://studious.app",
+                          "X-Title": "Studious"
+                      },
+                      json=payload,
+                      stream=True
+                  )
+                  response.raise_for_status()
+
+                  self.stream_openrouter_response(response)
+                  return
+              except requests.exceptions.RequestException as e:
+                  last_error = e
+                  print(f"WARN: API 키 #{i + 1} 사용 실패. 다음 키로 폴백합니다. 오류: {e}")
+          raise ConnectionError(f"모든 OpenRouter API 키로 요청에 실패했습니다.") from last_error
+
+      def stream_json_response(self, response_iterator):
+          self.send_response(200)
+          self.send_header('Content-type', 'text/event-stream; charset=utf-8')
+          self.end_headers()
+
+          buffer = ""
+          try:
+              for chunk in response_iterator:
+                  buffer += chunk.text
+          except Exception as e:
+              print(f"ERROR: 스트리밍 중 오류 발생: {e}")
+              buffer = f'{{"error": "스트리밍 중 오류 발생", "details": "{str(e)}"}}'
+
+          # 스트림이 끝나면 버퍼에 있는 전체 JSON을 전송
+          if buffer:
+              try:
+                  # 최종 JSON이 유효한지 확인
+                  json.loads(buffer)
+                  self.wfile.write(f"data: {buffer}\n\n".encode('utf-8'))
+              except json.JSONDecodeError:
+                  # 파싱 실패 시, 오류를 포함한 JSON을 대신 보냄
+                  error_json = json.dumps({"error": "최종 JSON 파싱 실패", "details": buffer})
+                  self.wfile.write(f"data: {error_json}\n\n".encode('utf-8'))
+
+              self.wfile.flush()
+
+          self.wfile.write('data: [DONE]\n\n'.encode('utf-8'))
+          self.wfile.flush()
+
+      def stream_openrouter_response(self, response):
+          self.send_response(200)
+          self.send_header('Content-type', 'text/event-stream; charset=utf-8')
+          self.end_headers()
+
+          buffer = ""
+          for line in response.iter_lines():
+              if line:
+                  decoded_line = line.decode('utf-8')
+                  if decoded_line.startswith('data: '):
+                      json_str = decoded_line[len('data: '):]
+                      if json_str.strip() == '[DONE]':
+                          break
+                      try:
+                          data = json.loads(json_str)
+                          if 'choices' in data and data['choices']:
+                              delta = data['choices'][0].get('delta', {})
+                              content = delta.get('content')
+                              if content:
+                                  buffer += content
+                      except json.JSONDecodeError:
+                          continue
+
+          # 스트림이 끝나면 버퍼에 있는 전체 JSON을 전송
+          if buffer:
+              self.wfile.write(f"data: {buffer}\n\n".encode('utf-8'))
+              self.wfile.flush()
+
+          self.wfile.write('data: [DONE]\n\n'.encode('utf-8'))
+          self.wfile.flush()
+
+      def handle_error(self, e, message="오류 발생", status_code=500):
+          print(f"ERROR: {message}: {e}")
+          traceback.print_exc()
+          if not getattr(self, '_headers_sent', False):
+              self.send_response(status_code)
+              self.send_header('Content-type', 'application/json')
+              self.end_headers()
+          error_details = {"error": message, "details": str(e)}
+          self.wfile.write(json.dumps(error_details).encode('utf-8'))
