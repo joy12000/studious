@@ -4,7 +4,6 @@ import { Button } from '../components/ui/button';
 import { Loader2, UploadCloud, FileText, X, BookMarked, CalendarDays, BrainCircuit, ChevronsUpDown, Check } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useNotes, Subject } from '../lib/useNotes';
 import { WeekPicker, getWeekNumber } from '../components/WeekPicker';
 import { format } from 'date-fns';
@@ -13,14 +12,15 @@ import { db } from '../lib/db';
 import LoadingOverlay from '../components/LoadingOverlay';
 import { upload } from '@vercel/blob/client';
 import { convertPdfToImages } from '../lib/pdfUtils';
+import { v4 as uuidv4 } from 'uuid';
 
 export default function ChatPage() {
-  const { allSubjects, addNoteFromTextbook, saveReviewNote } = useNotes();
+  const { allSubjects, addNoteFromTextbook } = useNotes();
   const navigate = useNavigate();
   const location = useLocation();
   const settings = useLiveQuery(() => db.settings.get('default'));
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [loadingMessage, setLoadingMessage] = useState('');
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -29,10 +29,9 @@ export default function ChatPage() {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
-  const MAX_FILE_SIZE_MB = 5; // 개별 파일 최대 5MB
-  const MAX_TOTAL_SIZE_MB = 10; // 총 파일 최대 10MB
+  const MAX_FILE_SIZE_MB = 5;
+  const MAX_TOTAL_SIZE_MB = 10;
 
-  const [generationType, setGenerationType] = useState<'textbook' | 'review'>('textbook');
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -61,7 +60,6 @@ export default function ChatPage() {
       if (location.state) {
           if (location.state.subject) setSelectedSubject(location.state.subject);
           if (location.state.date) setSelectedDate(new Date(location.state.date));
-          if (location.state.type) setGenerationType(location.state.type);
       }
   }, [location.state]);
 
@@ -81,7 +79,7 @@ export default function ChatPage() {
       if (file.type === 'application/pdf') {
         const isScanned = window.confirm("이 PDF가 스캔된 문서인가요? (텍스트 선택이 불가능한 경우) '확인'을 누르면 이미지로 변환하고, '취소'를 누르면 텍스트로 처리합니다.");
         if (isScanned) {
-            setIsLoading(true);
+            setIsUploading(true);
             try {
               const images = await convertPdfToImages(file, (progress) => {
                 setLoadingMessage(`PDF 변환 중... (${progress.pageNumber}/${progress.totalPages})`);
@@ -91,7 +89,7 @@ export default function ChatPage() {
               console.error("PDF 변환 실패:", error);
               alert('PDF 파일을 이미지로 변환하는 데 실패했습니다.');
             } finally {
-              setIsLoading(false);
+              setIsUploading(false);
               setLoadingMessage('');
             }
         } else {
@@ -102,16 +100,14 @@ export default function ChatPage() {
       }
     }
 
-    // 총 파일 크기 검사
     const totalSizeAfterAdding = currentTotalSize + filesToAdd.reduce((sum, file) => sum + file.size, 0);
     if (totalSizeAfterAdding > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
-      alert(`총 파일 크기는 ${MAX_TOTAL_SIZE_MB}MB를 초과할 수 없습니다. 현재: ${(currentTotalSize / (1024 * 1024)).toFixed(2)}MB, 추가하려는 파일: ${(filesToAdd.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024)).toFixed(2)}MB`);
+      alert(`총 파일 크기는 ${MAX_TOTAL_SIZE_MB}MB를 초과할 수 없습니다.`);
       return;
     }
 
     setUploadedFiles(prev => [...prev, ...filesToAdd]);
 
-    // 파일 입력 초기화
     if(fileInputRef.current) {
         fileInputRef.current.value = '';
     }
@@ -124,17 +120,13 @@ export default function ChatPage() {
       return;
     }
 
-    const currentTotalSize = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
-    if (currentTotalSize > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
-      alert(`총 파일 크기는 ${MAX_TOTAL_SIZE_MB}MB를 초과할 수 없습니다. 현재: ${(currentTotalSize / (1024 * 1024)).toFixed(2)}MB`);
-      return;
-    }
+    alert("백그라운드에서 참고서 생성을 시작합니다. 완료되면 알려드릴게요!");
+    navigate('/');
 
-    setIsLoading(true);
+    setIsUploading(true);
+    setLoadingMessage(`파일 ${uploadedFiles.length}개 업로드 중...`);
 
     try {
-      setLoadingMessage(`파일 ${uploadedFiles.length}개 업로드 중...`);
-      
       const blobResults = await Promise.all(
         uploadedFiles.map(file => 
           upload(file.name, file, {
@@ -144,10 +136,9 @@ export default function ChatPage() {
         )
       );
       
-      setLoadingMessage('AI가 노트를 생성하고 있습니다...');
+      setIsUploading(false);
 
-      const targetApi = generationType === 'review' ? '/api/create_review_note' : '/api/create_textbook';
-      
+      const noteId = uuidv4();
       const api_payload = {
           blobUrls: blobResults.map(b => b.url),
           subject: selectedSubject.name,
@@ -159,39 +150,39 @@ export default function ChatPage() {
           noteDate: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
       };
 
-      const response = await fetch(targetApi, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(api_payload),
-      });
+      await addNoteFromTextbook(
+        `[생성 중] ${selectedSubject.name} 참고서`,
+        'AI가 참고서를 생성하고 있습니다. 잠시만 기다려주세요...',
+        selectedSubject.id,
+        uploadedFiles,
+        api_payload.noteDate,
+        noteId
+      );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || errorData.details || '노트 생성에 실패했습니다.');
-      }
-
-      const result = await response.json();
-
-      if (generationType === 'textbook') {
-        const newNote = await addNoteFromTextbook(result.title, result.content, result.subjectId, uploadedFiles, api_payload.noteDate);
-        alert("AI 참고서가 성공적으로 노트에 저장되었습니다!");
-        navigate(`/note/${newNote.id}`);
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'GENERATE_TEXTBOOK',
+          payload: {
+            noteId: noteId,
+            body: api_payload,
+          },
+        });
       } else {
-        const { newNote } = await saveReviewNote(result, api_payload.noteDate, allSubjects);
-        alert("AI 복습노트가 성공적으로 노트에 저장되었습니다!");
-        navigate(`/note/${newNote.id}`);
+        throw new Error("Service Worker가 활성화되어 있지 않아 백그라운드 생성을 진행할 수 없습니다.");
       }
 
     } catch(error) {
-        alert(`오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+        console.error("참고서 생성 사전 작업(파일 업로드 등) 중 오류 발생:", error);
+        alert(`백그라운드 생성 시작 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+        navigate('/');
     } finally {
-        setIsLoading(false);
+      setIsUploading(false);
     }
   };
   
   return (
     <>
-      {isLoading && <LoadingOverlay message={loadingMessage} />}
+      {isUploading && <LoadingOverlay message={loadingMessage} />}
       <div className="min-h-screen w-full flex flex-col items-center justify-center p-4">
         <Card className="w-full max-w-2xl">
             <CardHeader className="text-center">
@@ -256,9 +247,9 @@ export default function ChatPage() {
                 )}
             </CardContent>
             <CardFooter>
-                 <Button onClick={handleGenerate} size="lg" className="w-full" disabled={isLoading || uploadedFiles.length === 0 || !selectedSubject}>
-                    {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <BrainCircuit className="mr-2 h-5 w-5" />}
-                    {isLoading ? loadingMessage : `AI ${generationType === 'textbook' ? '참고서' : '복습노트'} 생성`}
+                 <Button onClick={handleGenerate} size="lg" className="w-full" disabled={isUploading || uploadedFiles.length === 0 || !selectedSubject}>
+                    {isUploading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <BrainCircuit className="mr-2 h-5 w-5" />}
+                    {isUploading ? loadingMessage : `AI 참고서 생성`}
                 </Button>
             </CardFooter>
         </Card>

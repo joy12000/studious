@@ -290,7 +290,7 @@ export function useNotes(defaultFilters?: Filters) {
       }
     };
 
-    const addNoteFromTextbook = async (title: string, content: string, subjectId: string, files: File[], noteDate?: string): Promise<Note> => {
+    const addNoteFromTextbook = async (title: string, content: string, subjectId: string, files: File[], noteDate?: string, existingId?: string): Promise<Note> => {
       const attachments: Attachment[] = await Promise.all(files.map(async (file) => ({
         id: uuidv4(),
         type: 'file',
@@ -300,7 +300,7 @@ export function useNotes(defaultFilters?: Filters) {
       })));
     
       const newNote: Note = {
-        id: uuidv4(),
+        id: existingId || uuidv4(),
         title,
         content,
         subjectId,

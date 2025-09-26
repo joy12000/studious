@@ -11,9 +11,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import LoadingOverlay from '../components/LoadingOverlay';
 import { useLoading } from "../lib/useLoading";
 import { convertPdfToImages } from "../lib/pdfUtils";
+import { v4 as uuidv4 } from 'uuid';
+import { db } from '../lib/db';
+import { upload } from '@vercel/blob/client';
 
 export default function ReviewPage() {
-  const { addNoteFromReview, allSubjects, notes } = useNotes();
+  const { allSubjects, notes } = useNotes();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -63,48 +66,75 @@ export default function ReviewPage() {
     }
     setError(null);
 
-    const currentUploadedFilesSize = files.reduce((sum, file) => sum + file.size, 0);
-    const currentSelectedNotesAttachmentsSize = selectedExistingNotes.reduce((sum, note) => 
-      sum + (note.attachments?.reduce((attSum, att) => attSum + (att.data instanceof File ? att.data.size : 0), 0) || 0)
-    , 0);
-    const totalSize = currentUploadedFilesSize + currentSelectedNotesAttachmentsSize;
+    alert("백그라운드에서 복습 노트 생성을 시작합니다. 완료되면 알려드릴게요!");
+    navigate('/');
 
-    if (totalSize > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
-      setError(`총 파일 크기는 ${MAX_TOTAL_SIZE_MB}MB를 초과할 수 없습니다. 현재: ${(totalSize / (1024 * 1024)).toFixed(2)}MB`);
-      return;
+    startLoading("파일 업로드 및 생성 준비 중...");
+
+    try {
+      let blobUrls: string[] = [];
+      if (files.length > 0) {
+          const blobResults = await Promise.all(
+            files.map(file => 
+              upload(file.name, file, {
+                access: 'public',
+                handleUploadUrl: '/api/upload/route',
+              })
+            )
+          );
+          blobUrls = blobResults.map(b => b.url);
+      }
+
+      stopLoading();
+
+      const noteId = uuidv4();
+      const noteDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
+      
+      let combinedContent = "";
+      selectedExistingNotes.forEach(note => {
+        combinedContent += `\n\n--- 기존 노트: ${note.title} ---\n${note.content}`;
+      });
+
+      const api_payload = {
+        blobUrls,
+        aiConversationText: combinedContent.trim(),
+        subjects: allSubjects || [],
+        noteDate: noteDateStr,
+      };
+
+      const placeholderNote: Note = {
+        id: noteId,
+        title: '[생성 중] 복습 노트',
+        content: 'AI가 복습 노트를 생성하고 있습니다. 잠시만 기다려주세요...', 
+        noteType: 'review',
+        sourceType: 'other',
+        createdAt: new Date().toISOString(),
+        updatedAt: Date.now(),
+        favorite: false,
+        key_insights: [],
+        attachments: [], // Add empty attachments array
+      };
+      await db.notes.add(placeholderNote);
+
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'GENERATE_REVIEW_NOTE',
+          payload: {
+            noteId: noteId,
+            body: api_payload,
+          },
+        });
+      } else {
+        throw new Error("Service Worker가 활성화되어 있지 않아 백그라운드 생성을 진행할 수 없습니다.");
+      }
+
+    } catch (err) {
+      console.error("Review note background generation failed:", err);
+      setError(err instanceof Error ? err.message : "복습 노트 생성 중 알 수 없는 오류가 발생했습니다.");
+      stopLoading();
+      // Optionally update placeholder to error state
+      // await db.notes.update(noteId, { title: '[생성 실패] 복습 노트', content: err.message });
     }
-
-    startLoading("복습 노트를 생성하는 중...");
-
-    const noteDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
-    let combinedContent = "";
-    const combinedFiles: File[] = [...files];
-
-    selectedExistingNotes.forEach(note => {
-      combinedContent += `
-
---- 기존 노트: ${note.title} ---
-${note.content}`;
-      // Attachments from existing notes are not directly combined into combinedFiles for upload
-      // as they are already stored in the database. Their content is implicitly part of the note.content
-      // However, their size is accounted for in the totalSize check.
-    });
-
-    await addNoteFromReview({
-      files: combinedFiles,
-      subjects: allSubjects || [],
-      onProgress: setMessage,
-      onComplete: (newNote) => {
-        stopLoading();
-        navigate(`/note/${newNote.id}`);
-      },
-      onError: (err) => {
-        setError(err);
-        stopLoading();
-      },
-      noteDate: noteDateStr,
-      aiConversationText: combinedContent.trim(),
-    });
   };
 
   const onFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -149,7 +179,7 @@ ${note.content}`;
 
     const totalSizeAfterAdding = currentTotalSize + filesToAdd.reduce((sum, file) => sum + file.size, 0);
     if (totalSizeAfterAdding > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
-      setError(`총 파일 크기는 ${MAX_TOTAL_SIZE_MB}MB를 초과할 수 없습니다. 현재: ${(currentTotalSize / (1024 * 1024)).toFixed(2)}MB, 추가하려는 파일: ${(filesToAdd.reduce((sum, file) => sum + file.size, 0) / (1024 * 1024)).toFixed(2)}MB`);
+      setError(`총 파일 크기는 ${MAX_TOTAL_SIZE_MB}MB를 초과할 수 없습니다.`);
       return;
     }
 
@@ -224,7 +254,7 @@ ${note.content}`;
                                       <label htmlFor={`note-${note.id}`} className="flex items-center gap-2 cursor-pointer flex-1 truncate">
                                         <input 
                                           type="checkbox" 
-                                          id={`note-${note.id}`} 
+                                          id={`note-${note.id}`}
                                           checked={selectedExistingNotes.some(n => n.id === note.id)}
                                           onChange={() => handleToggleNoteSelection(note)}
                                           className="form-checkbox h-4 w-4 text-primary rounded focus:ring-primary"
