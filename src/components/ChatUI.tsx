@@ -158,9 +158,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 
           buffer += decoder.decode(value, { stream: true });
 
-          // 스트림에서 받은 데이터가 완전한 JSON 객체일 수 있으므로, 이를 처리
           const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // 마지막 불완전한 라인은 버퍼에 남김
+          buffer = lines.pop() || '';
 
           for (const line of lines) {
               if (line.startsWith('data: ')) {
@@ -172,17 +171,6 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
                         setMessages(prev => prev.map(msg => {
                           if (msg.id === botMessage.id) {
                             const newText = msg.text + data.token;
-                            const suggestionMatch = newText.match(/```suggestion\s*\r?\n기존 내용\s*\r?\n([\s\S]*?)\s*\r?\n===>\s*\r?\n새로운 내용\s*\r?\n([\s\S]*?)\s*```/);
-                            if (suggestionMatch) {
-                              return {
-                                ...msg,
-                                text: newText,
-                                suggestion: {
-                                  old: suggestionMatch[1].trim(),
-                                  new: suggestionMatch[2].trim(),
-                                },
-                              };
-                            }
                             return { ...msg, text: newText };
                           }
                           return msg;
@@ -194,6 +182,28 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
               }
           }
         }
+
+        // 스트리밍 완료 후 최종 suggestion 체크
+        setMessages(prev => prev.map(msg => {
+          if (msg.id === botMessage.id && msg.text && !msg.suggestion) {
+            const suggestionMatch = msg.text.match(/```suggestion\s*\r?\n기존 내용\s*\r?\n([\s\S]*?)\s*\r?\n===>\s*\r?\n새로운 내용\s*\r?\n([\s\S]*?)\s*```/);
+            
+            console.log('🔍 Final AI response:', msg.text);
+            console.log('🎯 Suggestion match result:', suggestionMatch);
+            
+            if (suggestionMatch) {
+              console.log('✅ Suggestion detected!');
+              return {
+                ...msg,
+                suggestion: {
+                  old: suggestionMatch[1].trim(),
+                  new: suggestionMatch[2].trim(),
+                },
+              };
+            }
+          }
+          return msg;
+        }));
 
       } catch (error) {
         console.error('API 통신 오류:', error);
