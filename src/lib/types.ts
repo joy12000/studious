@@ -51,6 +51,17 @@ export interface Quiz {
   questions: QuizQuestion[];
 }
 
+export interface Message {
+  id: number;
+  text: string;
+  sender: 'user' | 'bot';
+  suggestion?: {
+    old: string;
+    new: string;
+  };
+  fileUrls?: string[]; // Added for file attachments
+}
+
 export interface Note {
   id: string;
   title: string;
@@ -65,6 +76,7 @@ export interface Note {
   key_insights: string[];
   favorite: boolean;
   attachments?: Attachment[];
+  chatHistory?: Message[]; // Added chatHistory
 }
 
 // 🧠 [기능 추가] 복습 덱 아이템 타입
