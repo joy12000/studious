@@ -169,17 +169,20 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
                   try {
                       const data = JSON.parse(jsonStr);
                       if (data.token) {
+                        console.log('--- RAW AI TOKEN ---', data.token); // DEBUG LOG
                         setMessages(prev => prev.map(msg => {
                           if (msg.id === botMessage.id) {
                             const newText = msg.text + data.token;
+                            console.log('--- ACCUMULATED TEXT ---', newText); // DEBUG LOG
                             const suggestionMatch = newText.match(/```suggestion\s*\n기존 내용\s*\n([\s\S]*?)\s*\n===>\s*\n새로운 내용\s*\n([\s\S]*?)\s*```/);
+                            console.log('--- REGEX MATCH RESULT ---', suggestionMatch); // DEBUG LOG
                             if (suggestionMatch) {
                               return {
                                 ...msg,
                                 text: newText,
                                 suggestion: {
-                                  old: suggestionMatch[1],
-                                  new: suggestionMatch[2],
+                                  old: suggestionMatch[1].trim(),
+                                  new: suggestionMatch[2].trim(),
                                 },
                               };
                             }
