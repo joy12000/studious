@@ -268,6 +268,15 @@ export default function NotePage() {
     return [];
   }, [note]);
 
+  const handleApplySuggestion = (suggestion: { old: string; new: string }) => {
+    if (!note) return;
+
+    const newContent = note.content.replace(suggestion.old, suggestion.new);
+
+    updateNote(note.id, { content: newContent, updatedAt: Date.now() });
+    setNote(prev => prev ? { ...prev, content: newContent, updatedAt: Date.now() } : null);
+  };
+
   const handleAskAboutSection = (section: { title: string, content: string }) => {
     const prompt = `아래 내용에 대해 더 쉽게 설명해줘:\n\n--- [섹션: ${section.title}] ---\n${section.content}\n---`;
     setInitialChatMessage(prompt);
@@ -441,6 +450,7 @@ export default function NotePage() {
                         initialMessage={initialChatMessage} 
                         messagesRef={chatMessagesRef}
                         noteId={note.id}
+                        onApplySuggestion={handleApplySuggestion}
                       />}         </div>
         
         {/* Note Content Panel */}
