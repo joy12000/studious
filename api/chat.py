@@ -4,7 +4,7 @@ import os
 import requests
 import traceback
 import google.generativeai as genai
-from google.generativeai import types
+import google.generativeai
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
@@ -146,7 +146,7 @@ class handler(BaseHTTPRequestHandler):
                 response = model.generate_content(
                     gemini_messages,
                     stream=True,
-                    generation_config=types.GenerationConfig(
+                    generation_config=google.generativeai.types.GenerationConfig(
                         include_thoughts=True
                     )
                 )
