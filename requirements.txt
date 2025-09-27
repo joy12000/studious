@@ -4,3 +4,4 @@ certifi
 pdf2image
 Pillow
 Flask
+# Force rebuild on Vercel
