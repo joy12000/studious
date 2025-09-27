@@ -172,7 +172,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
                         setMessages(prev => prev.map(msg => {
                           if (msg.id === botMessage.id) {
                             const newText = msg.text + data.token;
-                            const suggestionMatch = newText.match(/```suggestion\s*\n([\s\S]*?)\s*\n===>\s*\n([\s\S]*?)\s*```/);
+                            const suggestionMatch = newText.match(/```suggestion\s*\n기존 내용\s*\n([\s\S]*?)\s*\n===>\s*\n새로운 내용\s*\n([\s\S]*?)\s*```/);
                             if (suggestionMatch) {
                               return {
                                 ...msg,
