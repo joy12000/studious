@@ -53,7 +53,8 @@ export interface Quiz {
 
 export interface Message {
   id: number;
-  text: string;
+  type: 'text' | 'thought'; // New field
+  content: string; // Renamed from 'text'
   sender: 'user' | 'bot';
   suggestion?: {
     old: string;

@@ -8,6 +8,7 @@ import MarkdownRenderer from './MarkdownRenderer';
 import { useNotes } from '../lib/useNotes';
 import { upload } from '@vercel/blob/client';
 import { convertPdfToImages } from '../lib/pdfUtils';
+import { Message } from '../lib/types'; // Import Message from types.ts
 
 const models = [
     { id: 'gemini-2.5-pro', name: '✨ Gemini 2.5 Pro' },
@@ -20,16 +21,8 @@ const models = [
     { id: 'deepseek/deepseek-chat-v3.1:free', name: '🔍 Deepseek v3.1' },
 ];
 
-export interface Message {
-  id: number;
-  text: string;
-  sender: 'user' | 'bot';
-  suggestion?: {
-    old: string;
-    new: string;
-  };
-  fileUrls?: string[]; // Added for file attachments
-}
+// Removed local Message interface definition
+
 interface GeminiHistory {
   role: 'user' | 'model';
   parts: { text: string }[];
@@ -37,7 +30,8 @@ interface GeminiHistory {
 
 const createInitialMessage = (): Message => ({
   id: Date.now(),
-  text: '현재 노트 내용을 바탕으로 무엇이든 물어보세요!',
+  type: 'text',
+  content: '현재 노트 내용을 바탕으로 무엇이든 물어보세요!',
   sender: 'bot',
 });
 
@@ -59,11 +53,11 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
   const [selectedModel, setSelectedModel] = useState(models[0].id);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]); // New state for selected files
-  const fileInputRef = useRef<HTMLInputElement>(null); // Ref for hidden file input
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_FILE_SIZE_MB = 5; // Max size per file
-  const MAX_TOTAL_SIZE_MB = 10; // Max total size for all files
+  const MAX_FILE_SIZE_MB = 5;
+  const MAX_TOTAL_SIZE_MB = 10;
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -172,13 +166,11 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
         alert(`개별 파일 크기는 ${MAX_FILE_SIZE_MB}MB를 초과할 수 없습니다: ${file.name}`);
         continue;
       }
-      // PDF to image conversion logic (similar to ChatPage/ReviewPage)
       if (file.type === 'application/pdf') {
         const isScanned = window.confirm("이 PDF가 스캔된 문서인가요? (텍스트 선택이 불가능한 경우) '확인'을 누르면 이미지로 변환하고, '취소'를 누르면 텍스트로 처리합니다.");
         if (isScanned) {
             setIsLoading(true);
             try {
-              // Assuming convertPdfToImages returns an array of File objects (images)
               const images = await convertPdfToImages(file, (progress) => {
                 // No direct loading message for ChatUI, but can be added if needed
               });
@@ -220,7 +212,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
     const currentInput = (typeof text === 'string' ? text : inputValue).trim();
     if (currentInput === '' && selectedFiles.length === 0 || isLoading) return; // Allow sending only files
 
-    const userMessage: Message = { id: Date.now(), text: currentInput, sender: 'user' };
+    const userMessage: Message = { id: Date.now(), type: 'text', content: currentInput, sender: 'user' }; // Added type
     const currentMessages = [...messages, userMessage];
     setMessages(currentMessages);
     setInputValue('');
@@ -248,12 +240,13 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
 
     const history: GeminiHistory[] = currentMessages.map(msg => ({
       role: msg.sender === 'user' ? 'user' : 'model',
-      parts: [{ text: msg.text }],
+      parts: [{ text: msg.content }], // Changed msg.text to msg.content
     }));
 
     const botMessage: Message = {
       id: Date.now() + 1,
-      text: '',
+      type: 'text', // Added type
+      content: '',
       sender: 'bot',
       fileUrls: uploadedBlobUrls, // Attach file URLs to the bot's message for context
     };
@@ -294,14 +287,22 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
                 if (jsonStr.trim() === '[DONE]') continue;
                 try {
                     const data = JSON.parse(jsonStr);
-                    if (data.token) {
+                    // Handle different message types from backend
+                    if (data.type === 'token' && data.content) {
                       setMessages(prev => prev.map(msg => {
                         if (msg.id === botMessage.id) {
-                          const newText = msg.text + data.token;
-                          return { ...msg, text: newText };
+                          const newContent = msg.content + data.content;
+                          return { ...msg, content: newContent };
                         }
                         return msg;
                       }));
+                    } else if (data.type === 'thought' && data.content) {
+                      setMessages(prev => [...prev, {
+                        id: Date.now() + Math.random(), // Unique ID for thought message
+                        type: 'thought',
+                        content: data.content,
+                        sender: 'bot',
+                      }]);
                     }
                 } catch (e) {
                     console.error('스트림 데이터 파싱 오류:', e, '원본:', jsonStr);
@@ -311,8 +312,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
       }
 
       setMessages(prev => prev.map(msg => {
-        if (msg.id === botMessage.id && msg.text && !msg.suggestion) {
-          const suggestion = detectSuggestion(msg.text);
+        if (msg.id === botMessage.id && msg.content && !msg.suggestion) {
+          const suggestion = detectSuggestion(msg.content);
           if (suggestion) {
             return {
               ...msg,
@@ -326,7 +327,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
     } catch (error) {
       console.error('API 통신 오류:', error);
       const errorMessageText = `죄송합니다, 답변을 생성하는 중 오류가 발생했습니다.\n\n오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`;
-      setMessages((prev) => prev.map(msg => msg.id === botMessage.id ? {...msg, text: errorMessageText} : msg));
+      setMessages((prev) => prev.map(msg => msg.id === botMessage.id ? {...msg, content: errorMessageText} : msg));
     } finally {
       setIsLoading(false);
       setSelectedFiles([]); // Clear selected files after sending
@@ -387,7 +388,14 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
                       <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">AI</div>
                     )}
                     <div className={`relative px-4 py-2 rounded-lg max-w-xl prose dark:prose-invert prose-p:my-0 prose-headings:my-2 ${msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                      <MarkdownRenderer content={msg.text} />
+                      {msg.type === 'thought' ? (
+                        <details className="text-xs text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 p-2 rounded-md my-1">
+                          <summary className="cursor-pointer">AI의 사고 과정 (클릭하여 보기)</summary>
+                          <MarkdownRenderer content={msg.content} />
+                        </details>
+                      ) : (
+                        <MarkdownRenderer content={msg.content} />
+                      )}
                     </div>
                   </div>
                 </div>

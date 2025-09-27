@@ -4,6 +4,7 @@ import os
 import requests
 import traceback
 import google.generativeai as genai
+import genai.types
 
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
@@ -142,7 +143,13 @@ class handler(BaseHTTPRequestHandler):
                     {'role': 'model', 'parts': ['네, 알겠습니다. 규칙을 모두 확인했으며, 반드시 JSON 형식으로만 답변하겠습니다.']}
                 ] + self.convert_to_gemini_format(messages)
 
-                response = model.generate_content(gemini_messages, stream=True)
+                response = model.generate_content(
+                    gemini_messages,
+                    stream=True,
+                    generation_config=genai.types.GenerationConfig(
+                        include_thoughts=True
+                    )
+                )
                 
                 self.stream_json_response(response)
                 return
@@ -201,9 +208,12 @@ class handler(BaseHTTPRequestHandler):
         try:
             for chunk in response_iterator:
                 if chunk.text:
-                    # 토큰을 포함한 JSON 객체를 생성하여 전송
-                    token_json = json.dumps({"token": chunk.text})
+                    token_json = json.dumps({"type": "token", "content": chunk.text})
                     self.wfile.write(f"data: {token_json}\n\n".encode('utf-8'))
+                    self.wfile.flush()
+                if hasattr(chunk, 'info') and hasattr(chunk.info, 'thought_summary') and chunk.info.thought_summary:
+                    thought_json = json.dumps({"type": "thought", "content": chunk.info.thought_summary})
+                    self.wfile.write(f"data: {thought_json}\n\n".encode('utf-8'))
                     self.wfile.flush()
         except Exception as e:
             print(f"ERROR: 스트리밍 중 오류 발생: {e}")
