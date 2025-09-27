@@ -159,6 +159,12 @@ export default function ChatPage() {
         noteId
       );
 
+      // Request notification permission before starting
+      if (Notification.permission === 'default') {
+        await Notification.requestPermission();
+      }
+
+      // Send message to Service Worker
       if (navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({
           type: 'GENERATE_TEXTBOOK',

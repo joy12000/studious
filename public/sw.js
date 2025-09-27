@@ -19,6 +19,18 @@ db.version(6).stores({
 });
 
 
+async function showSafeNotification(title, options) {
+  if (self.Notification && self.Notification.permission === 'granted') {
+    try {
+      await self.registration.showNotification(title, options);
+    } catch (e) {
+      console.error('Error showing notification:', e);
+    }
+  } else {
+    console.log('Notification permission not granted. Skipping notification.');
+  }
+}
+
 // 서비스 워커의 생명주기 이벤트를 제어합니다.
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
@@ -49,7 +61,7 @@ self.addEventListener('message', (event) => {
           updatedAt: Date.now(),
         });
 
-        await self.registration.showNotification('참고서 생성 완료!', {
+        await showSafeNotification('참고서 생성 완료!', {
           body: `\'${result.title}\' 생성이 완료되었습니다.`,
           icon: '/icon-192.png',
           data: { url: `/note/${payload.noteId}` }
@@ -61,7 +73,7 @@ self.addEventListener('message', (event) => {
             title: '[생성 실패] 참고서',
             content: `오류가 발생하여 참고서 생성을 완료하지 못했습니다.\n\n${error.message}`
         });
-        await self.registration.showNotification('참고서 생성 실패', {
+        await showSafeNotification('참고서 생성 실패', {
           body: '오류가 발생하여 참고서를 생성하지 못했습니다.',
           icon: '/icon-192.png',
         });
@@ -102,7 +114,7 @@ self.addEventListener('message', (event) => {
             await db.quizzes.add(newQuiz);
         }
 
-        await self.registration.showNotification('복습 노트 생성 완료!', {
+        await showSafeNotification('복습 노트 생성 완료!', {
           body: `\'${title}\' 생성이 완료되었습니다.`,
           icon: '/icon-192.png',
           data: { url: `/note/${payload.noteId}` }
@@ -114,7 +126,7 @@ self.addEventListener('message', (event) => {
             title: '[생성 실패] 복습 노트',
             content: `오류가 발생하여 복습 노트 생성을 완료하지 못했습니다.\n\n${error.message}`
         });
-        await self.registration.showNotification('복습 노트 생성 실패', {
+        await showSafeNotification('복습 노트 생성 실패', {
           body: '오류가 발생하여 복습 노트를 생성하지 못했습니다.',
           icon: '/icon-192.png',
         });

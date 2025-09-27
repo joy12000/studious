@@ -116,6 +116,11 @@ export default function ReviewPage() {
       };
       await db.notes.add(placeholderNote);
 
+      // Request notification permission before starting
+      if (Notification.permission === 'default') {
+        await Notification.requestPermission();
+      }
+
       if (navigator.serviceWorker.controller) {
         navigator.serviceWorker.controller.postMessage({
           type: 'GENERATE_REVIEW_NOTE',
