@@ -268,7 +268,7 @@ export default function NotePage() {
     return [];
   }, [note]);
 
-  const handleApplySuggestion = (suggestion: { old: string; new: string }) => {
+  const handleSuggestionAccepted = (suggestion: { old: string; new: string }) => {
     if (!note) return;
 
     const newContent = note.content.replace(suggestion.old, suggestion.new);
@@ -450,7 +450,7 @@ export default function NotePage() {
                         initialMessage={initialChatMessage} 
                         messagesRef={chatMessagesRef}
                         noteId={note.id}
-                        onApplySuggestion={handleApplySuggestion}
+                        onSuggestionAccepted={handleSuggestionAccepted}
                       />}         </div>
         
         {/* Note Content Panel */}

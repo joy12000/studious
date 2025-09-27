@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
-import { ArrowUp, Loader2, RefreshCw, Copy, Save, ChevronsUpDown, Check, X, Lightbulb } from 'lucide-react';
+import { ArrowUp, Loader2, RefreshCw, Copy, Save, ChevronsUpDown, Check, X, Lightbulb, Plus, FileText } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import MarkdownRenderer from './MarkdownRenderer';
 import { useNotes } from '../lib/useNotes';
+import { upload } from '@vercel/blob/client';
+import { convertPdfToImages } from '../lib/pdfUtils';
 
 const models = [
     { id: 'gemini-2.5-pro', name: '✨ Gemini 2.5 Pro' },
@@ -26,6 +28,7 @@ export interface Message {
     old: string;
     new: string;
   };
+  fileUrls?: string[]; // Added for file attachments
 }
 interface GeminiHistory {
   role: 'user' | 'model';
@@ -55,6 +58,12 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
 
   const [selectedModel, setSelectedModel] = useState(models[0].id);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]); // New state for selected files
+  const fileInputRef = useRef<HTMLInputElement>(null); // Ref for hidden file input
+
+  const MAX_FILE_SIZE_MB = 5; // Max size per file
+  const MAX_TOTAL_SIZE_MB = 10; // Max total size for all files
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -151,18 +160,91 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
     return null;
   };
 
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files) return;
+
+    const newFiles = Array.from(event.target.files);
+    let filesToAdd: File[] = [];
+    let currentTotalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+
+    for (const file of newFiles) {
+      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        alert(`개별 파일 크기는 ${MAX_FILE_SIZE_MB}MB를 초과할 수 없습니다: ${file.name}`);
+        continue;
+      }
+      // PDF to image conversion logic (similar to ChatPage/ReviewPage)
+      if (file.type === 'application/pdf') {
+        const isScanned = window.confirm("이 PDF가 스캔된 문서인가요? (텍스트 선택이 불가능한 경우) '확인'을 누르면 이미지로 변환하고, '취소'를 누르면 텍스트로 처리합니다.");
+        if (isScanned) {
+            setIsLoading(true);
+            try {
+              // Assuming convertPdfToImages returns an array of File objects (images)
+              const images = await convertPdfToImages(file, (progress) => {
+                // No direct loading message for ChatUI, but can be added if needed
+              });
+              filesToAdd.push(...images);
+            } catch (error) {
+              console.error("PDF 변환 실패:", error);
+              alert('PDF 파일을 이미지로 변환하는 데 실패했습니다.');
+            } finally {
+              setIsLoading(false);
+            }
+        } else {
+            filesToAdd.push(file);
+        }
+      } else {
+        filesToAdd.push(file);
+      }
+    }
+
+    const totalSizeAfterAdding = currentTotalSize + filesToAdd.reduce((sum, file) => sum + file.size, 0);
+    if (totalSizeAfterAdding > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
+      alert(`총 파일 크기는 ${MAX_TOTAL_SIZE_MB}MB를 초과할 수 없습니다.`);
+      return;
+    }
+
+    setSelectedFiles(prev => [...prev, ...filesToAdd]);
+    if(fileInputRef.current) {
+        fileInputRef.current.value = ''; // Clear input
+    }
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSendMessage = async (text: string | React.FormEvent) => {
     if (typeof text === 'object') {
         text.preventDefault();
     }
     const currentInput = (typeof text === 'string' ? text : inputValue).trim();
-    if (currentInput === '' || isLoading) return;
+    if (currentInput === '' && selectedFiles.length === 0 || isLoading) return; // Allow sending only files
 
     const userMessage: Message = { id: Date.now(), text: currentInput, sender: 'user' };
     const currentMessages = [...messages, userMessage];
     setMessages(currentMessages);
     setInputValue('');
     setIsLoading(true);
+
+    let uploadedBlobUrls: string[] = [];
+    if (selectedFiles.length > 0) {
+      try {
+        const blobResults = await Promise.all(
+          selectedFiles.map(file => 
+            upload(file.name, file, {
+              access: 'public',
+              handleUploadUrl: '/api/upload/route',
+            })
+          )
+        );
+        uploadedBlobUrls = blobResults.map(b => b.url);
+      } catch (error) {
+        console.error("File upload failed:", error);
+        alert("파일 업로드 중 오류가 발생했습니다.");
+        setIsLoading(false);
+        return;
+      }
+    }
 
     const history: GeminiHistory[] = currentMessages.map(msg => ({
       role: msg.sender === 'user' ? 'user' : 'model',
@@ -173,6 +255,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
       id: Date.now() + 1,
       text: '',
       sender: 'bot',
+      fileUrls: uploadedBlobUrls, // Attach file URLs to the bot's message for context
     };
     setMessages(prev => [...prev, botMessage]);
 
@@ -180,7 +263,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ history, model: selectedModel, noteContext }),
+        body: JSON.stringify({ history, model: selectedModel, noteContext, fileUrls: uploadedBlobUrls }),
       });
 
       if (!response.ok) {
@@ -246,6 +329,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
       setMessages((prev) => prev.map(msg => msg.id === botMessage.id ? {...msg, text: errorMessageText} : msg));
     } finally {
       setIsLoading(false);
+      setSelectedFiles([]); // Clear selected files after sending
     }
   };
 
@@ -254,7 +338,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
   const activeSuggestion = messages.find(msg => msg.suggestion);
 
   return (
-    <div className="flex flex-col h-full bg-card border-r rounded-r-lg shadow-lg">
+    <div className="flex flex-col h-full bg-card border-r rounded-r-lg shadow-lg pb-4">
               <div className="p-2 sm:p-4 border-b flex justify-between items-center">
                 <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
                   <PopoverTrigger asChild>
@@ -303,14 +387,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
                       <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">AI</div>
                     )}
                     <div className={`relative px-4 py-2 rounded-lg max-w-xl prose dark:prose-invert prose-p:my-0 prose-headings:my-2 ${msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                      <MarkdownRenderer content={msg.text} onApplySuggestion={(newContent) => handleApplyChange(msg.id, { old: msg.suggestion!.old, new: newContent })} />
-                      {msg.sender === 'bot' && !isLoading && msg.text && (
-                        <div className="absolute -top-2 -right-2 flex items-center gap-1">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleCopy(msg.text)}>
-                            <Copy className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
+                      <MarkdownRenderer content={msg.text} />
                     </div>
                   </div>
                 </div>
@@ -347,8 +424,29 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
         </div>
       )}
 
-      <div className="p-4 border-t">
-        <form id="chat-form" onSubmit={handleSendMessage} className="flex items-center gap-2">
+      {selectedFiles.length > 0 && (
+        <div className="p-2 border-t bg-muted/50">
+          <h3 className="text-xs font-semibold mb-1">첨부 파일:</h3>
+          <ul className="flex flex-wrap gap-2">
+            {selectedFiles.map((file, index) => (
+              <li key={index} className="flex items-center gap-1 bg-muted px-2 py-1 rounded-full text-xs">
+                <FileText className="h-3 w-3" />
+                {file.name}
+                <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => removeFile(index)}>
+                  <X className="h-3 w-3" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="p-4 border-t flex items-center gap-2">
+        <input ref={fileInputRef} type="file" multiple hidden onChange={handleFileChange} />
+        <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" onClick={() => fileInputRef.current?.click()}>
+          <Plus className="h-5 w-5" />
+        </Button>
+        <form id="chat-form" onSubmit={handleSendMessage} className="flex-1 flex items-center gap-2">
           <input
             type="text"
             value={inputValue}
@@ -357,7 +455,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
             className="w-full px-4 py-2 border rounded-full focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-background text-foreground placeholder:text-muted-foreground"
             disabled={isLoading}
           />
-          <Button type="submit" size="icon" className="rounded-full" disabled={isLoading || !inputValue.trim()}>
+          <Button type="submit" size="icon" className="rounded-full" disabled={isLoading || (!inputValue.trim() && selectedFiles.length === 0)}>
             {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowUp className="h-5 w-5" />}
           </Button>
         </form>
