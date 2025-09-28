@@ -78,18 +78,16 @@ const SidebarContent = ({ isCollapsed, onCollapse, isMobile, onMobileCollapse, o
         </div>
         <div className="mt-auto p-4 border-t flex flex-col gap-2">
         <SignedOut>
-          <SignInButton mode="modal" className="w-full" />
-          <SignUpButton mode="modal" className="w-full" />
+          <SignInButton mode="modal" className="w-full">
+            <Button variant="secondary" className="w-full">로그인</Button>
+          </SignInButton>
         </SignedOut>
         <SignedIn>
           <UserButton afterSignOutUrl="/" appearance={{elements: {userButtonAvatarBox: "w-full h-full"}}} />
         </SignedIn>
-        {isMobile ? (
+        {/* Sidebar collapse button hidden on desktop as per user request */}
+        {isMobile && (
           <Button variant="ghost" size="icon" className="w-full" onClick={onMobileCollapse}>
-            <Menu className="h-5 w-5" />
-          </Button>
-        ) : (
-          <Button variant="ghost" size="icon" className="w-full hidden md:block" onClick={onCollapse}>
             <Menu className="h-5 w-5" />
           </Button>
         )}
