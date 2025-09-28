@@ -6,6 +6,7 @@ import Root from './App'
 import { initInstallCapture } from './lib/install'
 import * as pdfjsLib from 'pdfjs-dist';
 import { ClerkProvider } from '@clerk/clerk-react';
+import { koKR } from '@clerk/localizations';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -23,7 +24,7 @@ const container = document.getElementById('root')!
 ReactDOM.createRoot(container).render(
   <StrictMode>
     <ErrorBoundary>
-      <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
+      <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/" localization={koKR}>
         <Root />
       </ClerkProvider>
     </ErrorBoundary>

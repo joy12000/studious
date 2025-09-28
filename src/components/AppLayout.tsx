@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Home, Settings, X, List, Menu, Calendar, GraduationCap, LayoutDashboard, BrainCircuit } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react";
 
 // 사이드바 상태 공유를 위한 Context
 interface SidebarContextType {
@@ -37,7 +38,21 @@ const NavLink = ({ to, icon, children, isCollapsed, onClick }: { to: string, ico
     );
 };
 
-const SidebarContent = ({ isCollapsed, onCollapse, isMobile, onMobileCollapse, onLinkClick }: { isCollapsed: boolean, onCollapse?: () => void, isMobile?: boolean, onMobileCollapse?: () => void, onLinkClick?: () => void }) => {
+// Added Clerk component types to SidebarContentProps
+interface SidebarContentProps {
+  isCollapsed: boolean;
+  onCollapse?: () => void;
+  isMobile?: boolean;
+  onMobileCollapse?: () => void;
+  onLinkClick?: () => void;
+  SignedIn: typeof SignedIn;
+  SignedOut: typeof SignedOut;
+  SignInButton: typeof SignInButton;
+  SignUpButton: typeof SignUpButton;
+  UserButton: typeof UserButton;
+}
+
+const SidebarContent = ({ isCollapsed, onCollapse, isMobile, onMobileCollapse, onLinkClick, SignedIn, SignedOut, SignInButton, SignUpButton, UserButton }: SidebarContentProps) => {
     const { setIsSidebarOpen } = useSidebar();
     return (
       <div className="flex h-full max-h-screen flex-col">
@@ -61,7 +76,14 @@ const SidebarContent = ({ isCollapsed, onCollapse, isMobile, onMobileCollapse, o
                 <NavLink to="/settings" icon={<Settings className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>Settings</NavLink>
             </nav>
         </div>
-        <div className="mt-auto p-4 border-t">
+        <div className="mt-auto p-4 border-t flex flex-col gap-2">
+        <SignedOut>
+          <SignInButton mode="modal" className="w-full" />
+          <SignUpButton mode="modal" className="w-full" />
+        </SignedOut>
+        <SignedIn>
+          <UserButton afterSignOutUrl="/" appearance={{elements: {userButtonAvatarBox: "w-full h-full"}}} />
+        </SignedIn>
         {isMobile ? (
           <Button variant="ghost" size="icon" className="w-full" onClick={onMobileCollapse}>
             <Menu className="h-5 w-5" />
@@ -76,7 +98,17 @@ const SidebarContent = ({ isCollapsed, onCollapse, isMobile, onMobileCollapse, o
     );
 };
 
-const AppLayout = ({ children }: { children: React.ReactNode }) => {
+// Added Clerk component types to AppLayoutProps
+interface AppLayoutProps {
+  children: React.ReactNode;
+  SignedIn: typeof SignedIn;
+  SignedOut: typeof SignedOut;
+  SignInButton: typeof SignInButton;
+  SignUpButton: typeof SignUpButton;
+  UserButton: typeof UserButton;
+}
+
+const AppLayout = ({ children, SignedIn, SignedOut, SignInButton, SignUpButton, UserButton }: AppLayoutProps) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(true);
   const [isMobileNavCollapsed, setIsMobileNavCollapsed] = useState(true);
@@ -115,6 +147,11 @@ const AppLayout = ({ children }: { children: React.ReactNode }) => {
                     isMobile={true}
                     onMobileCollapse={() => setIsMobileNavCollapsed(!isMobileNavCollapsed)}
                     onLinkClick={handleLinkClick}
+                    SignedIn={SignedIn}
+                    SignedOut={SignedOut}
+                    SignInButton={SignInButton}
+                    SignUpButton={SignUpButton}
+                    UserButton={UserButton}
                 />
             </aside>
 

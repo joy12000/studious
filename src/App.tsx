@@ -28,16 +28,13 @@ function App() {
   // ... (useEffect 로직은 동일) ...
 
   return (
-    <AppLayout>
-      <header style={{ display: 'flex', justifyContent: 'flex-end', padding: '1rem' }}>
-        <SignedOut>
-          <SignInButton />
-          <SignUpButton />
-        </SignedOut>
-        <SignedIn>
-          <UserButton />
-        </SignedIn>
-      </header>
+    <AppLayout
+      SignedIn={SignedIn}
+      SignedOut={SignedOut}
+      SignInButton={SignInButton}
+      SignUpButton={SignUpButton}
+      UserButton={UserButton}
+    >
       <ShareHandler />
       <Routes>
         <Route path="/" element={<HomePage />} />
