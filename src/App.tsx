@@ -14,6 +14,13 @@ import ReviewDeckPage from './pages/ReviewDeckPage'; // 🧠 복습 덱 페이�
 import ShareHandler from './components/ShareHandler';
 import AppLayout from './components/AppLayout';
 import { useNotes } from './lib/useNotes';
+import {
+  SignedIn,
+  SignedOut,
+  SignInButton,
+  SignUpButton,
+  UserButton,
+} from "@clerk/clerk-react";
 
 function App() {
   const navigate = useNavigate();
@@ -22,6 +29,15 @@ function App() {
 
   return (
     <AppLayout>
+      <header style={{ display: 'flex', justifyContent: 'flex-end', padding: '1rem' }}>
+        <SignedOut>
+          <SignInButton />
+          <SignUpButton />
+        </SignedOut>
+        <SignedIn>
+          <UserButton />
+        </SignedIn>
+      </header>
       <ShareHandler />
       <Routes>
         <Route path="/" element={<HomePage />} />

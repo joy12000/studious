@@ -6,7 +6,13 @@
   "description": "AI-powered note-taking and study assistant PWA for students",
   "author": "joy12000",
   "license": "MIT",
-  "keywords": ["ai", "note-taking", "pwa", "study", "education"],
+  "keywords": [
+    "ai",
+    "note-taking",
+    "pwa",
+    "study",
+    "education"
+  ],
   "homepage": "https://studious-ai.vercel.app",
   "repository": {
     "type": "git",
@@ -28,6 +34,7 @@
     "clean": "rm -rf dist node_modules/.cache"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.49.0",
     "@google/generative-ai": "^0.24.1",
     "@radix-ui/react-popover": "^1.1.15",
     "@radix-ui/react-slot": "^1.2.3",
@@ -49,10 +56,10 @@
     "marked": "^16.2.0",
     "mermaid": "^10.9.1",
     "pdfjs-dist": "^5.4.149",
-    "react": "^18.3.1",
+    "react": "^18.0.0",
     "react-chartjs-2": "^5.2.0",
     "react-day-picker": "^9.11.0",
-    "react-dom": "^18.3.1",
+    "react-dom": "^18.0.0",
     "react-katex": "^3.1.0",
     "react-router-dom": "^7.8.0",
     "tailwind-merge": "^3.3.1",

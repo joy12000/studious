@@ -1,10 +1,11 @@
 import './index.css'
-import React from 'react'
+import React, { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
 import ErrorBoundary from './components/ErrorBoundary'
 import Root from './App'
 import { initInstallCapture } from './lib/install'
 import * as pdfjsLib from 'pdfjs-dist';
+import { ClerkProvider } from '@clerk/clerk-react';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -13,11 +14,18 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 
 initInstallCapture()
 
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+if (!PUBLISHABLE_KEY) {
+  throw new Error("Missing Clerk Publishable Key");
+}
+
 const container = document.getElementById('root')!
 ReactDOM.createRoot(container).render(
-  <React.StrictMode>
+  <StrictMode>
     <ErrorBoundary>
-      <Root />
+      <ClerkProvider publishableKey={PUBLISHABLE_KEY} afterSignOutUrl="/">
+        <Root />
+      </ClerkProvider>
     </ErrorBoundary>
-  </React.StrictMode>
+  </StrictMode>
 )
