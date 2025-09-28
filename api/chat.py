@@ -145,10 +145,7 @@ class handler(BaseHTTPRequestHandler):
 
                 response = model.generate_content(
                     gemini_messages,
-                    stream=True,
-                    generation_config=google.generativeai.types.GenerationConfig(
-                        # include_thoughts=True # Removed as it's not a valid argument
-                    )
+                    stream=True
                 )
                 
                 self.stream_json_response(response)
