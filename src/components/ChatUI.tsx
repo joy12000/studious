@@ -76,6 +76,14 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
   const [syncedImages, setSyncedImages] = useState<{id: string, url: string}[]>([]);
   const [isSyncLoading, setIsSyncLoading] = useState(false);
 
+import { useAuth } from '@clerk/clerk-react';
+import { createClient } from '@supabase/supabase-js';
+
+// ... (rest of the imports)
+
+// ... (inside ChatUI component)
+  const { getToken } = useAuth();
+
   useEffect(() => {
     if (!isSyncedMediaOpen) {
       return;
@@ -84,7 +92,24 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
     const fetchInitialImages = async () => {
       setIsSyncLoading(true);
       try {
-        const { data, error } = await supabase
+        const token = await getToken({ template: 'supabase' });
+        if (!token) {
+          throw new Error("인증 토큰을 가져올 수 없습니다.");
+        }
+
+        const authedSupabase = createClient(
+          import.meta.env.VITE_PUBLICSUPABASE_URL!,
+          import.meta.env.VITE_PUBLICSUPABASE_ANON_KEY!,
+          {
+            global: {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            },
+          }
+        );
+
+        const { data, error } = await authedSupabase
           .from('synced_media')
           .select('id, url')
           .order('created_at', { ascending: false })
@@ -104,6 +129,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
 
     const channel = supabase.channel('synced_media_changes')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'synced_media' }, (payload) => {
+        // This will only receive inserts that the user is allowed to see based on RLS
         setSyncedImages(prev => [payload.new as {id: string, url: string}, ...prev]);
       })
       .subscribe();
@@ -111,7 +137,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isSyncedMediaOpen]);
+  }, [isSyncedMediaOpen, getToken]);
 
   const handleSyncedImageClick = async (imageUrl: string) => {
     try {

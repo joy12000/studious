@@ -14,43 +14,53 @@ class handler(BaseHTTPRequestHandler):
                 self.send_error(500, "Supabase environment variables not set.")
                 return
 
-            supabase: Client = create_client(supabase_url, supabase_key)
+            # 1. Get token from header
+            auth_header = self.headers.get('Authorization')
+            if not auth_header or not auth_header.startswith('Bearer '):
+                self.send_error(401, "Authorization header missing or invalid.")
+                return
+            jwt = auth_header.split('Bearer ')[1]
 
+            # 2. Initialize Supabase client with user's JWT
+            supabase: Client = create_client(
+                supabase_url,
+                supabase_key,
+                options={"global": {"headers": {"Authorization": f"Bearer {jwt}"}}})
+
+            # 3. Parse multipart form data
             content_length = int(self.headers['Content-Length'])
-            # This is a naive way to handle multipart/form-data, good for single file uploads.
-            # For more complex forms, a library would be better.
             form_data = self.rfile.read(content_length)
-
-            # Parse multipart/form-data
             boundary = self.headers.get_boundary().encode()
             parts = form_data.split(b'--' + boundary)
             
             file_part = None
-            content_type = 'application/octet-stream' # Default
+            user_id = None
+            content_type = 'application/octet-stream'
+
             for part in parts:
                 if b'Content-Disposition: form-data; name="file"' in part:
                     headers_section, content = part.split(b'\r\n\r\n', 1)
                     headers = headers_section.split(b'\r\n')
-                    
                     filename_header = [h for h in headers if b'filename' in h][0]
                     filename = filename_header.split(b'filename="')[1].split(b'"')[0].decode()
-                    
                     if any(b'Content-Type' in h for h in headers):
                         content_type_header = [h for h in headers if b'Content-Type' in h][0]
                         content_type = content_type_header.split(b': ')[1].decode()
-
                     file_part = (filename, content.strip(b'\r\n--'))
-                    break
+                
+                if b'Content-Disposition: form-data; name="userId"' in part:
+                    content_section = part.split(b'\r\n\r\n', 1)[1]
+                    user_id = content_section.strip().decode('utf-8')
 
-            if not file_part:
-                self.send_error(400, "File part not found in form data.")
+            if not file_part or not user_id:
+                self.send_error(400, f"File or userId missing. Got file: {"yes" if file_part else "no"}, Got userId: {"yes" if user_id else "no"}")
                 return
 
             filename, file_bytes = file_part
             file_extension = os.path.splitext(filename)[1]
-            new_filename = f'public/{uuid.uuid4()}{file_extension}'
+            new_filename = f'public/{user_id}/{uuid.uuid4()}{file_extension}'
 
-            # 1. Upload to Supabase Storage
+            # 4. Upload to Supabase Storage
             try:
                 response = supabase.storage.from_('synced_media').upload(
                     new_filename, 
@@ -60,22 +70,16 @@ class handler(BaseHTTPRequestHandler):
             except Exception as e:
                 raise Exception(f"Storage upload failed: {e}")
 
-            # 2. Get public URL
+            # 5. Get public URL
             public_url_response = supabase.storage.from_('synced_media').get_public_url(new_filename)
-            
             public_url = public_url_response
 
-            # 3. Insert URL into Supabase Database
-            print(f"Attempting to insert URL: {public_url} into synced_media table.")
+            # 6. Insert URL and userId into Supabase Database
             insert_response = supabase.table('synced_media').insert({
                 'url': public_url,
-                # 'user_id': 'some_user_id' # TODO: Add user auth later
+                'user_id': user_id
             }).execute()
             print(f"Insert response: {insert_response}")
-
-            # The supabase-py library raises an exception on failure, which is handled
-            # by the main try/except block. This explicit error check is removed
-            # as it causes a crash on successful insertions.
 
             self.send_response(200)
             self.send_header('Content-type', 'application/json')

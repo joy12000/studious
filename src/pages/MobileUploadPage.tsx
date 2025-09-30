@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2, UploadCloud, CheckCircle, AlertTriangle, X, Camera } from 'lucide-react'; // Added Camera
+import { Loader2, UploadCloud, CheckCircle, AlertTriangle, X, Camera } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '@clerk/clerk-react';
 
 export default function MobileUploadPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const { userId, getToken } = useAuth();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
@@ -28,18 +30,33 @@ export default function MobileUploadPage() {
       toast.error('먼저 파일을 선택해주세요.');
       return;
     }
+    if (!userId || !getToken) {
+      toast.error('로그인이 필요합니다. 페이지를 새로고침 해주세요.');
+      return;
+    }
 
     setIsUploading(true);
     let allUploadsSuccessful = true;
     const uploadedUrls: string[] = [];
 
+    const token = await getToken({ template: 'supabase' });
+    if (!token) {
+      toast.error('인증에 실패했습니다. 다시 로그인해주세요.');
+      setIsUploading(false);
+      return;
+    }
+
     for (const file of selectedFiles) {
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('userId', userId);
 
       try {
         const response = await fetch('/api/add-synced-media', {
           method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
           body: formData,
         });
 
