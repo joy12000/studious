@@ -30,6 +30,7 @@ type RemoteNote = {
  * - Delete local notes if they are marked as `is_deleted` on remote.
  */
 export async function syncNotes(
+    userId: string,
     getToken: (options?: { template?: string }) => Promise<string | null>
 ) {
     // 1. Get Supabase client with Clerk JWT
@@ -50,50 +51,78 @@ export async function syncNotes(
     if (remoteError) throw remoteError;
 
     const remoteNotes = remoteNotesData as RemoteNote[];
-    const localNotes = await db.notes.toArray();
-    const localNotesMap = new Map(localNotes.map(n => [n.id, n]));
+    const allLocalNotes = await db.notes.toArray(); // Get all notes, including soft-deleted
+
+    const remoteNotesMap = new Map(remoteNotes.map(n => [n.id, n]));
 
     const notesToPutLocally: Note[] = [];
     const idsToDeleteLocally: string[] = [];
+    const notesToUpsertToRemote: Note[] = [];
 
-    // 3. Compare remote notes to local notes
+    // 3. Compare remote to local (PULL logic)
     for (const remoteNote of remoteNotes) {
-        const localNote = localNotesMap.get(remoteNote.id);
+        const localNote = allLocalNotes.find(n => n.id === remoteNote.id);
         const remoteUpdatedAt = new Date(remoteNote.updated_at).getTime();
 
-        // If remote note is marked as deleted, ensure it's deleted locally
         if (remoteNote.is_deleted) {
-            if (localNote) {
-                idsToDeleteLocally.push(remoteNote.id);
-            }
+            if (localNote) idsToDeleteLocally.push(remoteNote.id);
             continue;
         }
 
-        // Convert remote note format to local Note format
-        const noteToStore: Note = {
-            id: remoteNote.id,
-            title: remoteNote.title || '',
-            content: remoteNote.content || '',
-            noteType: remoteNote.note_type || 'general',
-            subjectId: remoteNote.subject_id || undefined,
-            sourceType: remoteNote.source_type || 'other',
-            sourceUrl: remoteNote.source_url,
-            createdAt: remoteNote.created_at,
-            updatedAt: remoteUpdatedAt,
-            noteDate: remoteNote.note_date || undefined,
-            key_insights: remoteNote.key_insights || [],
-            favorite: remoteNote.favorite,
-            attachments: remoteNote.attachments || undefined,
-            chatHistory: remoteNote.chatHistory || undefined,
-        };
-
-        // If note doesn't exist locally OR remote is newer, schedule for local update/add
         if (!localNote || remoteUpdatedAt > localNote.updatedAt) {
+            const noteToStore: Note = {
+                id: remoteNote.id,
+                title: remoteNote.title || '',
+                content: remoteNote.content || '',
+                noteType: remoteNote.note_type || 'general',
+                subjectId: remoteNote.subject_id || undefined,
+                sourceType: remoteNote.source_type || 'other',
+                sourceUrl: remoteNote.source_url,
+                createdAt: remoteNote.created_at,
+                updatedAt: remoteUpdatedAt,
+                noteDate: remoteNote.note_date || undefined,
+                key_insights: remoteNote.key_insights || [],
+                favorite: remoteNote.favorite,
+                attachments: remoteNote.attachments || undefined,
+                chatHistory: remoteNote.chatHistory || undefined,
+                is_deleted: remoteNote.is_deleted,
+            };
             notesToPutLocally.push(noteToStore);
         }
     }
 
-    // 4. Execute batch operations on local DB
+    // 4. Compare local to remote (PUSH logic)
+    for (const localNote of allLocalNotes) {
+        const remoteNote = remoteNotesMap.get(localNote.id);
+        if (!remoteNote || localNote.updatedAt > new Date(remoteNote.updated_at).getTime()) {
+            notesToUpsertToRemote.push(localNote);
+        }
+    }
+
+    // 5. Execute DB operations
+    if (notesToUpsertToRemote.length > 0) {
+        const upsertData = notesToUpsertToRemote.map(n => ({
+            id: n.id,
+            user_id: userId,
+            title: n.title,
+            content: n.content,
+            note_type: n.noteType,
+            subject_id: n.subjectId,
+            source_type: n.sourceType,
+            source_url: n.sourceUrl,
+            created_at: n.createdAt,
+            updated_at: new Date(n.updatedAt).toISOString(),
+            note_date: n.noteDate,
+            key_insights: n.key_insights,
+            favorite: n.favorite,
+            attachments: n.attachments,
+            chatHistory: n.chatHistory,
+            is_deleted: n.is_deleted || false,
+        }));
+        const { error } = await supabase.from('notes').upsert(upsertData);
+        if (error) throw new Error(`Failed to upsert notes to Supabase: ${error.message}`);
+    }
+
     if (notesToPutLocally.length > 0) {
         await db.notes.bulkPut(notesToPutLocally);
     }
@@ -104,5 +133,6 @@ export async function syncNotes(
     return {
         addedOrUpdated: notesToPutLocally.length,
         deleted: idsToDeleteLocally.length,
+        pushed: notesToUpsertToRemote.length,
     };
 }

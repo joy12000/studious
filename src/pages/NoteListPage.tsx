@@ -13,18 +13,21 @@ import toast from 'react-hot-toast';
 export default function NoteListPage() {
   const { notes, loading, filters, setFilters, toggleFavorite, importNote } = useNotes();
   const navigate = useNavigate();
-  const { getToken } = useAuth();
+  const { getToken, userId } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
 
   const handleSync = async () => {
-    if (!getToken) return;
+    if (!getToken || !userId) {
+      toast.error('로그인이 필요합니다.');
+      return;
+    }
 
     setIsSyncing(true);
     const toastId = toast.loading('Supabase와 노트 동기화를 시작합니다...');
 
     try {
-      const result = await syncNotes(getToken);
-      toast.success(`동기화 완료! (추가/업데이트: ${result.addedOrUpdated}, 삭제: ${result.deleted})`, { id: toastId });
+      const result = await syncNotes(userId, getToken);
+      toast.success(`동기화 완료! (가져오기: ${result.addedOrUpdated}, 로컬 삭제: ${result.deleted}, 원격 푸시: ${result.pushed})`, { id: toastId });
     } catch (error) {
       console.error("Sync failed", error);
       toast.error(error instanceof Error ? error.message : '알 수 없는 오류로 동기화에 실패했습니다.', { id: toastId });

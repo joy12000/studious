@@ -78,6 +78,7 @@ export interface Note {
   favorite: boolean;
   attachments?: Attachment[];
   chatHistory?: Message[]; // Added chatHistory
+  is_deleted?: boolean; // For soft-delete sync
 }
 
 // 🧠 [기능 추가] 복습 덱 아이템 타입

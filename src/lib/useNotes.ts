@@ -89,7 +89,9 @@ export function useNotes(defaultFilters?: Filters) {
     const schedule = useLiveQuery(() => db.schedule.toArray(), []);
     
     const filteredNotes = useLiveQuery(async () => {
-      let query = db.notes.toCollection();
+      // Start by filtering out soft-deleted notes
+      let query = db.notes.filter(note => !note.is_deleted);
+
       if (filters.search) {
           const searchQuery = filters.search.toLowerCase();
           query = query.filter(n =>
@@ -128,6 +130,7 @@ export function useNotes(defaultFilters?: Filters) {
         attachments: [],
         subjectId: task.payload.subjectId,
         sourceUrl: task.noteType === 'youtube_summary' ? task.payload.youtubeUrl : undefined,
+        is_deleted: false,
       };
 
       await db.notes.add(placeholderNote);
@@ -173,7 +176,7 @@ export function useNotes(defaultFilters?: Filters) {
     const toggleFavorite = async (id: string) => {
         const note = await db.notes.get(id);
         if (!note) return;
-        await db.notes.update(id, { favorite: !note.favorite });
+        await db.notes.update(id, { favorite: !note.favorite, updatedAt: Date.now() });
     };
 
 
@@ -395,7 +398,8 @@ export function useNotes(defaultFilters?: Filters) {
     };
 
     const deleteNote = async (id: string) => {
-      await db.notes.delete(id);
+      // Soft delete by setting a flag and updating the timestamp
+      await db.notes.update(id, { is_deleted: true, updatedAt: Date.now() });
     };
 
     const addSubject = async (name: string, color?: string) => {
