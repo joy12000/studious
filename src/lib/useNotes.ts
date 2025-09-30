@@ -58,7 +58,7 @@ export interface AddNoteFromAssignmentPayload {
 }
 
 export interface StartBackgroundTaskPayload {
-  noteType: 'textbook' | 'review';
+  noteType: 'textbook' | 'review' | 'youtube_summary' | 'assignment';
   payload: any; // The data for the backend API
   subjectName?: string; // Optional subject name for placeholder
 }
@@ -107,22 +107,27 @@ export function useNotes(defaultFilters?: Filters) {
 
     const startBackgroundTask = async (task: StartBackgroundTaskPayload) => {
       const noteId = uuidv4();
-      const placeholderTitle = task.noteType === 'textbook' 
-        ? `[생성 중] ${task.subjectName || '참고서'}` 
-        : '[생성 중] 복습 노트';
+      
+      const typeToTitle: Record<StartBackgroundTaskPayload['noteType'], string> = {
+        textbook: `[생성 중] ${task.subjectName || '참고서'}`,
+        review: '[생성 중] 복습 노트',
+        youtube_summary: '[생성 중] YouTube 요약',
+        assignment: '[생성 중] AI 과제 도우미',
+      };
 
       const placeholderNote: Note = {
         id: noteId,
-        title: placeholderTitle,
+        title: typeToTitle[task.noteType],
         content: 'AI가 노트를 생성하고 있습니다. 잠시만 기다려주세요...',
         noteType: task.noteType,
-        sourceType: 'other',
+        sourceType: task.noteType === 'youtube_summary' ? 'youtube' : 'other',
         createdAt: new Date().toISOString(),
         updatedAt: Date.now(),
         favorite: false,
         key_insights: [],
         attachments: [],
         subjectId: task.payload.subjectId,
+        sourceUrl: task.noteType === 'youtube_summary' ? task.payload.youtubeUrl : undefined,
       };
 
       await db.notes.add(placeholderNote);
@@ -137,25 +142,26 @@ export function useNotes(defaultFilters?: Filters) {
             if (!registration.active) {
                 throw new Error("Service Worker is not active.");
             }
+            
+            const messageType = `GENERATE_${task.noteType.toUpperCase()}`;
+
             registration.active.postMessage({
-              type: task.noteType === 'textbook' ? 'GENERATE_TEXTBOOK' : 'GENERATE_REVIEW_NOTE',
+              type: messageType,
               payload: {
                 noteId: noteId,
                 body: task.payload,
               },
             });
         } catch (err) {
-            // Handle cases where SW is supported but fails to become ready
             await db.notes.update(noteId, { 
-              title: `[생성 실패] ${placeholderTitle}`,
+              title: `[생성 실패] ${typeToTitle[task.noteType]}`,
               content: `서비스 워커 준비 중 오류가 발생했습니다: ${err.message}`
             });
-            throw err; // Re-throw to be caught by the UI
+            throw err;
         }
       } else {
-        // Fallback or error if SW is not supported
         await db.notes.update(noteId, { 
-          title: `[생성 실패] ${placeholderTitle}`,
+          title: `[생성 실패] ${typeToTitle[task.noteType]}`,
           content: '서비스 워커가 지원되지 않아 백그라운드 생성을 시작할 수 없습니다.'
         });
         throw new Error("Service Worker is not supported in this browser.");
@@ -170,52 +176,7 @@ export function useNotes(defaultFilters?: Filters) {
         await db.notes.update(id, { favorite: !note.favorite });
     };
 
-    const addNote = async (payload: AddNotePayload) => {
-      const { youtubeUrl, onProgress, onComplete, onError } = payload;
-      
-      onProgress?.('YouTube 영상 요약을 시작합니다...');
 
-      try {
-        const response = await fetch('/api/summarize_youtube', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ youtubeUrl }),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.details || errorData.error || 'YouTube 요약 중 오류가 발생했습니다.');
-        }
-
-        const result = await response.json();
-        const { title, summary: content, key_insights: insights } = result; // Remove 'tag: subject' from destructuring
-
-        // For YouTube notes, we do not create or assign a subject.
-        // The subjectId will be undefined, as it's an optional field in the Note interface.
-        const newNote: Note = {
-          id: uuidv4(),
-          title,
-          content,
-          // subjectId is intentionally omitted for YouTube notes
-          noteType: 'general',
-          sourceType: 'youtube',
-          sourceUrl: youtubeUrl,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().getTime(),
-          favorite: false,
-          attachments: [],
-          key_insights: insights || [],
-        };
-    
-        await db.notes.add(newNote);
-        onComplete?.(newNote);
-
-      } catch (err) {
-        console.error("YouTube summarization failed:", err);
-        const errorMessage = err instanceof Error ? err.message : "YouTube 영상을 처리하는 중 오류가 발생했습니다.";
-        onError?.(errorMessage);
-      }
-    };
 
     const addNoteFromReview = async (args: AddNoteFromReviewPayload) => {
       const { aiConversationText, files, subjects, onProgress, onComplete, onError, noteDate } = args;
@@ -556,7 +517,6 @@ export function useNotes(defaultFilters?: Filters) {
         filters,
         setFilters,
         toggleFavorite,
-        addNote,
         addNoteFromReview,
         addScheduleFromImage,
         addNoteFromTextbook,

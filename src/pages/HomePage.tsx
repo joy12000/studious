@@ -2,9 +2,8 @@ import { generateFallbackIconDataUrl } from '../lib/utils';
 
 import React, { useState, useEffect } from "react";
 import { useNotes } from "../lib/useNotes";
-import { useLoading } from "../lib/useLoading"; // ✨ useLoading 임포트
-import LoadingOverlay from '../components/LoadingOverlay'; // ✨ LoadingOverlay 임포트
 import { useNavigate, useLocation } from "react-router-dom";
+import toast from 'react-hot-toast';
 import { Loader2, Youtube, ArrowRight, File, BrainCircuit, AppWindow, Pencil, Check, Trash2, Plus, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -38,11 +37,11 @@ const defaultLinks: ExternalLinkItem[] = [
 const LINKS_STORAGE_KEY = 'studious-external-links';
 
 export default function HomePage() {
-  const { addNote } = useNotes();
+  const { startBackgroundTask } = useNotes();
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { isLoading, loadingMessage, startLoading, stopLoading, setMessage } = useLoading();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
   const [headline, setHeadline] = useState(HEADLINES[0]); // Add headline state
 
@@ -106,49 +105,56 @@ export default function HomePage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleProgress = (status: string) => setMessage(status);
-  const handleComplete = (note: any) => {
-    stopLoading();
-    navigate(`/note/${note.id}`);
-  };
-  const handleError = (error: string) => {
-    stopLoading();
-    alert(`오류가 발생했습니다: ${error}`);
-  };
-
   const handleYoutubeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!youtubeUrl) return;
-    startLoading('YouTube 영상 요약을 시작합니다...');
-    await addNote({ youtubeUrl, onProgress: handleProgress, onComplete: handleComplete, onError: handleError });
+    if (!youtubeUrl || !youtubeUrl.includes('youtu')) {
+      toast.error('올바른 YouTube 링크를 입력해주세요.');
+      return;
+    }
+    
+    setIsSubmitting(true);
+    try {
+      await startBackgroundTask({
+        noteType: 'youtube_summary',
+        payload: { youtubeUrl },
+      });
+      toast.success('YouTube 요약이 백그라운드에서 시작되었습니다!');
+      setYoutubeUrl('');
+    } catch (error) {
+      console.error("YouTube 요약 시작 중 오류 발생:", error);
+      toast.error(`요약 시작 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   useEffect(() => {
     const queryParams = new URLSearchParams(location.search);
     const shareUrl = queryParams.get('share_url');
     if (shareUrl) {
-      setYoutubeUrl(shareUrl);
-      startLoading('공유된 YouTube 영상 요약을 시작합니다...');
-      addNote({ 
-        youtubeUrl: shareUrl, 
-        onProgress: handleProgress, 
-        onComplete: (note) => {
-          stopLoading();
-          navigate(`/note/${note.id}`, { replace: true });
-        }, 
-        onError: (error) => {
-          stopLoading();
-          alert(`오류가 발생했습니다: ${error}`);
-          navigate('/', { replace: true });
-        } 
-      });
+      const processShare = async () => {
+        toast.loading('공유된 YouTube 영상 요약을 시작합니다...');
+        try {
+          await startBackgroundTask({
+            noteType: 'youtube_summary',
+            payload: { youtubeUrl: shareUrl },
+          });
+          toast.dismiss();
+          toast.success('백그라운드에서 요약이 시작되었습니다!');
+          navigate('.', { replace: true }); // Clear query params
+        } catch (error) {
+          toast.dismiss();
+          toast.error(`요약 시작 중 오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+          navigate('.', { replace: true }); // Clear query params
+        }
+      };
+      processShare();
     }
-  }, [location, addNote, navigate]);
+  }, []); // Run only once on mount
 
 
   return (
     <>
-      {isLoading && <LoadingOverlay message={loadingMessage} />}
       <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4 sm:p-8">
         <div className="absolute top-4 right-4 z-10">
           <Popover>
@@ -219,8 +225,8 @@ export default function HomePage() {
               placeholder="YouTube 영상 링크를 붙여넣으세요"
               className="flex-grow bg-transparent px-2 py-2 focus:outline-none"
             />
-            <Button type="submit" size="icon" className="rounded-full flex-shrink-0">
-              <ArrowRight className="h-5 w-5" />
+            <Button type="submit" size="icon" className="rounded-full flex-shrink-0" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
             </Button>
           </form>
 

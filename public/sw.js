@@ -132,6 +132,93 @@ self.addEventListener('message', (event) => {
         });
       }
     })());
+  } else if (event.data && event.data.type === 'GENERATE_YOUTUBE_SUMMARY') {
+    const { payload } = event.data;
+    event.waitUntil((async () => {
+      try {
+        const response = await fetch('/api/summarize_youtube', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload.body),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+        }
+
+        const result = await response.json();
+        const { title, summary: content, key_insights } = result;
+
+        await db.notes.update(payload.noteId, {
+          title,
+          content,
+          key_insights: key_insights || [],
+          sourceType: 'youtube',
+          sourceUrl: payload.body.youtubeUrl,
+          updatedAt: Date.now(),
+        });
+
+        await showSafeNotification('YouTube 요약 완료!', {
+          body: `\'${title}\' 요약이 완료되었습니다.`,
+          icon: '/icon-192.png',
+          data: { url: `/note/${payload.noteId}` }
+        });
+
+      } catch (error) {
+        console.error('YouTube summary generation failed in service worker:', error);
+        await db.notes.update(payload.noteId, {
+            title: '[생성 실패] YouTube 요약',
+            content: `오류가 발생하여 YouTube 요약을 완료하지 못했습니다.\n\n${error.message}`
+        });
+        await showSafeNotification('YouTube 요약 실패', {
+          body: '오류가 발생하여 YouTube를 요약하지 못했습니다.',
+          icon: '/icon-192.png',
+        });
+      }
+    })());
+  } else if (event.data && event.data.type === 'GENERATE_ASSIGNMENT') {
+    const { payload } = event.data;
+    event.waitUntil((async () => {
+      try {
+        const response = await fetch('/api/assignment_helper', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload.body),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+        }
+
+        const result = await response.json();
+
+        await db.notes.update(payload.noteId, {
+          title: result.title,
+          content: result.content,
+          subjectId: result.subjectId,
+          updatedAt: Date.now(),
+        });
+
+        await showSafeNotification('AI 과제 도우미 완료!', {
+          body: `\'${result.title}\' 생성이 완료되었습니다.`,
+          icon: '/icon-192.png',
+          data: { url: `/note/${payload.noteId}` }
+        });
+
+      } catch (error) {
+        console.error('Assignment generation failed in service worker:', error);
+        await db.notes.update(payload.noteId, {
+            title: '[생성 실패] AI 과제 도우미',
+            content: `오류가 발생하여 과제 도우미 노트를 생성하지 못했습니다.\n\n${error.message}`
+        });
+        await showSafeNotification('AI 과제 도우미 생성 실패', {
+          body: '오류가 발생하여 과제 도우미 노트를 생성하지 못했습니다.',
+          icon: '/icon-192.png',
+        });
+      }
+    })());
   }
 });
 
