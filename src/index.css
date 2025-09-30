@@ -174,3 +174,6 @@
 .dark .prose a {
   color: var(--foreground); /* Use white for links in dark mode prose */
 }
+.dark .prose li a {
+  color: var(--foreground) !important; /* Use white for links in dark mode prose */
+}
