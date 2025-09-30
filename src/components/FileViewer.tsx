@@ -4,14 +4,12 @@ import React, { useEffect, useState } from 'react';
 import { Attachment } from '../lib/types';
 import MarkdownRenderer from './MarkdownRenderer';
 import { Document, Page, pdfjs } from 'react-pdf';
-import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
-import 'react-pdf/dist/esm/Page/TextLayer.css';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 
 // PDF.js worker 설정
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.js',
-  import.meta.url,
-).toString();
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.js?url';
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface FileViewerProps {
   attachment: Attachment | null;
