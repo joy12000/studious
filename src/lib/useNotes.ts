@@ -64,7 +64,7 @@ export interface StartBackgroundTaskPayload {
 }
 
 export function useNotes(defaultFilters?: Filters) {
-    const [filters, setFilters] = useState<Filters>(defaultFilters || {});
+    const [filters, setFilters] = useState<Filters>(defaultFilters || { noteType: 'textbook' });
 
     const notes = useLiveQuery(() => db.notes.toArray(), []);
     const allSubjects = useLiveQuery(() => db.subjects.toArray(), []);
