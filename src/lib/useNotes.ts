@@ -57,6 +57,12 @@ export interface AddNoteFromAssignmentPayload {
     onError: (error: string) => void;
 }
 
+export interface StartBackgroundTaskPayload {
+  noteType: 'textbook' | 'review';
+  payload: any; // The data for the backend API
+  subjectName?: string; // Optional subject name for placeholder
+}
+
 export function useNotes(defaultFilters?: Filters) {
     const [filters, setFilters] = useState<Filters>(defaultFilters || {});
 
@@ -98,6 +104,53 @@ export function useNotes(defaultFilters?: Filters) {
     }, [filters]);
 
     const loading = filteredNotes === undefined;
+
+    const startBackgroundTask = async (task: StartBackgroundTaskPayload) => {
+      const noteId = uuidv4();
+      const placeholderTitle = task.noteType === 'textbook' 
+        ? `[생성 중] ${task.subjectName || '참고서'}` 
+        : '[생성 중] 복습 노트';
+
+      const placeholderNote: Note = {
+        id: noteId,
+        title: placeholderTitle,
+        content: 'AI가 노트를 생성하고 있습니다. 잠시만 기다려주세요...',
+        noteType: task.noteType,
+        sourceType: 'other',
+        createdAt: new Date().toISOString(),
+        updatedAt: Date.now(),
+        favorite: false,
+        key_insights: [],
+        attachments: [],
+        subjectId: task.payload.subjectId,
+      };
+
+      await db.notes.add(placeholderNote);
+
+      if (Notification.permission === 'default') {
+        await Notification.requestPermission();
+      }
+
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        const registration = await navigator.serviceWorker.ready;
+        registration.active?.postMessage({
+          type: task.noteType === 'textbook' ? 'GENERATE_TEXTBOOK' : 'GENERATE_REVIEW_NOTE',
+          payload: {
+            noteId: noteId,
+            body: task.payload,
+          },
+        });
+      } else {
+        // Fallback or error if SW is not available
+        await db.notes.update(noteId, { 
+          title: `[생성 실패] ${placeholderTitle}`,
+          content: '서비스 워커가 활성화되어 있지 않아 백그라운드 생성을 시작할 수 없습니다.'
+        });
+        throw new Error("Service Worker is not active.");
+      }
+      
+      return placeholderNote;
+    };
 
     const toggleFavorite = async (id: string) => {
         const note = await db.notes.get(id);
@@ -511,5 +564,6 @@ export function useNotes(defaultFilters?: Filters) {
         deleteReviewItem,
         activityData,
         saveReviewNote,
+        startBackgroundTask,
     };
 }

@@ -14,14 +14,16 @@ import { convertPdfToImages } from "../lib/pdfUtils";
 import { v4 as uuidv4 } from 'uuid';
 import { db } from '../lib/db';
 import { upload } from '@vercel/blob/client';
+import toast from 'react-hot-toast';
 
 export default function ReviewPage() {
-  const { allSubjects, notes } = useNotes();
+  const { allSubjects, notes, startBackgroundTask } = useNotes();
   const navigate = useNavigate();
   const location = useLocation();
   
   const [files, setFiles] = useState<File[]>([]);
-  const { isLoading, loadingMessage, startLoading, stopLoading, setMessage } = useLoading();
+  const [isUploading, setIsUploading] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -61,15 +63,13 @@ export default function ReviewPage() {
 
   const handleSave = async () => {
     if (files.length === 0 && selectedExistingNotes.length === 0) {
-      setError("하나 이상의 학습 자료 또는 기존 노트를 선택해주세요.");
+      toast.error("하나 이상의 학습 자료 또는 기존 노트를 선택해주세요.");
       return;
     }
     setError(null);
 
-    alert("백그라운드에서 복습 노트 생성을 시작합니다. 완료되면 알려드릴게요!");
-    navigate('/');
-
-    startLoading("파일 업로드 및 생성 준비 중...");
+    setIsUploading(true);
+    setLoadingMessage('파일 업로드 및 생성 준비 중...');
 
     try {
       let blobUrls: string[] = [];
@@ -85,10 +85,7 @@ export default function ReviewPage() {
           blobUrls = blobResults.map(b => b.url);
       }
 
-      stopLoading();
-
-      const noteId = uuidv4();
-      const noteDateStr = selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined;
+      setLoadingMessage('AI 복습 노트 생성 작업 시작 중...');
       
       let combinedContent = "";
       selectedExistingNotes.forEach(note => {
@@ -99,46 +96,23 @@ export default function ReviewPage() {
         blobUrls,
         aiConversationText: combinedContent.trim(),
         subjects: allSubjects || [],
-        noteDate: noteDateStr,
+        noteDate: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
       };
 
-      const placeholderNote: Note = {
-        id: noteId,
-        title: '[생성 중] 복습 노트',
-        content: 'AI가 복습 노트를 생성하고 있습니다. 잠시만 기다려주세요...', 
+      await startBackgroundTask({
         noteType: 'review',
-        sourceType: 'other',
-        createdAt: new Date().toISOString(),
-        updatedAt: Date.now(),
-        favorite: false,
-        key_insights: [],
-        attachments: [], // Add empty attachments array
-      };
-      await db.notes.add(placeholderNote);
+        payload: api_payload,
+      });
 
-      // Request notification permission before starting
-      if (Notification.permission === 'default') {
-        await Notification.requestPermission();
-      }
-
-      if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({
-          type: 'GENERATE_REVIEW_NOTE',
-          payload: {
-            noteId: noteId,
-            body: api_payload,
-          },
-        });
-      } else {
-        throw new Error("Service Worker가 활성화되어 있지 않아 백그라운드 생성을 진행할 수 없습니다.");
-      }
+      toast.success('AI 복습 노트 생성이 백그라운드에서 시작되었습니다!');
+      navigate('/notes');
 
     } catch (err) {
       console.error("Review note background generation failed:", err);
-      setError(err instanceof Error ? err.message : "복습 노트 생성 중 알 수 없는 오류가 발생했습니다.");
-      stopLoading();
-      // Optionally update placeholder to error state
-      // await db.notes.update(noteId, { title: '[생성 실패] 복습 노트', content: err.message });
+      toast.error(err instanceof Error ? err.message : "복습 노트 생성 중 알 수 없는 오류가 발생했습니다.");
+    } finally {
+      setIsUploading(false);
+      setLoadingMessage('');
     }
   };
 
@@ -162,17 +136,19 @@ export default function ReviewPage() {
       if (file.type === 'application/pdf') {
         const isScanned = window.confirm("이 PDF가 스캔된 문서인가요? (텍스트 선택이 불가능한 경우) '확인'을 누르면 이미지로 변환하고, '취소'를 누르면 텍스트로 처리합니다.");
         if (isScanned) {
-            startLoading('PDF를 이미지로 변환 중...');
+            setIsUploading(true);
+            setLoadingMessage('PDF를 이미지로 변환 중...');
             try {
               const images = await convertPdfToImages(file, (progress) => {
-                setMessage(`PDF 변환 중... (${progress.pageNumber}/${progress.totalPages})`);
+                setLoadingMessage(`PDF 변환 중... (${progress.pageNumber}/${progress.totalPages})`);
               });
               filesToAdd.push(...images);
             } catch (error) {
               console.error("PDF 변환 실패:", error);
               setError('PDF 파일을 이미지로 변환하는 데 실패했습니다.');
             } finally {
-              stopLoading();
+              setIsUploading(false);
+              setLoadingMessage('');
             }
         } else {
             filesToAdd.push(file);
@@ -222,7 +198,7 @@ export default function ReviewPage() {
 
   return (
     <>
-      {isLoading && <LoadingOverlay message={loadingMessage as string} />}
+      {isUploading && <LoadingOverlay message={loadingMessage as string} />}
       <div className="min-h-screen w-full flex flex-col items-center justify-center p-4">
         <Card className="w-full max-w-2xl">
             <CardHeader className="text-center">
@@ -317,8 +293,8 @@ export default function ReviewPage() {
             </CardContent>
             <CardFooter className="flex-col gap-4 pt-4">
                 {error && <p className="text-destructive text-sm text-center">{error}</p>}
-                <Button size="lg" className="w-full" onClick={handleSave} disabled={isLoading || (files.length === 0 && selectedExistingNotes.length === 0)}>
-                    {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <ArrowRight className="mr-2 h-5 w-5"/>}
+                <Button size="lg" className="w-full" onClick={handleSave} disabled={isUploading || (files.length === 0 && selectedExistingNotes.length === 0)}>
+                    {isUploading ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : <ArrowRight className="mr-2 h-5 w-5"/>}
                     복습 노트 생성
                 </Button>
             </CardFooter>

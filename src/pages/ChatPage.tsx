@@ -13,9 +13,10 @@ import LoadingOverlay from '../components/LoadingOverlay';
 import { upload } from '@vercel/blob/client';
 import { convertPdfToImages } from '../lib/pdfUtils';
 import { v4 as uuidv4 } from 'uuid';
+import toast from 'react-hot-toast';
 
 export default function ChatPage() {
-  const { allSubjects, addNoteFromTextbook } = useNotes();
+  const { allSubjects, startBackgroundTask } = useNotes();
   const navigate = useNavigate();
   const location = useLocation();
   const settings = useLiveQuery(() => db.settings.get('default'));
@@ -116,12 +117,9 @@ export default function ChatPage() {
 
   const handleGenerate = async () => {
     if (uploadedFiles.length === 0 || !selectedSubject) {
-      alert('과목과 하나 이상의 파일을 업로드해주세요.');
+      toast.error('과목과 하나 이상의 파일을 업로드해주세요.');
       return;
     }
-
-    alert("백그라운드에서 참고서 생성을 시작합니다. 완료되면 알려드릴게요!");
-    navigate('/');
 
     setIsUploading(true);
     setLoadingMessage(`파일 ${uploadedFiles.length}개 업로드 중...`);
@@ -136,9 +134,8 @@ export default function ChatPage() {
         )
       );
       
-      setIsUploading(false);
+      setLoadingMessage('AI 참고서 생성 작업 시작 중...');
 
-      const noteId = uuidv4();
       const api_payload = {
           blobUrls: blobResults.map(b => b.url),
           subject: selectedSubject.name,
@@ -150,39 +147,21 @@ export default function ChatPage() {
           noteDate: selectedDate ? format(selectedDate, 'yyyy-MM-dd') : undefined,
       };
 
-      await addNoteFromTextbook(
-        `[생성 중] ${selectedSubject.name} 참고서`,
-        'AI가 참고서를 생성하고 있습니다. 잠시만 기다려주세요...',
-        selectedSubject.id,
-        uploadedFiles,
-        api_payload.noteDate,
-        noteId
-      );
+      await startBackgroundTask({
+        noteType: 'textbook',
+        payload: api_payload,
+        subjectName: selectedSubject.name,
+      });
 
-      // Request notification permission before starting
-      if (Notification.permission === 'default') {
-        await Notification.requestPermission();
-      }
-
-      // Send message to Service Worker
-      if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({
-          type: 'GENERATE_TEXTBOOK',
-          payload: {
-            noteId: noteId,
-            body: api_payload,
-          },
-        });
-      } else {
-        throw new Error("Service Worker가 활성화되어 있지 않아 백그라운드 생성을 진행할 수 없습니다.");
-      }
+      toast.success('AI 참고서 생성이 백그라운드에서 시작되었습니다!');
+      navigate('/notes'); // 작업 시작 후 노트 목록으로 이동
 
     } catch(error) {
-        console.error("참고서 생성 사전 작업(파일 업로드 등) 중 오류 발생:", error);
-        alert(`백그라운드 생성 시작 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
-        navigate('/');
+        console.error("참고서 생성 사전 작업 중 오류 발생:", error);
+        toast.error(`백그라운드 생성 시작 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
     } finally {
       setIsUploading(false);
+      setLoadingMessage('');
     }
   };
   

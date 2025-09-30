@@ -5,6 +5,8 @@ import { Home, Settings, X, List, Menu, Calendar, GraduationCap, LayoutDashboard
 import { cn } from "@/lib/utils";
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react";
 
+import { Toaster } from 'react-hot-toast';
+
 // 사이드바 상태 공유를 위한 Context
 interface SidebarContextType {
   isSidebarOpen: boolean;
@@ -120,6 +122,7 @@ const AppLayout = ({ children, SignedIn, SignedOut, SignInButton, SignUpButton, 
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, setIsSidebarOpen }}>
+        <Toaster position="bottom-center" />
         <div className="flex flex-col h-screen w-full">
             {/* Mobile Overlay */}
             {isSidebarOpen && (
