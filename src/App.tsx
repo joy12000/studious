@@ -11,6 +11,7 @@ import ChatPage from './pages/ChatPage';
 import AssignmentHelperPage from './pages/AssignmentHelperPage';
 import DashboardPage from './pages/DashboardPage'; // 📈 대시보드 페이지 임포트
 import ReviewDeckPage from './pages/ReviewDeckPage'; // 🧠 복습 덱 페이지 임포트
+import MobileUploadPage from './pages/MobileUploadPage';
 import ShareHandler from './components/ShareHandler';
 import AppLayout from './components/AppLayout';
 import { useNotes } from './lib/useNotes';
@@ -49,6 +50,7 @@ function App() {
         <Route path="/share" element={<ShareHandler />} />
         <Route path="/shared-note" element={<SharedNotePage />} />
         <Route path="/chat" element={<ChatPage />} />
+        <Route path="/m/upload" element={<MobileUploadPage />} />
       </Routes>
     </AppLayout>
   );

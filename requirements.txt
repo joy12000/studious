@@ -4,4 +4,6 @@ certifi
 pdf2image
 Pillow
 Flask
+supabase
+gotrue
 # Force rebuild on Vercel again

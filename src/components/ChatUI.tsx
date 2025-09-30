@@ -9,6 +9,7 @@ import { useNotes } from '../lib/useNotes';
 import { upload } from '@vercel/blob/client';
 import { convertPdfToImages } from '../lib/pdfUtils';
 import { Message } from '../lib/types'; // Import Message from types.ts
+import { supabase } from '../lib/supabase';
 
 const models = [
     { id: 'gemini-2.5-pro', name: '✨ Gemini 2.5 Pro' },
@@ -53,6 +54,65 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
 
   const [selectedModel, setSelectedModel] = useState(models[0].id);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [isSyncedMediaOpen, setIsSyncedMediaOpen] = useState(false);
+  const [syncedImages, setSyncedImages] = useState<{id: string, url: string}[]>([]);
+  const [isSyncLoading, setIsSyncLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isSyncedMediaOpen) {
+      return;
+    }
+
+    const fetchInitialImages = async () => {
+      setIsSyncLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('synced_media')
+          .select('id, url')
+          .order('created_at', { ascending: false })
+          .limit(20);
+
+        if (error) throw error;
+        setSyncedImages(data || []);
+      } catch (error) {
+        console.error("Error fetching synced media:", error);
+        toast.error("모바일 업로드 목록을 불러오는 데 실패했습니다.");
+      } finally {
+        setIsSyncLoading(false);
+      }
+    };
+
+    fetchInitialImages();
+
+    const channel = supabase.channel('synced_media_changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'synced_media' }, (payload) => {
+        setSyncedImages(prev => [payload.new as {id: string, url: string}, ...prev]);
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isSyncedMediaOpen]);
+
+  const handleSyncedImageClick = async (imageUrl: string) => {
+    try {
+      toast.loading('이미지 첨부 중...');
+      const response = await fetch(imageUrl);
+      const blob = await response.blob();
+      const fileName = imageUrl.split('/').pop() || 'mobile-upload.jpg';
+      const file = new File([blob], fileName, { type: blob.type });
+      
+      setSelectedFiles(prev => [...prev, file]);
+      setIsSyncedMediaOpen(false);
+      toast.dismiss();
+      toast.success('이미지가 첨부되었습니다.');
+    } catch (error) {
+      toast.dismiss();
+      toast.error('이미지를 첨부하는 데 실패했습니다.');
+      console.error("Failed to fetch and attach synced image:", error);
+    }
+  };
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -484,6 +544,40 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
         <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" onClick={() => fileInputRef.current?.click()}>
           <Plus className="h-5 w-5" />
         </Button>
+        <Popover open={isSyncedMediaOpen} onOpenChange={setIsSyncedMediaOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" title="모바일에서 가져오기">
+              <UploadCloud className="h-5 w-5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-80">
+            <div className="grid gap-4">
+              <div className="space-y-2">
+                <h4 className="font-medium leading-none">모바일 업로드</h4>
+                <p className="text-sm text-muted-foreground">
+                  모바일 기기에서 업로드된 이미지 목록입니다.
+                </p>
+              </div>
+              <div className="grid grid-cols-3 gap-2 h-48 overflow-y-auto border p-2 rounded-lg">
+                {isSyncLoading ? (
+                  <p className="col-span-3 text-center text-sm text-muted-foreground">불러오는 중...</p>
+                ) : syncedImages.length === 0 ? (
+                  <p className="col-span-3 text-center text-sm text-muted-foreground">업로드된 이미지가 없습니다.</p>
+                ) : (
+                  syncedImages.map((image) => (
+                    <button 
+                      key={image.id} 
+                      className="relative aspect-square rounded-md overflow-hidden hover:opacity-80 transition-opacity"
+                      onClick={() => handleSyncedImageClick(image.url)}
+                    >
+                      <img src={image.url} alt="Synced image" className="w-full h-full object-cover" />
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
         <form id="chat-form" onSubmit={handleSendMessage} className="flex-1 flex items-center gap-2">
           <input
             ref={chatInputRef}
