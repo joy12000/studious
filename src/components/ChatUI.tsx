@@ -10,6 +10,7 @@ import { upload } from '@vercel/blob/client';
 import { convertPdfToImages } from '../lib/pdfUtils';
 import { Message } from '../lib/types'; // Import Message from types.ts
 import { supabase } from '../lib/supabase';
+import toast from 'react-hot-toast';
 
 const models = [
     { id: 'gemini-2.5-pro', name: '✨ Gemini 2.5 Pro' },
