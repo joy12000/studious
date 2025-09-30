@@ -1,8 +1,0 @@
-feat(UI): Enhance homepage layout and refine dark mode theme
-
-This commit applies the final set of UI and theme improvements based on user feedback.
-
-- Adjusts the vertical spacing on the homepage for a more balanced layout.
-- Fixes a CSS rendering bug that caused the animated gradient headline to appear as a white box.
-- Updates the dark mode primary color to a much darker, more subtle shade of deep blue.
-- Corrects the navigation link on a homepage card to point to the refactored `/textbook` route.

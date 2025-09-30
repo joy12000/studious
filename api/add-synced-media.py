@@ -7,8 +7,8 @@ import uuid
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         try:
-            supabase_url = os.environ.get('VITE_SUPABASE_URL')
-            supabase_key = os.environ.get('VITE_SUPABASE_ANON_KEY')
+            supabase_url = os.environ.get('VITE_PUBLICSUPABASE_URL')
+            supabase_key = os.environ.get('VITE_PUBLICSUPABASE_ANON_KEY')
             
             if not supabase_url or not supabase_key:
                 self.send_error(500, "Supabase environment variables not set.")
