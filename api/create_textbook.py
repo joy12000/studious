@@ -100,10 +100,10 @@ class handler(BaseHTTPRequestHandler):
 
             - **올바른 예시:**
             ```visual
-            {
+            {{
               "type": "box",
-              "children": [ { "type": "text", "props": { "content": "예시" } } ]
-            }
+              "children": [ {{ "type": "text", "props": {{ "content": "예시" }} }} ]
+            }}
             ```
 
             ### visual JSON 생성 규칙 (★★★★★ 반드시 준수)
