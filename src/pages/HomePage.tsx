@@ -194,7 +194,7 @@ export default function HomePage() {
 
         <div className="flex-grow-[2] flex items-end justify-center">
           <div className="w-full max-w-4xl text-center">
-            <h1 className="text-8xl sm:text-8xl font-bold tracking-tight animated-gradient-text py-3">
+            <h1 className="text-6xl sm:text-8xl font-bold tracking-tight animated-gradient-text py-3">
               STUDIOUS
             </h1>
           </div>

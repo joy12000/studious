@@ -61,7 +61,7 @@ export const ClassPortalModal: React.FC<Props> = ({ isOpen, onClose, title, note
   
   const handleGoToChat = () => {
     onClose();
-    navigate('/chat', { state: { subject: contextSubject, date: contextDate } });
+    navigate('/textbook', { state: { subject: contextSubject, date: contextDate } });
   };
   
   const handleGoToReview = () => {

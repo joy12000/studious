@@ -59,10 +59,12 @@ export default function ScheduleImportButton() {
         disabled={isLoading}
         variant="secondary" 
         size="lg" 
-        className="w-full rounded-full shadow-lg"
+        className="rounded-full shadow-lg"
       >
-        <Calendar className="h-5 w-5 mr-3" />
-        {isLoading ? '처리 중...' : '시간표 이미지 선택'}
+        <Calendar className="h-5 w-5 md:mr-3" />
+        <span className="hidden md:inline">
+          {isLoading ? '처리 중...' : '시간표 이미지 선택'}
+        </span>
       </Button>
     </>
   );
