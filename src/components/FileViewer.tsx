@@ -1,0 +1,72 @@
+// src/components/FileViewer.tsx
+
+import React, { useEffect, useState } from 'react';
+import { Attachment } from '../lib/types';
+import MarkdownRenderer from './MarkdownRenderer';
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/esm/Page/AnnotationLayer.css';
+import 'react-pdf/dist/esm/Page/TextLayer.css';
+
+// PDF.js worker 설정
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.js',
+  import.meta.url,
+).toString();
+
+interface FileViewerProps {
+  attachment: Attachment | null;
+}
+
+const FileViewer: React.FC<FileViewerProps> = ({ attachment }) => {
+  const [markdownContent, setMarkdownContent] = useState<string | null>(null);
+  const [numPages, setNumPages] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (attachment?.type === 'file' && attachment.mimeType === 'text/markdown') {
+      const reader = new FileReader();
+      reader.onload = (e) => setMarkdownContent(e.target?.result as string);
+      reader.readAsText(attachment.data);
+    } else {
+      setMarkdownContent(null);
+    }
+  }, [attachment]);
+
+  function onDocumentLoadSuccess({ numPages }: { numPages: number }) {
+    setNumPages(numPages);
+  }
+
+  if (!attachment || attachment.type !== 'file') {
+    return (
+      <div className="flex items-center justify-center h-full bg-muted rounded-lg">
+        <p className="text-muted-foreground">미리 볼 파일을 선택하세요.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="w-full h-[60vh] border rounded-lg overflow-auto p-4 bg-background">
+      {attachment.mimeType === 'application/pdf' && (
+        <Document file={attachment.data} onLoadSuccess={onDocumentLoadSuccess}>
+          {Array.from(new Array(numPages), (el, index) => (
+            <Page key={`page_${index + 1}`} pageNumber={index + 1} />
+          ))}
+        </Document>
+      )}
+
+      {attachment.mimeType === 'text/markdown' && markdownContent && (
+        <div className="prose dark:prose-invert max-w-none">
+          <MarkdownRenderer content={markdownContent} />
+        </div>
+      )}
+
+      {!['application/pdf', 'text/markdown'].includes(attachment.mimeType) && (
+        <div className="flex flex-col items-center justify-center h-full">
+            <p className="text-muted-foreground">이 파일 형식은 미리보기를 지원하지 않습니다.</p>
+            <p className="text-sm text-muted-foreground mt-2">파일 이름: {attachment.name}</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default FileViewer;

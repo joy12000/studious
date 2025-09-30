@@ -17,6 +17,7 @@ import { ChatUI, Message } from '../components/ChatUI';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ErrorBoundary from '../components/ErrorBoundary'; // ErrorBoundary 임포트
+import FileViewer from '../components/FileViewer'; // ✨ FileViewer 임포트
 
 type TextbookSection = {
   title: string;
@@ -158,8 +159,14 @@ export default function NotePage() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [initialChatMessage, setInitialChatMessage] = useState<string | undefined>();
   const [isConverting, setIsConverting] = useState(false);
+  const [selectedAttachment, setSelectedAttachment] = useState<Attachment | null>(null); // ✨ 뷰어에서 볼 파일 상태
   
   const chatMessagesRef = useRef<Message[]>();
+
+  // ✨ 첨부 파일 클릭 핸들러 추가
+  const handleAttachmentClick = (attachment: Attachment) => {
+    setSelectedAttachment(attachment);
+  };
 
   useEffect(() => {
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
@@ -489,6 +496,13 @@ export default function NotePage() {
 
             <main className="flex-1 overflow-y-auto p-4 md:p-8">
               <article className={`mx-auto transition-all duration-300 ease-in-out max-w-4xl`}>
+                {/* ✨ FileViewer 컴포넌트 추가 */}
+                {note.attachments && note.attachments.length > 0 && (
+                  <div className="mb-8">
+                    <FileViewer attachment={selectedAttachment} />
+                  </div>
+                )}
+
                 <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-muted-foreground">
                   <div className="flex items-center gap-2"><Calendar className="h-4 w-4" /><span>{formatDate(note.createdAt)}</span></div>
                   {note.sourceType === 'youtube' && note.sourceUrl && (<button onClick={openSource} className="flex items-center gap-1.5 text-red-600 hover:text-red-700 font-medium"><Youtube className="h-4 w-4" />YouTube에서 열기</button>)}
@@ -566,7 +580,12 @@ export default function NotePage() {
                           </div>
                         </div>
                       )}
-                      <AttachmentPanel attachments={note.attachments || []} readOnly />
+                      {/* ✨ 읽기 모드일 때 AttachmentPanel에 클릭 핸들러 전달 */}
+                      <AttachmentPanel 
+                        attachments={note.attachments || []} 
+                        onAttachmentClick={handleAttachmentClick} // 클릭 핸들러 prop 추가 필요
+                        readOnly 
+                      />
                       {note.noteType === 'review' && quiz && <QuizComponent quiz={quiz} />}
                       <div className="mt-8 flex flex-col sm:flex-row gap-2">
                         {note.noteType === 'review' && quiz && (

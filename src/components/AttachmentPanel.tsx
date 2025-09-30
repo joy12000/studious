@@ -7,10 +7,12 @@ type Props = {
   onAddLink?: () => void;
   onAddFile?: (files: FileList | null) => void;
   onRemoveAttachment?: (id: string) => void;
+  onAttachmentClick?: (attachment: Attachment) => void; // ✨ 클릭 핸들러 prop 추가
   readOnly?: boolean;
 };
 
-const AttachmentItem = ({ attachment, onRemove, readOnly }: { attachment: Attachment; onRemove?: (id: string) => void; readOnly?: boolean; }) => {
+// ✨ AttachmentItem에 onClick prop 추가
+const AttachmentItem = ({ attachment, onRemove, onClick, readOnly }: { attachment: Attachment; onRemove?: (id: string) => void; onClick?: () => void; readOnly?: boolean; }) => {
   const handleRemove = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -21,6 +23,7 @@ const AttachmentItem = ({ attachment, onRemove, readOnly }: { attachment: Attach
 
   const handleDownload = (e: React.MouseEvent, fileAttachment: Attachment & { type: 'file' }) => {
     e.preventDefault();
+    e.stopPropagation(); // Prevent click from bubbling to the parent div
     const url = URL.createObjectURL(fileAttachment.data);
     const a = document.createElement('a');
     a.href = url;
@@ -31,13 +34,17 @@ const AttachmentItem = ({ attachment, onRemove, readOnly }: { attachment: Attach
     URL.revokeObjectURL(url);
   };
 
+  // ✨ 공통 클래스 및 클릭 이벤트 처리
+  const commonClasses = "flex items-center gap-2 px-3 py-2 text-sm rounded-lg group";
+  const clickableClasses = readOnly ? "cursor-pointer bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700" : "bg-slate-100 dark:bg-slate-800";
+
   if (attachment.type === 'link') {
     return (
       <a
         href={attachment.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 group"
+        className={`${commonClasses} ${clickableClasses}`}
       >
         <Link className="w-4 h-4 text-slate-500" />
         <span className="flex-1 truncate text-blue-600 dark:text-blue-400">{attachment.url}</span>
@@ -53,15 +60,16 @@ const AttachmentItem = ({ attachment, onRemove, readOnly }: { attachment: Attach
   if (attachment.type === 'file') {
     const fileSize = (attachment.data.size / 1024).toFixed(1); // in KB
     return (
-      <div className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg bg-slate-100 dark:bg-slate-800 group">
+      <div 
+        className={`${commonClasses} ${clickableClasses}`}
+        onClick={readOnly ? onClick : undefined} // ✨ 읽기 모드에서만 클릭 이벤트 활성화
+      >
         <Paperclip className="w-4 h-4 text-slate-500" />
         <span className="flex-1 truncate">{attachment.name}</span>
         <span className="text-xs text-slate-500">{fileSize} KB</span>
-        {readOnly && (
-           <button onClick={(e) => handleDownload(e, attachment)} className="p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-slate-300 dark:hover:bg-slate-600">
-            <Download className="w-3 h-3" />
-          </button>
-        )}
+        <button onClick={(e) => handleDownload(e, attachment)} className="p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-slate-300 dark:hover:bg-slate-600 ml-auto">
+          <Download className="w-3 h-3" />
+        </button>
         {!readOnly && (
           <button onClick={handleRemove} className="p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-slate-300 dark:hover:bg-slate-600">
             <X className="w-3 h-3" />
@@ -74,7 +82,8 @@ const AttachmentItem = ({ attachment, onRemove, readOnly }: { attachment: Attach
   return null;
 };
 
-export default function AttachmentPanel({ attachments, onAddLink, onAddFile, onRemoveAttachment, readOnly = false }: Props) {
+// ✨ onAttachmentClick prop 받도록 수정
+export default function AttachmentPanel({ attachments, onAddLink, onAddFile, onRemoveAttachment, onAttachmentClick, readOnly = false }: Props) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleFileButtonClick = () => {
@@ -88,7 +97,6 @@ export default function AttachmentPanel({ attachments, onAddLink, onAddFile, onR
     e.target.value = '';
   };
 
-  // GEMINI: 첨부파일이 없으면 아무것도 렌더링하지 않음 (읽기 전용 모드에서)
   if (readOnly && attachments.length === 0) {
     return null;
   }
@@ -98,7 +106,13 @@ export default function AttachmentPanel({ attachments, onAddLink, onAddFile, onR
       <h3 className="text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">첨부파일</h3>
       <div className="space-y-2">
         {attachments.map(att => (
-          <AttachmentItem key={att.id} attachment={att} onRemove={onRemoveAttachment} readOnly={readOnly} />
+          <AttachmentItem 
+            key={att.id} 
+            attachment={att} 
+            onRemove={onRemoveAttachment} 
+            onClick={() => onAttachmentClick && onAttachmentClick(att)} // ✨ 클릭 시 핸들러 호출
+            readOnly={readOnly}
+          />
         ))}
       </div>
       {!readOnly && (

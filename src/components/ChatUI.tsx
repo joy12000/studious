@@ -49,6 +49,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { updateNote, getNote } = useNotes();
   const prevMessagesLength = useRef(messages.length);
+  const chatInputRef = useRef<HTMLInputElement>(null); // 채팅 입력창을 위한 ref 추가
 
   const [selectedModel, setSelectedModel] = useState(models[0].id);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -58,6 +59,35 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
 
   const MAX_FILE_SIZE_MB = 5;
   const MAX_TOTAL_SIZE_MB = 10;
+
+  // ✨ 스크린샷 붙여넣기 처리를 위한 useEffect 추가
+  useEffect(() => {
+    const handlePaste = (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.indexOf('image') !== -1) {
+          const file = items[i].getAsFile();
+          if (file) {
+            // 기존 파일 첨부 로직과 유사하게 처리
+            setSelectedFiles(prev => [...prev, file]);
+          }
+        }
+      }
+    };
+
+    const inputElement = chatInputRef.current;
+    if (inputElement) {
+      inputElement.addEventListener('paste', handlePaste as EventListener);
+    }
+
+    return () => {
+      if (inputElement) {
+        inputElement.removeEventListener('paste', handlePaste as EventListener);
+      }
+    };
+  }, [setSelectedFiles]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -456,6 +486,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
         </Button>
         <form id="chat-form" onSubmit={handleSendMessage} className="flex-1 flex items-center gap-2">
           <input
+            ref={chatInputRef}
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
