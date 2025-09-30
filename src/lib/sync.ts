@@ -1,6 +1,6 @@
 import { db } from './db';
 import { createClient } from '@supabase/supabase-js';
-import { Note } from './types';
+import { Note, Subject } from './types';
 
 // Supabase 'notes' table schema mapped to a type
 type RemoteNote = {
@@ -18,17 +18,9 @@ type RemoteNote = {
     key_insights: string[] | null;
     favorite: boolean;
     attachments: Note['attachments'] | null;
-    chatHistory: Note['chatHistory'] | null;
     is_deleted: boolean;
 };
 
-/**
- * Fetches notes from Supabase and syncs them to the local Dexie database.
- * This is a PULL-only sync. It will:
- * - Add notes from remote that are not local.
- * - Update local notes if the remote version is newer.
- * - Delete local notes if they are marked as `is_deleted` on remote.
- */
 export async function syncNotes(
     userId: string,
     getToken: (options?: { template?: string }) => Promise<string | null>
@@ -43,7 +35,27 @@ export async function syncNotes(
         { global: { headers: { Authorization: `Bearer ${token}` } } }
     );
 
-    // 2. Fetch all remote and local notes
+    // --- 1. SUBJECT SYNC ---
+    const { data: remoteSubjects, error: remoteSubjectsError } = await supabase.from('subjects').select('*');
+    if (remoteSubjectsError) throw new Error(`Failed to fetch subjects: ${remoteSubjectsError.message}`);
+    
+    const localSubjects = await db.subjects.toArray();
+    const remoteSubjectsMap = new Map(remoteSubjects.map(s => [s.id, s]));
+
+    // Push local subjects that don't exist on remote
+    const subjectsToUpsert = localSubjects.filter(localSub => !remoteSubjectsMap.has(localSub.id));
+    if (subjectsToUpsert.length > 0) {
+        const { error } = await supabase.from('subjects').upsert(subjectsToUpsert.map(s => ({ ...s, user_id: userId })));
+        if (error) throw new Error(`Failed to upsert subjects: ${error.message}`);
+    }
+
+    // Pull remote subjects that don't exist locally
+    const subjectsToPutLocally = remoteSubjects.filter(remoteSub => !localSubjects.some(localSub => localSub.id === remoteSub.id));
+    if (subjectsToPutLocally.length > 0) {
+        await db.subjects.bulkPut(subjectsToPutLocally as Subject[]);
+    }
+
+    // --- 2. NOTE SYNC ---
     const { data: remoteNotesData, error: remoteError } = await supabase
         .from('notes')
         .select('*');
@@ -51,7 +63,7 @@ export async function syncNotes(
     if (remoteError) throw remoteError;
 
     const remoteNotes = remoteNotesData as RemoteNote[];
-    const allLocalNotes = await db.notes.toArray(); // Get all notes, including soft-deleted
+    const allLocalNotes = await db.notes.toArray();
 
     const remoteNotesMap = new Map(remoteNotes.map(n => [n.id, n]));
 
@@ -59,7 +71,7 @@ export async function syncNotes(
     const idsToDeleteLocally: string[] = [];
     const notesToUpsertToRemote: Note[] = [];
 
-    // 3. Compare remote to local (PULL logic)
+    // PULL logic
     for (const remoteNote of remoteNotes) {
         const localNote = allLocalNotes.find(n => n.id === remoteNote.id);
         const remoteUpdatedAt = new Date(remoteNote.updated_at).getTime();
@@ -90,7 +102,7 @@ export async function syncNotes(
         }
     }
 
-    // 4. Compare local to remote (PUSH logic)
+    // PUSH logic
     for (const localNote of allLocalNotes) {
         const remoteNote = remoteNotesMap.get(localNote.id);
         if (!remoteNote || localNote.updatedAt > new Date(remoteNote.updated_at).getTime()) {
@@ -98,7 +110,7 @@ export async function syncNotes(
         }
     }
 
-    // 5. Execute DB operations
+    // Execute DB operations
     if (notesToUpsertToRemote.length > 0) {
         const upsertData = notesToUpsertToRemote.map(n => ({
             id: n.id,
