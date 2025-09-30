@@ -1,15 +1,21 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2, UploadCloud, CheckCircle, AlertTriangle, X } from 'lucide-react'; // Added X for removing files
+import { Loader2, UploadCloud, CheckCircle, AlertTriangle, X, Camera } from 'lucide-react'; // Added Camera
 import toast from 'react-hot-toast';
 
 export default function MobileUploadPage() {
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]); // Changed to array
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files) {
-      setSelectedFiles(Array.from(event.target.files)); // Take all files
+      setSelectedFiles(Array.from(event.target.files));
+    }
+  };
+
+  const handleCameraChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files[0]) {
+      setSelectedFiles(prev => [...prev, event.target.files![0]]);
     }
   };
 
@@ -18,7 +24,7 @@ export default function MobileUploadPage() {
   };
 
   const handleUpload = async () => {
-    if (selectedFiles.length === 0) { // Check length
+    if (selectedFiles.length === 0) {
       toast.error('먼저 파일을 선택해주세요.');
       return;
     }
@@ -29,7 +35,7 @@ export default function MobileUploadPage() {
 
     for (const file of selectedFiles) {
       const formData = new FormData();
-      formData.append('file', file); // Backend expects 'file'
+      formData.append('file', file);
 
       try {
         const response = await fetch('/api/add-synced-media', {
@@ -56,7 +62,7 @@ export default function MobileUploadPage() {
     setIsUploading(false);
     if (allUploadsSuccessful) {
       toast.success(`모든 파일 업로드 완료! PC에서 확인하세요.`);
-      setSelectedFiles([]); // Reset after successful upload
+      setSelectedFiles([]);
     } else {
       toast.error('일부 파일 업로드에 실패했습니다.');
     }
@@ -102,6 +108,18 @@ export default function MobileUploadPage() {
             <UploadCloud className="mr-2 h-5 w-5" />
           )}
           {isUploading ? '업로드 중...' : 'PC로 전송'}
+        </Button>
+
+        <input id="camera-input" type="file" accept="image/*" capture="environment" onChange={handleCameraChange} className="hidden" />
+        <Button 
+          onClick={() => document.getElementById('camera-input')?.click()} 
+          size="lg" 
+          className="w-full mt-4"
+          variant="secondary"
+          disabled={isUploading}
+        >
+          <Camera className="mr-2 h-5 w-5" />
+          사진 바로 찍기
         </Button>
       </div>
     </div>
