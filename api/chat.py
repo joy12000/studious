@@ -6,6 +6,9 @@ import traceback
 import google.generativeai as genai
 import google.generativeai
 
+import io
+from PIL import Image
+
 class handler(BaseHTTPRequestHandler):
     def do_POST(self):
         # API 키 목록을 환경 변수에서 가져옵니다.
@@ -32,7 +35,8 @@ class handler(BaseHTTPRequestHandler):
             
             history = body.get('history', [])
             note_context = body.get('noteContext', '')
-            model_identifier = body.get('model', 'gemini-2.5-flash') # 기본 모델 변경
+            model_identifier = body.get('model', 'gemini-2.5-flash')
+            file_urls = body.get('fileUrls', [])
 
             if not history:
                 raise ValueError("대화 내용이 비어있습니다.")
@@ -42,10 +46,25 @@ class handler(BaseHTTPRequestHandler):
             
             messages = self.prepare_messages(history)
 
+            # --- [파일 처리] ---
+            image_parts = []
+            if file_urls:
+                for url in file_urls:
+                    try:
+                        response = requests.get(url)
+                        response.raise_for_status()
+                        content_type = response.headers.get('content-type')
+                        if content_type and 'image' in content_type:
+                            img = Image.open(io.BytesIO(response.content))
+                            image_parts.append(img)
+                    except Exception as e:
+                        print(f"WARN: 파일 URL 처리 실패: {url}, 오류: {e}")
+
             # API 공급자 선택 및 실행
             if model_identifier.startswith('gemini-'):
-                self.execute_gemini_direct(model_identifier, messages, system_prompt_text, valid_keys)
+                self.execute_gemini_direct(model_identifier, messages, system_prompt_text, valid_keys, image_parts)
             else:
+                # OpenRouter는 현재 멀티모달 입력을 이 형식으로 지원하지 않을 수 있습니다.
                 self.execute_openrouter(model_identifier, messages, system_prompt_text, valid_keys)
 
         except Exception as e:
@@ -121,7 +140,7 @@ class handler(BaseHTTPRequestHandler):
             messages.append({"role": role, "content": content})
         return messages
 
-    def execute_gemini_direct(self, model_identifier, messages, system_prompt_text, valid_keys):
+    def execute_gemini_direct(self, model_identifier, messages, system_prompt_text, valid_keys, image_parts=[]):
         gemini_api_keys = [key for key in valid_keys if key and key.startswith('AIza')]
         if not gemini_api_keys:
             raise ValueError("설정된 Gemini API 키가 없습니다.")
@@ -132,15 +151,21 @@ class handler(BaseHTTPRequestHandler):
                 print(f"INFO: Gemini Direct 모델 '{model_identifier}' / API 키 #{i + 1} 호출 시도...")
                 genai.configure(api_key=api_key)
                 
-                # 모델 이름에서 'google/' 접두사 제거
                 clean_model_id = model_identifier.replace('google/', '')
                 model = genai.GenerativeModel(clean_model_id)
 
-                # Gemini API는 별도의 시스템 프롬프트를 지원하지 않으므로 메시지 목록에 추가합니다.
                 gemini_messages = [
                     {'role': 'user', 'parts': [system_prompt_text]},
                     {'role': 'model', 'parts': ['네, 알겠습니다. 규칙을 모두 확인했으며, 반드시 JSON 형식으로만 답변하겠습니다.']}
                 ] + self.convert_to_gemini_format(messages)
+
+                # 마지막 사용자 메시지에 이미지 추가
+                if image_parts and gemini_messages:
+                    last_message = gemini_messages[-1]
+                    if last_message['role'] == 'user':
+                        # 텍스트 파트와 이미지 파트를 결합
+                        text_part = last_message['parts'][0] # 기존 텍스트 파트
+                        last_message['parts'] = [text_part] + image_parts
 
                 response = model.generate_content(
                     gemini_messages,
