@@ -11,6 +11,8 @@ import { convertPdfToImages } from '../lib/pdfUtils';
 import { Message } from '../lib/types'; // Import Message from types.ts
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
+import { useAuth } from '@clerk/clerk-react';
+import { createClient } from '@supabase/supabase-js';
 
 const models = [
     { id: 'gemini-2.5-pro', name: '✨ Gemini 2.5 Pro' },
@@ -75,13 +77,6 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
   const [isSyncedMediaOpen, setIsSyncedMediaOpen] = useState(false);
   const [syncedImages, setSyncedImages] = useState<{id: string, url: string}[]>([]);
   const [isSyncLoading, setIsSyncLoading] = useState(false);
-
-import { useAuth } from '@clerk/clerk-react';
-import { createClient } from '@supabase/supabase-js';
-
-// ... (rest of the imports)
-
-// ... (inside ChatUI component)
   const { getToken } = useAuth();
 
   useEffect(() => {
