@@ -94,9 +94,18 @@ class handler(BaseHTTPRequestHandler):
         A[첫 번째 줄<br>두 번째 줄]
         B[노드 이름 (특수문자)]
         C -- 링크 텍스트 --> D
-        subgraph 서브그래프 제목  
+        subgraph "서브그래프 제목"  
         
-            자유 시각화 (visual): 복잡한 개념, 비교, 구조 등을 설명해야 할 때, 아래 규칙에 따라 가상의 UI 컴포넌트 구조를 JSON으로 설계하여 시각화할 수 있습니다.
+            자유 시각화 (visual): 복잡한 개념, 비교, 구조 등을 설명해야 할 때, 아래 규칙에 따라 가상의 UI 컴포넌트 구조를 JSON으로 설계하여 시각화할 수 있습니다. **이 JSON 데이터는 반드시 `visual` 언어 타입의 코드 블록으로 감싸야 합니다.**
+
+            - **올바른 예시:**
+            ```visual
+            {
+              "type": "box",
+              "children": [ { "type": "text", "props": { "content": "예시" } } ]
+            }
+            ```
+
             ### visual JSON 생성 규칙 (★★★★★ 반드시 준수)
             1.  **텍스트 내용**: 텍스트를 표시할 때는 반드시 `props` 객체 안에 `content` 속성을 사용해야 합니다.
                 -   **올바른 예시:** `{{ "type": "text", "props": {{ "content": "내용" }} }}`
