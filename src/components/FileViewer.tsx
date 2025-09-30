@@ -20,6 +20,15 @@ const FileViewer: React.FC<FileViewerProps> = ({ attachment }) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
+  const debugData = {
+    hasAttachment: !!attachment,
+    attachmentName: attachment?.name,
+    attachmentMime: attachment?.mimeType,
+    isDataBlob: attachment?.data instanceof Blob,
+    dataSize: attachment?.data?.size,
+    pdfUrl: pdfUrl,
+  };
+
   useEffect(() => {
     let objectUrl: string | null = null;
 
@@ -61,6 +70,9 @@ const FileViewer: React.FC<FileViewerProps> = ({ attachment }) => {
 
   return (
     <div className="w-full h-[60vh] border rounded-lg overflow-auto p-4 bg-background">
+      <pre className="bg-gray-100 dark:bg-gray-800 p-2 rounded text-xs whitespace-pre-wrap break-all mb-4">
+        {JSON.stringify(debugData, null, 2)}
+      </pre>
       {pdfUrl && (
         <Document file={pdfUrl} onLoadSuccess={onDocumentLoadSuccess}>
           {Array.from(new Array(numPages), (el, index) => (

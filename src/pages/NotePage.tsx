@@ -165,6 +165,7 @@ export default function NotePage() {
 
   // ✨ 첨부 파일 클릭 핸들러 추가
   const handleAttachmentClick = (attachment: Attachment) => {
+    alert(`[DEBUG] Attachment Clicked:\nType: ${typeof attachment.data}\nisBlob: ${attachment.data instanceof Blob}\nSize: ${attachment.data?.size}\nMIME Type: ${attachment.mimeType}`);
     setSelectedAttachment(attachment);
   };
 
