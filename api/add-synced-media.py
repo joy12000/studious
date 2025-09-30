@@ -51,14 +51,14 @@ class handler(BaseHTTPRequestHandler):
             new_filename = f'public/{uuid.uuid4()}{file_extension}'
 
             # 1. Upload to Supabase Storage
-            response = supabase.storage.from_('synced_media').upload(
-                new_filename, 
-                file_bytes, 
-                file_options={"content-type": content_type}
-            )
-
-            if response.get('error'):
-                 raise Exception(f"Storage upload failed: {response.get('error').message if response.get('error') else 'Unknown storage upload error'}")
+            try:
+                response = supabase.storage.from_('synced_media').upload(
+                    new_filename, 
+                    file_bytes, 
+                    file_options={"content-type": content_type}
+                )
+            except Exception as e:
+                raise Exception(f"Storage upload failed: {e}")
 
             # 2. Get public URL
             public_url_response = supabase.storage.from_('synced_media').get_public_url(new_filename)

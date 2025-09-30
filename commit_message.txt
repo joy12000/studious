@@ -1,3 +1,0 @@
-fix: Robust Supabase Storage upload error handling in backend API
-
-The backend API (api/add-synced-media.py) was crashing when checking `response.error` after a successful Supabase Storage upload, as the `error` attribute is not present in successful responses. This commit updates the code to use `response.get('error')` for safer error checking, resolving the `AttributeError`.
