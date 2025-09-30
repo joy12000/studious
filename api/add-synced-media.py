@@ -63,7 +63,7 @@ class handler(BaseHTTPRequestHandler):
             # 2. Get public URL
             public_url_response = supabase.storage.from_('synced_media').get_public_url(new_filename)
             
-            public_url = public_url_response.data
+            public_url = public_url_response
 
             # 3. Insert URL into Supabase Database
             print(f"Attempting to insert URL: {public_url} into synced_media table.")
