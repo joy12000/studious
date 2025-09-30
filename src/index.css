@@ -41,36 +41,25 @@
   }
  
   .dark {
-    --background: 222 47.4% 11.2%;
-    --foreground: 210 20% 98%;
- 
-    --card: 217 32.6% 17.5%;
-    --card-foreground: 210 20% 98%;
- 
-    --popover: 222 47.4% 11.2%;
-    --popover-foreground: 210 20% 98%;
- 
-    --primary: 210 20% 98%;
-    --primary-foreground: 220.9 39.3% 11%;
- 
-    --secondary: 215 27.9% 16.9%;
-    --secondary-foreground: 210 20% 98%;
- 
-    --muted: 215 27.9% 16.9%;
-    --muted-foreground: 217.9 10.6% 64.9%;
- 
-    --accent: 215 27.9% 16.9%;
-    --accent-foreground: 210 20% 98%;
- 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 20% 98%;
-
-    --success: 142.1 70.2% 46.3%;
-    --success-foreground: 142.1 70.2% 6.3%;
- 
-    --border: 215 27.9% 16.9%;
-    --input: 215 27.9% 16.9%;
-    --ring: 216 12.2% 83.9%;
+    --background: 0 0% 21%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 25%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 25%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 221 83% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 25%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 29%;
+    --muted-foreground: 0 0% 63%;
+    --accent: 221 83% 53%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 32%;
+    --input: 0 0% 32%;
+    --ring: 221 83% 53%;
   }
 }
  
@@ -158,4 +147,25 @@
 /* ✅ [추가] Mermaid 확대보기 모달 내부의 SVG 크기를 키우는 스타일 */
 .mermaid-modal-content svg {
   @apply max-w-full w-full h-auto;
+}
+
+@layer utilities {
+  .animated-gradient-text {
+    background: linear-gradient(to right, #000000, #888888, #000000);
+    background-size: 200% auto;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    animation: gradient-animation 4s linear infinite;
+  }
+
+  .dark .animated-gradient-text {
+    background: linear-gradient(to right, #888888, #ffffff, #888888);
+    background-size: 200% auto;
+  }
+}
+
+@keyframes gradient-animation {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
 }

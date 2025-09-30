@@ -11,13 +11,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 
 
 
-const HEADLINES = [
-  "새로운 지식을 내 것으로",
-  "복잡한 정보를 명확하게",
-  "학습의 모든 과정을 한 곳에서",
-  "AI와 함께 더 깊이있는 학습을",
-  "당신의 두 번째 뇌가 되어줄게요"
-];
+
 
 interface ExternalLinkItem {
   id: string;
@@ -43,7 +37,7 @@ export default function HomePage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
-  const [headline, setHeadline] = useState(HEADLINES[0]); // Add headline state
+  
 
   const [externalLinks, setExternalLinks] = useState<ExternalLinkItem[]>([]); // Add externalLinks state
   const [isEditLinks, setIsEditLinks] = useState(false); // Add isEditLinks state
@@ -94,16 +88,7 @@ export default function HomePage() {
     }
   };
 
-  useEffect(() => { // useEffect for headline rotation
-    const interval = setInterval(() => {
-      setHeadline(prev => {
-        const currentIndex = HEADLINES.indexOf(prev);
-        const nextIndex = (currentIndex + 1) % HEADLINES.length;
-        return HEADLINES[nextIndex];
-      });
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
+
 
   const handleYoutubeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -155,7 +140,7 @@ export default function HomePage() {
 
   return (
     <>
-      <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background p-4 sm:p-8">
+      <div className="min-h-screen w-full flex flex-col items-center justify-start pt-32 bg-background p-4 sm:p-8">
         <div className="absolute top-4 right-4 z-10">
           <Popover>
             <PopoverTrigger asChild>
@@ -208,12 +193,9 @@ export default function HomePage() {
         </div>
 
         <div className="w-full max-w-4xl text-center">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-foreground">
-            학습의 시작점, Studious
+          <h1 className="text-8xl sm:text-9xl font-bold tracking-tight animated-gradient-text py-3">
+            STUDIOUS
           </h1>
-          <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-            AI와 함께 더 스마트하고 효율적으로 학습하세요.
-          </p>
 
           {/* 유튜브 요약 기능은 홈페이지의 핵심 기능으로 유지 */}
           <form onSubmit={handleYoutubeSubmit} className="mt-10 flex items-center gap-2 bg-card border rounded-full p-2 shadow-lg max-w-xl mx-auto">
