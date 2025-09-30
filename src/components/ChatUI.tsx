@@ -37,20 +37,36 @@ const createInitialMessage = (): Message => ({
 });
 
 interface ChatUIProps {
-  noteContext: string;
-  onClose: () => void;
-  noteId: string;
-  onSuggestionAccepted: (suggestion: { old: string; new: string }) => void;
+  noteContext?: string;
+  onClose?: () => void;
+  noteId?: string;
+  onSuggestionAccepted?: (suggestion: { old: string; new: string }) => void;
 }
 
-export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, onSuggestionAccepted }) => {
+export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물어보세요!', onClose, noteId, onSuggestionAccepted }) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { updateNote, getNote } = useNotes();
   const prevMessagesLength = useRef(messages.length);
-  const chatInputRef = useRef<HTMLInputElement>(null); // 채팅 입력창을 위한 ref 추가
+  const navigate = useNavigate();
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const handleMobileUploadClick = () => {
+    if (isMobile) {
+      navigate('/m/upload');
+    }
+  };
+
 
   const [selectedModel, setSelectedModel] = useState(models[0].id);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
@@ -193,7 +209,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
   }, [noteId, messages, updateNote]);
 
   const handleApplyChange = (messageId: number, suggestion: { old: string; new: string }) => {
-    onSuggestionAccepted(suggestion);
+    if (onSuggestionAccepted) onSuggestionAccepted(suggestion);
     setMessages(prev => prev.map(msg => 
       msg.id === messageId ? { ...msg, suggestion: undefined } : msg
     ));
@@ -452,15 +468,15 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
                 </Popover>
 
                 <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" onClick={handleSaveChat} title="현재 노트에 대화 저장">
+                  {noteId && <Button variant="ghost" size="icon" onClick={handleSaveChat} title="현재 노트에 대화 저장">
                     <Save className="h-4 w-4" />
-                  </Button>
+                  </Button>}
                   <Button variant="ghost" size="icon" onClick={handleNewChat} title="새 대화">
                     <RefreshCw className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={onClose} title="닫기">
+                  {onClose && <Button variant="ghost" size="icon" onClick={onClose} title="닫기">
                     <X className="h-5 w-5" />
-                  </Button>
+                  </Button>}
                 </div>
               </div>
       <div ref={messagesEndRef} className="flex-1 p-4 overflow-y-auto">
@@ -544,40 +560,46 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext, onClose, noteId, on
         <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" onClick={() => fileInputRef.current?.click()}>
           <Plus className="h-5 w-5" />
         </Button>
-        <Popover open={isSyncedMediaOpen} onOpenChange={setIsSyncedMediaOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" title="모바일에서 가져오기">
-              <UploadCloud className="h-5 w-5" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-80">
-            <div className="grid gap-4">
-              <div className="space-y-2">
-                <h4 className="font-medium leading-none">모바일 업로드</h4>
-                <p className="text-sm text-muted-foreground">
-                  모바일 기기에서 업로드된 이미지 목록입니다.
-                </p>
+        {isMobile ? (
+          <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" title="모바일에서 업로드" onClick={handleMobileUploadClick}>
+            <UploadCloud className="h-5 w-5" />
+          </Button>
+        ) : (
+          <Popover open={isSyncedMediaOpen} onOpenChange={setIsSyncedMediaOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" title="모바일에서 가져오기">
+                <UploadCloud className="h-5 w-5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80">
+              <div className="grid gap-4">
+                <div className="space-y-2">
+                  <h4 className="font-medium leading-none">모바일 업로드</h4>
+                  <p className="text-sm text-muted-foreground">
+                    모바일 기기에서 업로드된 이미지 목록입니다.
+                  </p>
+                </div>
+                <div className="grid grid-cols-3 gap-2 h-48 overflow-y-auto border p-2 rounded-lg">
+                  {isSyncLoading ? (
+                    <p className="col-span-3 text-center text-sm text-muted-foreground">불러오는 중...</p>
+                  ) : syncedImages.length === 0 ? (
+                    <p className="col-span-3 text-center text-sm text-muted-foreground">업로드된 이미지가 없습니다.</p>
+                  ) : (
+                    syncedImages.map((image) => (
+                      <button 
+                        key={image.id} 
+                        className="relative aspect-square rounded-md overflow-hidden hover:opacity-80 transition-opacity"
+                        onClick={() => handleSyncedImageClick(image.url)}
+                      >
+                        <img src={image.url} alt="Synced image" className="w-full h-full object-cover" />
+                      </button>
+                    ))
+                  )}
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-2 h-48 overflow-y-auto border p-2 rounded-lg">
-                {isSyncLoading ? (
-                  <p className="col-span-3 text-center text-sm text-muted-foreground">불러오는 중...</p>
-                ) : syncedImages.length === 0 ? (
-                  <p className="col-span-3 text-center text-sm text-muted-foreground">업로드된 이미지가 없습니다.</p>
-                ) : (
-                  syncedImages.map((image) => (
-                    <button 
-                      key={image.id} 
-                      className="relative aspect-square rounded-md overflow-hidden hover:opacity-80 transition-opacity"
-                      onClick={() => handleSyncedImageClick(image.url)}
-                    >
-                      <img src={image.url} alt="Synced image" className="w-full h-full object-cover" />
-                    </button>
-                  ))
-                )}
-              </div>
-            </div>
-          </PopoverContent>
-        </Popover>
+            </PopoverContent>
+          </Popover>
+        )}
         <form id="chat-form" onSubmit={handleSendMessage} className="flex-1 flex items-center gap-2">
           <input
             ref={chatInputRef}

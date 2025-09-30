@@ -1,7 +1,7 @@
 import React, { useState, createContext, useContext } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Home, Settings, X, List, Menu, Calendar, GraduationCap, LayoutDashboard, BrainCircuit } from 'lucide-react';
+import { Home, Settings, X, List, Menu, Calendar, GraduationCap, LayoutDashboard, BrainCircuit, MessageCircle } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react";
 
@@ -71,9 +71,10 @@ const SidebarContent = ({ isCollapsed, onCollapse, isMobile, onMobileCollapse, o
             <nav className="grid items-start px-2 text-sm font-medium gap-1">
                 <NavLink to="/" icon={<Home className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>Home</NavLink>
                 <NavLink to="/dashboard" icon={<LayoutDashboard className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>대시보드</NavLink>
-                <NavLink to="/review-deck" icon={<BrainCircuit className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>오늘의 복습</NavLink>
                 <NavLink to="/notes" icon={<List className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>노트 목록</NavLink>
+                <NavLink to="/review-deck" icon={<BrainCircuit className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>오늘의 복습</NavLink>
                 <NavLink to="/schedule" icon={<Calendar className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>시간표</NavLink>
+                <NavLink to="/chat" icon={<MessageCircle className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>채팅</NavLink>
                 <NavLink to="/assignment" icon={<GraduationCap className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>AI 과제</NavLink>
                 <NavLink to="/settings" icon={<Settings className="h-5 w-5" />} isCollapsed={isCollapsed} onClick={onLinkClick}>Settings</NavLink>
             </nav>

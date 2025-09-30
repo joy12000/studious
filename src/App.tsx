@@ -7,6 +7,7 @@ import SettingsPage from './pages/SettingsPage';
 import SharedNotePage from './pages/SharedNotePage';
 import SchedulePage from './pages/SchedulePage';
 import ReviewPage from './pages/ReviewPage';
+import TextbookPage from './pages/TextbookPage';
 import ChatPage from './pages/ChatPage';
 import AssignmentHelperPage from './pages/AssignmentHelperPage';
 import DashboardPage from './pages/DashboardPage'; // 📈 대시보드 페이지 임포트
@@ -49,6 +50,7 @@ function App() {
         <Route path="/review-deck" element={<ReviewDeckPage />} /> {/* 🧠 복습 덱 라우트 추가 */}
         <Route path="/share" element={<ShareHandler />} />
         <Route path="/shared-note" element={<SharedNotePage />} />
+        <Route path="/textbook" element={<TextbookPage />} />
         <Route path="/chat" element={<ChatPage />} />
         <Route path="/m/upload" element={<MobileUploadPage />} />
       </Routes>
