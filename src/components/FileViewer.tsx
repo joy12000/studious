@@ -8,7 +8,7 @@ import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 
 // PDF.js worker 설정
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.js?url';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.mjs?url';
 pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 interface FileViewerProps {
