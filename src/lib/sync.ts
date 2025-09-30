@@ -84,7 +84,6 @@ export async function syncNotes(
                 key_insights: remoteNote.key_insights || [],
                 favorite: remoteNote.favorite,
                 attachments: remoteNote.attachments || undefined,
-                chatHistory: remoteNote.chatHistory || undefined,
                 is_deleted: remoteNote.is_deleted,
             };
             notesToPutLocally.push(noteToStore);
@@ -116,7 +115,6 @@ export async function syncNotes(
             key_insights: n.key_insights,
             favorite: n.favorite,
             attachments: n.attachments,
-            chatHistory: n.chatHistory,
             is_deleted: n.is_deleted || false,
         }));
         const { error } = await supabase.from('notes').upsert(upsertData);
