@@ -47,19 +47,19 @@
     --card-foreground: 0 0% 100%;
     --popover: 0 0% 25%;
     --popover-foreground: 0 0% 100%;
-    --primary: 221 83% 53%;
+    --primary: 223 66% 35%;
     --primary-foreground: 0 0% 100%;
     --secondary: 0 0% 25%;
     --secondary-foreground: 0 0% 100%;
     --muted: 0 0% 29%;
     --muted-foreground: 0 0% 63%;
-    --accent: 221 83% 53%;
+    --accent: 223 66% 35%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     --border: 0 0% 32%;
     --input: 0 0% 32%;
-    --ring: 221 83% 53%;
+    --ring: 223 66% 35%;
   }
 }
  
@@ -151,7 +151,9 @@
 
 @layer utilities {
   .animated-gradient-text {
-    background: linear-gradient(to right, #000000, #888888, #000000);
+    display: inline-block;
+    background-color: transparent;
+    background-image: linear-gradient(to right, #000000, #888888, #000000);
     background-size: 200% auto;
     background-clip: text;
     -webkit-background-clip: text;
@@ -160,8 +162,7 @@
   }
 
   .dark .animated-gradient-text {
-    background: linear-gradient(to right, #888888, #ffffff, #888888);
-    background-size: 200% auto;
+    background-image: linear-gradient(to right, #888888, #ffffff, #888888);
   }
 }
 

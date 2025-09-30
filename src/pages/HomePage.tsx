@@ -140,7 +140,7 @@ export default function HomePage() {
 
   return (
     <>
-      <div className="min-h-screen w-full flex flex-col items-center justify-start pt-32 bg-background p-4 sm:p-8">
+      <div className="min-h-screen w-full flex flex-col items-center bg-background p-4 sm:p-8">
         <div className="absolute top-4 right-4 z-10">
           <Popover>
             <PopoverTrigger asChild>
@@ -192,13 +192,18 @@ export default function HomePage() {
           </Popover>
         </div>
 
-        <div className="w-full max-w-4xl text-center">
-          <h1 className="text-8xl sm:text-9xl font-bold tracking-tight animated-gradient-text py-3">
-            STUDIOUS
-          </h1>
+        <div className="flex-grow-[2] flex items-end justify-center">
+          <div className="w-full max-w-4xl text-center">
+            <h1 className="text-8xl sm:text-9xl font-bold tracking-tight animated-gradient-text py-3">
+              STUDIOUS
+            </h1>
+          </div>
+        </div>
 
-          {/* 유튜브 요약 기능은 홈페이지의 핵심 기능으로 유지 */}
-          <form onSubmit={handleYoutubeSubmit} className="mt-10 flex items-center gap-2 bg-card border rounded-full p-2 shadow-lg max-w-xl mx-auto">
+        <div className="flex-grow-[1]"></div>
+
+        <div className="w-full max-w-xl text-center">
+          <form onSubmit={handleYoutubeSubmit} className="flex items-center gap-2 bg-card border rounded-full p-2 shadow-lg w-full">
             <Youtube className="h-5 w-5 text-muted-foreground ml-3 flex-shrink-0" />
             <input
               type="text"
@@ -212,11 +217,10 @@ export default function HomePage() {
             </Button>
           </form>
 
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-xl mx-auto">
-            {/* 다른 기능들은 전용 페이지로 안내하는 카드로 제공 */}
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card 
               className="text-left hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
-              onClick={() => navigate('/chat')}
+              onClick={() => navigate('/textbook')}
             >
               <CardHeader>
                 <BrainCircuit className="h-8 w-8 text-primary mb-3" />
@@ -236,6 +240,7 @@ export default function HomePage() {
             </Card>
           </div>
         </div>
+        <div className="flex-grow-[3]"></div>
       </div>
     </>
   );
