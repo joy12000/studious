@@ -165,7 +165,6 @@ export default function NotePage() {
 
   // ✨ 첨부 파일 클릭 핸들러 추가
   const handleAttachmentClick = (attachment: Attachment) => {
-    alert(`[DEBUG] Attachment Clicked:\nType: ${typeof attachment.data}\nisBlob: ${attachment.data instanceof Blob}\nSize: ${attachment.data?.size}\nMIME Type: ${attachment.mimeType}`);
     setSelectedAttachment(attachment);
   };
 
@@ -240,12 +239,13 @@ export default function NotePage() {
         setIsConverting(true);
         try {
           const images = await convertPdfToImages(file);
-          const newAttachments: Attachment[] = images.map(imageFile => ({
+          const newAttachments: Attachment[] = await Promise.all(images.map(async (imageFile) => ({
             id: uuidv4(),
             type: 'file',
             name: imageFile.name,
-            data: imageFile,
-          }));
+            mimeType: imageFile.type,
+            data: await imageFile.arrayBuffer(),
+          })));
           setEditAttachments(prev => [...prev, ...newAttachments]);
         } catch (error) {
           console.error("PDF to image conversion failed:", error);
@@ -258,7 +258,8 @@ export default function NotePage() {
           id: uuidv4(),
           type: 'file',
           name: file.name,
-          data: file,
+          mimeType: file.type,
+          data: await file.arrayBuffer(),
         };
         setEditAttachments(prev => [...prev, newAttachment]);
       }

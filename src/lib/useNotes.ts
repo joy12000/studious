@@ -322,7 +322,7 @@ export function useNotes(defaultFilters?: Filters) {
         type: 'file',
         name: file.name,
         mimeType: file.type,
-        data: file,
+        data: await file.arrayBuffer(),
       })));
     
       const newNote: Note = {

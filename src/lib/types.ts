@@ -13,7 +13,7 @@ export type FileAttachment = {
   type: 'file';
   name: string;
   mimeType: string;
-  data: Blob;
+  data: ArrayBuffer;
 };
 
 export type LinkAttachment = {

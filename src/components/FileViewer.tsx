@@ -20,20 +20,12 @@ const FileViewer: React.FC<FileViewerProps> = ({ attachment }) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
-  const debugData = {
-    hasAttachment: !!attachment,
-    attachmentName: attachment?.name,
-    attachmentMime: attachment?.mimeType,
-    isDataBlob: attachment?.data instanceof Blob,
-    dataSize: attachment?.data?.size,
-    pdfUrl: pdfUrl,
-  };
-
   useEffect(() => {
     let objectUrl: string | null = null;
 
-    if (attachment?.type === 'file' && attachment.mimeType === 'application/pdf' && attachment.data instanceof Blob) {
-      objectUrl = URL.createObjectURL(attachment.data);
+    if (attachment?.type === 'file' && attachment.mimeType === 'application/pdf' && attachment.data instanceof ArrayBuffer) {
+      const blob = new Blob([attachment.data], { type: attachment.mimeType });
+      objectUrl = URL.createObjectURL(blob);
       setPdfUrl(objectUrl);
     } else {
       setPdfUrl(null);
@@ -47,10 +39,11 @@ const FileViewer: React.FC<FileViewerProps> = ({ attachment }) => {
   }, [attachment]);
 
   useEffect(() => {
-    if (attachment?.type === 'file' && attachment.mimeType === 'text/markdown' && attachment.data instanceof Blob) {
+    if (attachment?.type === 'file' && attachment.mimeType === 'text/markdown' && attachment.data instanceof ArrayBuffer) {
+      const blob = new Blob([attachment.data], { type: attachment.mimeType });
       const reader = new FileReader();
       reader.onload = (e) => setMarkdownContent(e.target?.result as string);
-      reader.readAsText(attachment.data);
+      reader.readAsText(blob);
     } else {
       setMarkdownContent(null);
     }
@@ -70,9 +63,6 @@ const FileViewer: React.FC<FileViewerProps> = ({ attachment }) => {
 
   return (
     <div className="w-full h-[60vh] border rounded-lg overflow-auto p-4 bg-background">
-      <pre className="bg-gray-100 dark:bg-gray-800 p-2 rounded text-xs whitespace-pre-wrap break-all mb-4">
-        {JSON.stringify(debugData, null, 2)}
-      </pre>
       {pdfUrl && (
         <Document file={pdfUrl} onLoadSuccess={onDocumentLoadSuccess}>
           {Array.from(new Array(numPages), (el, index) => (
