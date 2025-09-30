@@ -1,6 +1,8 @@
-feat: Add direct camera capture button to mobile upload page
+feat(UI): Refine homepage layout, gradient, and fix dark mode TOC color
 
-This commit enhances the mobile upload page by adding a dedicated button for direct camera capture.
+This commit addresses several UI refinements and bug fixes:
 
-- Implemented a new button that triggers the device's camera directly using `input type="file" capture="environment"`.
-- Integrated the captured photo into the existing multi-file upload workflow, allowing it to be added to the list of selected files.
+- **Homepage Headline:** Adjusted the animation speed, font size, and vertical positioning of the 'STUDIOUS' headline for improved aesthetics.
+- **Gradient Text Fix:** Resolved a rendering bug where the animated gradient text appeared as a solid box by adding `display: inline-block` and `background-color: transparent` to the CSS.
+- **Dark Mode Primary Color:** Updated the primary blue color in dark mode to a much darker, more subtle shade as per user feedback.
+- **TextbookPage TOC Color Fix:** Added a CSS rule to ensure that Markdown table of contents links are clearly visible in dark mode.

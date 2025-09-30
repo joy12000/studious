@@ -192,9 +192,9 @@ export default function HomePage() {
           </Popover>
         </div>
 
-        <div className="flex-grow-[2] flex items-end justify-center">
+        <div className="flex-grow-[1] flex items-end justify-center">
           <div className="w-full max-w-4xl text-center">
-            <h1 className="text-8xl sm:text-9xl font-bold tracking-tight animated-gradient-text py-3">
+            <h1 className="text-8xl sm:text-8xl font-bold tracking-tight animated-gradient-text py-3">
               STUDIOUS
             </h1>
           </div>
@@ -240,7 +240,7 @@ export default function HomePage() {
             </Card>
           </div>
         </div>
-        <div className="flex-grow-[3]"></div>
+        <div className="flex-grow-[4]"></div>
       </div>
     </>
   );
