@@ -35,6 +35,7 @@ export async function exportPlainSingleNote(noteId: string): Promise<Blob> {
   if (!note) {
     throw new Error('Note not found for export');
   }
+  console.log('[exportPlainSingleNote] Note object before stringify:', note);
   // ExportedData a-lways expects a `notes` array
   const payload: ExportedData = { version: 1, exportedAt: Date.now(), notes: [note], settings: [] };
   return new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
