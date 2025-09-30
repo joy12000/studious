@@ -73,9 +73,9 @@ class handler(BaseHTTPRequestHandler):
             }).execute()
             print(f"Insert response: {insert_response}")
 
-            if insert_response.error:
-                print(f"Database insert error: {insert_response.error}")
-                raise Exception(f"Database insert failed: {insert_response.error.message}")
+            # The supabase-py library raises an exception on failure, which is handled
+            # by the main try/except block. This explicit error check is removed
+            # as it causes a crash on successful insertions.
 
             self.send_response(200)
             self.send_header('Content-type', 'application/json')
