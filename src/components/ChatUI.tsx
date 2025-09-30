@@ -50,6 +50,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { updateNote, getNote } = useNotes();
   const prevMessagesLength = useRef(messages.length);
+  const chatInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
