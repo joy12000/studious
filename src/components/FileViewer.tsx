@@ -18,9 +18,27 @@ interface FileViewerProps {
 const FileViewer: React.FC<FileViewerProps> = ({ attachment }) => {
   const [markdownContent, setMarkdownContent] = useState<string | null>(null);
   const [numPages, setNumPages] = useState<number | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (attachment?.type === 'file' && attachment.mimeType === 'text/markdown') {
+    let objectUrl: string | null = null;
+
+    if (attachment?.type === 'file' && attachment.mimeType === 'application/pdf' && attachment.data instanceof Blob) {
+      objectUrl = URL.createObjectURL(attachment.data);
+      setPdfUrl(objectUrl);
+    } else {
+      setPdfUrl(null);
+    }
+
+    return () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+      }
+    };
+  }, [attachment]);
+
+  useEffect(() => {
+    if (attachment?.type === 'file' && attachment.mimeType === 'text/markdown' && attachment.data instanceof Blob) {
       const reader = new FileReader();
       reader.onload = (e) => setMarkdownContent(e.target?.result as string);
       reader.readAsText(attachment.data);
@@ -43,8 +61,8 @@ const FileViewer: React.FC<FileViewerProps> = ({ attachment }) => {
 
   return (
     <div className="w-full h-[60vh] border rounded-lg overflow-auto p-4 bg-background">
-      {attachment.mimeType === 'application/pdf' && (
-        <Document file={attachment.data} onLoadSuccess={onDocumentLoadSuccess}>
+      {pdfUrl && (
+        <Document file={pdfUrl} onLoadSuccess={onDocumentLoadSuccess}>
           {Array.from(new Array(numPages), (el, index) => (
             <Page key={`page_${index + 1}`} pageNumber={index + 1} />
           ))}
