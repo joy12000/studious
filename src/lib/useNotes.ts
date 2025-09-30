@@ -131,22 +131,34 @@ export function useNotes(defaultFilters?: Filters) {
         await Notification.requestPermission();
       }
 
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        const registration = await navigator.serviceWorker.ready;
-        registration.active?.postMessage({
-          type: task.noteType === 'textbook' ? 'GENERATE_TEXTBOOK' : 'GENERATE_REVIEW_NOTE',
-          payload: {
-            noteId: noteId,
-            body: task.payload,
-          },
-        });
+      if ('serviceWorker' in navigator) {
+        try {
+            const registration = await navigator.serviceWorker.ready; // Wait for SW to be active
+            if (!registration.active) {
+                throw new Error("Service Worker is not active.");
+            }
+            registration.active.postMessage({
+              type: task.noteType === 'textbook' ? 'GENERATE_TEXTBOOK' : 'GENERATE_REVIEW_NOTE',
+              payload: {
+                noteId: noteId,
+                body: task.payload,
+              },
+            });
+        } catch (err) {
+            // Handle cases where SW is supported but fails to become ready
+            await db.notes.update(noteId, { 
+              title: `[생성 실패] ${placeholderTitle}`,
+              content: `서비스 워커 준비 중 오류가 발생했습니다: ${err.message}`
+            });
+            throw err; // Re-throw to be caught by the UI
+        }
       } else {
-        // Fallback or error if SW is not available
+        // Fallback or error if SW is not supported
         await db.notes.update(noteId, { 
           title: `[생성 실패] ${placeholderTitle}`,
-          content: '서비스 워커가 활성화되어 있지 않아 백그라운드 생성을 시작할 수 없습니다.'
+          content: '서비스 워커가 지원되지 않아 백그라운드 생성을 시작할 수 없습니다.'
         });
-        throw new Error("Service Worker is not active.");
+        throw new Error("Service Worker is not supported in this browser.");
       }
       
       return placeholderNote;
