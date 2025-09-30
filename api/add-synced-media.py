@@ -66,12 +66,15 @@ class handler(BaseHTTPRequestHandler):
             public_url = public_url_response.data
 
             # 3. Insert URL into Supabase Database
+            print(f"Attempting to insert URL: {public_url} into synced_media table.")
             insert_response = supabase.table('synced_media').insert({
                 'url': public_url,
                 # 'user_id': 'some_user_id' # TODO: Add user auth later
             }).execute()
+            print(f"Insert response: {insert_response}")
 
             if insert_response.error:
+                print(f"Database insert error: {insert_response.error}")
                 raise Exception(f"Database insert failed: {insert_response.error.message}")
 
             self.send_response(200)
