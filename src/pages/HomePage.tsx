@@ -192,7 +192,7 @@ export default function HomePage() {
           </Popover>
         </div>
 
-        <div className="flex-grow-[1] flex items-end justify-center">
+        <div className="flex-grow-[2] flex items-end justify-center">
           <div className="w-full max-w-4xl text-center">
             <h1 className="text-8xl sm:text-8xl font-bold tracking-tight animated-gradient-text py-3">
               STUDIOUS
@@ -200,7 +200,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="flex-grow-[2]"></div>
+        <div className="flex-grow-[1]"></div>
 
         <div className="w-full max-w-xl text-center">
           <form onSubmit={handleYoutubeSubmit} className="flex items-center gap-2 bg-card border rounded-full p-2 shadow-lg w-full">

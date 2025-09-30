@@ -1,8 +1,3 @@
-feat(UI): Refine homepage layout, gradient, and fix dark mode TOC color
+fix: Correct Supabase Storage upload error handling in backend API
 
-This commit addresses several UI refinements and bug fixes:
-
-- **Homepage Headline:** Adjusted the animation speed, font size, and vertical positioning of the 'STUDIOUS' headline for improved aesthetics.
-- **Gradient Text Fix:** Resolved a rendering bug where the animated gradient text appeared as a solid box by adding `display: inline-block` and `background-color: transparent` to the CSS.
-- **Dark Mode Primary Color:** Updated the primary blue color in dark mode to a much darker, more subtle shade as per user feedback.
-- **TextbookPage TOC Color Fix:** Added a CSS rule to ensure that Markdown table of contents links are clearly visible in dark mode.
+The backend API (api/add-synced-media.py) was incorrectly checking for `response.status_code` after a Supabase Storage upload, leading to a 500 error. This commit updates the code to correctly check `response.error` for upload failures, resolving the issue.

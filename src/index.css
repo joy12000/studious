@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap');
+
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -47,19 +49,19 @@
     --card-foreground: 0 0% 100%;
     --popover: 0 0% 25%;
     --popover-foreground: 0 0% 100%;
-    --primary: 223 66% 35%;
+    --primary: 220 47% 11%; /* #101827 */
     --primary-foreground: 0 0% 100%;
     --secondary: 0 0% 25%;
     --secondary-foreground: 0 0% 100%;
     --muted: 0 0% 29%;
     --muted-foreground: 0 0% 63%;
-    --accent: 223 66% 35%;
+    --accent: 220 47% 11%; /* #101827 */
     --accent-foreground: 0 0% 100%;
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
     --border: 0 0% 32%;
     --input: 0 0% 32%;
-    --ring: 223 66% 35%;
+    --ring: 220 47% 11%; /* #101827 */
   }
 }
  
@@ -69,6 +71,7 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
     margin: 0;
     padding: 0;

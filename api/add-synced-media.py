@@ -57,8 +57,8 @@ class handler(BaseHTTPRequestHandler):
                 file_options={"content-type": content_type}
             )
 
-            if response.status_code != 200:
-                 raise Exception(f"Storage upload failed: {response.text}")
+            if response.error:
+                 raise Exception(f"Storage upload failed: {response.response.text if hasattr(response.response, 'text') else response.error.message}")
 
             # 2. Get public URL
             public_url_response = supabase.storage.from_('synced_media').get_public_url(new_filename)
