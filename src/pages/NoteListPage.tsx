@@ -1,18 +1,37 @@
 // src/pages/NoteListPage.tsx
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useNotes, Filters } from '../lib/useNotes';
+import { useNotes } from '../lib/useNotes';
 import NoteCard from '../components/NoteCard';
-import { Plus, LayoutGrid, List, Menu, Search, X, Youtube, BrainCircuit, Notebook } from 'lucide-react';
+import { Plus, LayoutGrid, List, Search, X, Youtube, BrainCircuit, Notebook, RefreshCw } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { useSidebar } from '@/components/AppLayout';
 import { Button } from '@/components/ui/button';
+import { useAuth } from '@clerk/clerk-react';
+import { syncNotes } from '../lib/sync';
+import toast from 'react-hot-toast';
 
 export default function NoteListPage() {
   const { notes, loading, filters, setFilters, toggleFavorite, importNote } = useNotes();
-  const { setIsSidebarOpen } = useSidebar();
   const navigate = useNavigate();
+  const { getToken } = useAuth();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSync = async () => {
+    if (!getToken) return;
+
+    setIsSyncing(true);
+    const toastId = toast.loading('Supabase와 노트 동기화를 시작합니다...');
+
+    try {
+      const result = await syncNotes(getToken);
+      toast.success(`동기화 완료! (추가/업데이트: ${result.addedOrUpdated}, 삭제: ${result.deleted})`, { id: toastId });
+    } catch (error) {
+      console.error("Sync failed", error);
+      toast.error(error instanceof Error ? error.message : '알 수 없는 오류로 동기화에 실패했습니다.', { id: toastId });
+    }
+
+    setIsSyncing(false);
+  };
 
   const handleAddNewEmptyNote = async () => {
     const newNote = await importNote({
@@ -53,6 +72,9 @@ export default function NoteListPage() {
                 <h1 className="text-xl font-bold">내 노트</h1>
               </div>
               <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={handleSync} disabled={isSyncing} title="Supabase와 동기화">
+                    <RefreshCw className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
+                </Button>
                 <ToggleGroup type="single" value={view} onValueChange={(value) => { if (value) setView(value as 'grid' | 'list'); }}>
                     <ToggleGroupItem value="grid"><LayoutGrid className="h-5 w-5" /></ToggleGroupItem>
                     <ToggleGroupItem value="list"><List className="h-5 w-5" /></ToggleGroupItem>
