@@ -1,0 +1,8 @@
+feat: Enable multiple file uploads on mobile upload page
+
+This commit enhances the mobile upload page to support multiple file selections and uploads.
+
+- Modified `MobileUploadPage.tsx` to allow users to select and upload multiple image files simultaneously.
+- Updated the component's state management to handle an array of selected files.
+- Implemented a loop to send individual upload requests for each selected file to the backend API, ensuring compatibility with the existing single-file API endpoint.
+- Enhanced the UI to display a list of selected files with an option to remove them before uploading.

@@ -1,48 +1,64 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2, UploadCloud, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, UploadCloud, CheckCircle, AlertTriangle, X } from 'lucide-react'; // Added X for removing files
 import toast from 'react-hot-toast';
 
 export default function MobileUploadPage() {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]); // Changed to array
   const [isUploading, setIsUploading] = useState(false);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      setSelectedFile(event.target.files[0]);
+    if (event.target.files) {
+      setSelectedFiles(Array.from(event.target.files)); // Take all files
     }
   };
 
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleUpload = async () => {
-    if (!selectedFile) {
+    if (selectedFiles.length === 0) { // Check length
       toast.error('먼저 파일을 선택해주세요.');
       return;
     }
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append('file', selectedFile);
+    let allUploadsSuccessful = true;
+    const uploadedUrls: string[] = [];
 
-    try {
-      const response = await fetch('/api/add-synced-media', {
-        method: 'POST',
-        body: formData,
-      });
+    for (const file of selectedFiles) {
+      const formData = new FormData();
+      formData.append('file', file); // Backend expects 'file'
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.details || '업로드에 실패했습니다.');
+      try {
+        const response = await fetch('/api/add-synced-media', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.details || `파일 ${file.name} 업로드에 실패했습니다.`);
+        }
+
+        const result = await response.json();
+        uploadedUrls.push(result.url);
+        toast.success(`파일 ${file.name} 업로드 성공!`);
+
+      } catch (error) {
+        console.error(`Upload failed for ${file.name}:`, error);
+        toast.error(`파일 ${file.name} 업로드 중 오류 발생: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+        allUploadsSuccessful = false;
       }
+    }
 
-      const result = await response.json();
-      toast.success(`업로드 성공! PC에서 확인하세요.\nURL: ${result.url}`);
-      setSelectedFile(null); // Reset after successful upload
-
-    } catch (error) {
-      console.error("Upload failed:", error);
-      toast.error(`업로드 중 오류 발생: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
-    } finally {
-      setIsUploading(false);
+    setIsUploading(false);
+    if (allUploadsSuccessful) {
+      toast.success(`모든 파일 업로드 완료! PC에서 확인하세요.`);
+      setSelectedFiles([]); // Reset after successful upload
+    } else {
+      toast.error('일부 파일 업로드에 실패했습니다.');
     }
   };
 
@@ -57,19 +73,28 @@ export default function MobileUploadPage() {
           onClick={() => document.getElementById('file-input')?.click()}
         >
           <UploadCloud className="h-12 w-12 mb-4" />
-          {selectedFile ? (
-            <p className="font-semibold text-primary">{selectedFile.name}</p>
+          {selectedFiles.length > 0 ? (
+            <div className="space-y-2">
+              {selectedFiles.map((file, index) => (
+                <div key={index} className="flex items-center justify-between w-full px-4 py-2 bg-muted rounded-md">
+                  <p className="font-semibold text-primary truncate">{file.name}</p>
+                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); removeFile(index); }}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
           ) : (
             <p className="font-semibold">파일을 선택하려면 여기를 클릭하세요</p>
           )}
-          <input id="file-input" type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+          <input id="file-input" type="file" accept="image/*" onChange={handleFileChange} className="hidden" multiple />
         </div>
 
         <Button 
           onClick={handleUpload} 
           size="lg" 
           className="w-full mt-8"
-          disabled={isUploading || !selectedFile}
+          disabled={isUploading || selectedFiles.length === 0}
         >
           {isUploading ? (
             <Loader2 className="mr-2 h-5 w-5 animate-spin" />
