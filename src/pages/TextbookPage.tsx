@@ -72,10 +72,10 @@ export default function ChatPage() {
     let currentTotalSize = uploadedFiles.reduce((sum, file) => sum + file.size, 0);
 
     for (const file of newFiles) {
-      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
-        alert(`개별 파일 크기는 ${MAX_FILE_SIZE_MB}MB를 초과할 수 없습니다: ${file.name}`);
-        continue;
-      }
+      // if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+      //   alert(`개별 파일 크기는 ${MAX_FILE_SIZE_MB}MB를 초과할 수 없습니다: ${file.name}`);
+      //   continue;
+      // }
 
       if (file.type === 'application/pdf') {
         const isScanned = window.confirm("이 PDF가 스캔된 문서인가요? (텍스트 선택이 불가능한 경우) '확인'을 누르면 이미지로 변환하고, '취소'를 누르면 텍스트로 처리합니다.");
@@ -101,11 +101,11 @@ export default function ChatPage() {
       }
     }
 
-    const totalSizeAfterAdding = currentTotalSize + filesToAdd.reduce((sum, file) => sum + file.size, 0);
-    if (totalSizeAfterAdding > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
-      alert(`총 파일 크기는 ${MAX_TOTAL_SIZE_MB}MB를 초과할 수 없습니다.`);
-      return;
-    }
+    // const totalSizeAfterAdding = currentTotalSize + filesToAdd.reduce((sum, file) => sum + file.size, 0);
+    // if (totalSizeAfterAdding > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
+    //   alert(`총 파일 크기는 ${MAX_TOTAL_SIZE_MB}MB를 초과할 수 없습니다.`);
+    //   return;
+    // }
 
     setUploadedFiles(prev => [...prev, ...filesToAdd]);
 
