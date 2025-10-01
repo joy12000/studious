@@ -229,8 +229,22 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       }
 
       if (trimmed) {
-        const html = marked.parse(trimmed, { gfm: true, breaks: true }) as string;
-        return <div key={i} dangerouslySetInnerHTML={{ __html: html }} />;
+        const katexRegex = /(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g;
+        const parts = trimmed.split(katexRegex);
+
+        return parts.map((part, j) => {
+          if (!part) return null;
+          const t = part.trim();
+          if (t.startsWith('$$') && t.endsWith('$$')) {
+            return <BlockMath key={`${i}-${j}`}>{normalizeMathUnicode(part.slice(2, -2))}</BlockMath>;
+          }
+          if (t.startsWith('$') && t.endsWith('$')) {
+            return <InlineMath key={`${i}-${j}`}>{normalizeMathUnicode(part.slice(1, -1))}</InlineMath>;
+          }
+          // This is a regular markdown part, parse it fully
+          const html = marked.parse(part, { gfm: true, breaks: true }) as string;
+          return <span key={`${i}-${j}`} dangerouslySetInnerHTML={{ __html: html }} />;
+        });
       }
       return null;
     });
