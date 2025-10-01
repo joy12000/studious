@@ -3,8 +3,8 @@ import base64
 import os
 from flask import Flask, request, jsonify
 from supabase import create_client, Client
-import traceback # traceback 모듈 추가
-import uuid # uuid 모듈 추가 (중복 제거)
+import traceback
+import uuid # <-- 이 위치로 이동
 
 app = Flask(__name__)
 
