@@ -1,90 +1,70 @@
-from http.server import BaseHTTPRequestHandler
-import json
+import json # json 모듈 추가
+import base64
 import os
+from flask import Flask, request, jsonify # Flask 관련 import는 유지하되, 사용 방식 변경
 from supabase import create_client, Client
-import uuid
 
-class handler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        try:
-            supabase_url = os.environ.get('VITE_PUBLICSUPABASE_URL')
-            supabase_key = os.environ.get('VITE_PUBLICSUPABASE_ANON_KEY')
-            
-            if not supabase_url or not supabase_key:
-                self.send_error(500, "Supabase environment variables not set.")
-                return
+app = Flask(__name__)
 
-            # 1. Get token from header
-            auth_header = self.headers.get('Authorization')
-            if not auth_header or not auth_header.startswith('Bearer '):
-                self.send_error(401, "Authorization header missing or invalid.")
-                return
-            jwt = auth_header.split('Bearer ')[1]
+# Supabase 클라이언트 초기화
+SUPABASE_URL = os.environ.get("SUPABASE_URL")
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-            # 2. Initialize Supabase client with user's JWT
-            supabase: Client = create_client(
-                supabase_url,
-                supabase_key,
-                options={"global": {"headers": {"Authorization": f"Bearer {jwt}"}}})
+@app.route('/api/add-synced-media', methods=['POST'])
+def add_synced_media():
+    try:
+        # Vercel 환경에서 request 객체가 딕셔너리 형태로 들어올 수 있으므로,
+        # Flask의 request 객체와 딕셔너리 형태 모두를 처리할 수 있도록 로직을 추가합니다.
+        if isinstance(request, dict): # request가 딕셔너리인 경우 (서버리스 환경)
+            event = request # request를 event로 간주
+            # Vercel Python 런타임의 경우, body는 base64 인코딩될 수 있습니다.
+            if 'body' in event and event.get('isBase64Encoded', False):
+                body_data = base64.b64decode(event['body']).decode('utf-8')
+            elif 'body' in event:
+                body_data = event['body']
+            else:
+                body_data = None
 
-            # 3. Parse multipart form data
-            content_length = int(self.headers['Content-Length'])
-            form_data = self.rfile.read(content_length)
-            boundary = self.headers.get_boundary().encode()
-            parts = form_data.split(b'--' + boundary)
-            
-            file_part = None
-            user_id = None
-            content_type = 'application/octet-stream'
+            if body_data:
+                data = json.loads(body_data)
+            else:
+                return jsonify({"error": "No body data provided in serverless event"}), 400
+        else: # Flask의 request 객체인 경우 (로컬 개발 또는 전통적인 Flask 배포)
+            data = request.json
+            if not data:
+                return jsonify({"error": "No JSON data provided"}), 400
 
-            for part in parts:
-                if b'Content-Disposition: form-data; name="file"' in part:
-                    headers_section, content = part.split(b'\r\n\r\n', 1)
-                    headers = headers_section.split(b'\r\n')
-                    filename_header = [h for h in headers if b'filename' in h][0]
-                    filename = filename_header.split(b'filename="')[1].split(b'"')[0].decode()
-                    if any(b'Content-Type' in h for h in headers):
-                        content_type_header = [h for h in headers if b'Content-Type' in h][0]
-                        content_type = content_type_header.split(b': ')[1].decode()
-                    file_part = (filename, content.strip(b'\r\n--'))
-                
-                if b'Content-Disposition: form-data; name="userId"' in part:
-                    content_section = part.split(b'\r\n\r\n', 1)[1]
-                    user_id = content_section.strip().decode('utf-8')
+        file_data = data.get('file_data')
+        file_name = data.get('file_name')
+        content_type = data.get('content_type')
+        user_id = data.get('user_id')
 
-            if not file_part or not user_id:
-                self.send_error(400, f"File or userId missing. Got file: {"yes" if file_part else "no"}, Got userId: {"yes" if user_id else "no"}")
-                return
+        if not all([file_data, file_name, content_type, user_id]):
+            return jsonify({"error": "Missing file_data, file_name, content_type, or user_id"}), 400
 
-            filename, file_bytes = file_part
-            file_extension = os.path.splitext(filename)[1]
-            new_filename = f'public/{user_id}/{uuid.uuid4()}{file_extension}'
+        decoded_file = base64.b64decode(file_data)
 
-            # 4. Upload to Supabase Storage
-            try:
-                response = supabase.storage.from_('synced_media').upload(
-                    new_filename, 
-                    file_bytes, 
-                    file_options={"content-type": content_type}
-                )
-            except Exception as e:
-                raise Exception(f"Storage upload failed: {e}")
+        bucket_name = "synced_media"
+        path_on_storage = f"{user_id}/{file_name}"
 
-            # 5. Get public URL
-            public_url_response = supabase.storage.from_('synced_media').get_public_url(new_filename)
-            public_url = public_url_response
+        response = supabase.storage.from_(bucket_name).upload(
+            file=decoded_file,
+            path=path_on_storage,
+            file_options={"content-type": content_type}
+        )
 
-            # 6. Insert URL and userId into Supabase Database
-            insert_response = supabase.table('synced_media').insert({
-                'url': public_url,
-                'user_id': user_id
-            }).execute()
-            print(f"Insert response: {insert_response}")
+        if response.status_code == 200:
+            public_url_response = supabase.storage.from_(bucket_name).get_public_url(path_on_storage)
+            return jsonify({"message": "File uploaded successfully", "public_url": public_url_response}), 200
+        else:
+            # Supabase 응답이 딕셔너리 형태가 아닐 수 있으므로, .json() 호출 전에 확인
+            error_details = response.text if hasattr(response, 'text') else str(response)
+            return jsonify({"error": "Supabase upload failed", "details": error_details}), response.status_code
 
-            self.send_response(200)
-            self.send_header('Content-type', 'application/json')
-            self.end_headers()
-            self.wfile.write(json.dumps({"success": True, "url": public_url}).encode('utf-8'))
+    except Exception as e:
+        print(f"Error in add_synced_media: {e}")
+        return jsonify({"error": str(e)}), 500
 
-        except Exception as e:
-            self.send_error(500, str(e))
+if __name__ == '__main__':
+    app.run(debug=True)
