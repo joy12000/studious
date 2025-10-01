@@ -60,23 +60,32 @@ def add_synced_media():
         # 데이터 유효성 검사 전 로그
         print(f"Received data keys: {data.keys() if data else 'No data'}")
 
+import uuid # uuid 모듈 추가
+import os # os 모듈은 이미 있지만, 혹시 몰라 다시 명시
+
+# ... (기존 코드) ...
+
         file_data = data.get('file_data')
-        file_name = data.get('file_name')
+        original_file_name = data.get('file_name') # 원본 파일 이름
         content_type = data.get('content_type')
         user_id = data.get('user_id')
 
-        if not all([file_data, file_name, content_type, user_id]):
-            print(f"Missing data: file_data={bool(file_data)}, file_name={bool(file_name)}, content_type={bool(content_type)}, user_id={bool(user_id)}")
+        if not all([file_data, original_file_name, content_type, user_id]):
+            print(f"Missing data: file_data={bool(file_data)}, original_file_name={bool(original_file_name)}, content_type={bool(content_type)}, user_id={bool(user_id)}")
             return jsonify({"error": "Missing file_data, file_name, content_type, or user_id"}), 400
 
-        print(f"File name: {file_name}, Content type: {content_type}, User ID: {user_id}")
-        print(f"File data length: {len(file_data) if file_data else 0}")
+        # 고유한 파일 이름 생성 (UUID + 원본 확장자)
+        file_extension = os.path.splitext(original_file_name)[1] # 확장자 추출
+        unique_file_name = f"{uuid.uuid4()}{file_extension}"
+        
+        print(f"Original file name: {original_file_name}, Unique file name: {unique_file_name}")
 
         decoded_file = base64.b64decode(file_data)
         print(f"Decoded file size: {len(decoded_file)} bytes")
 
         bucket_name = "synced_media"
-        path_on_storage = f"public/{file_name}"
+        # path_on_storage = f"public/{file_name}" # 기존
+        path_on_storage = f"public/{unique_file_name}" # 고유한 파일 이름 사용
         print(f"Uploading to Supabase bucket: {bucket_name}, path: {path_on_storage}")
 
         response = supabase.storage.from_(bucket_name).upload(
