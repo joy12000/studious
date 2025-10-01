@@ -417,7 +417,10 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
         const { done, value } = await reader.read();
         if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
+        const decodedChunk = decoder.decode(value, { stream: true });
+        console.log('[STREAM_DEBUG] Raw Decoded Chunk:', decodedChunk);
+        buffer += decodedChunk;
+        console.log('[STREAM_DEBUG] Current Buffer:', buffer);
 
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
@@ -425,11 +428,13 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
         for (const line of lines) {
             if (line.startsWith('data: ')) {
                 const jsonStr = line.slice(6);
+                console.log('[STREAM_DEBUG] Received JSON String:', jsonStr);
                 if (jsonStr.trim() === '[DONE]') continue;
                 try {
                     const data = JSON.parse(jsonStr);
                     // Handle different message types from backend
                     if (data.type === 'token' && data.content) {
+                      console.log('[STREAM_DEBUG] Content Token:', data.content);
                       setMessages(prev => prev.map(msg => {
                         if (msg.id === botMessage.id) {
                           const newContent = msg.content + data.content;
