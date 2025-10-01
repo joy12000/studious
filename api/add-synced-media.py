@@ -76,7 +76,7 @@ def add_synced_media():
         print(f"Decoded file size: {len(decoded_file)} bytes")
 
         bucket_name = "synced_media"
-        path_on_storage = f"{user_id}/{file_name}"
+        path_on_storage = f"public/{user_id}/{file_name}"
         print(f"Uploading to Supabase bucket: {bucket_name}, path: {path_on_storage}")
 
         response = supabase.storage.from_(bucket_name).upload(
