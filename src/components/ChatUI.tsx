@@ -468,7 +468,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
   const activeSuggestion = messages.find(msg => msg.suggestion);
 
   return (
-    <div className="flex flex-col h-full bg-card border-r rounded-r-lg shadow-lg pb-4">
+    <div className={`flex flex-col bg-card pb-4 ${isMobile ? 'fixed inset-0 z-[9999]' : 'h-full border-r rounded-r-lg shadow-lg'}`}>
               <div className="p-2 sm:p-4 border-b flex justify-between items-center">
                 <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
                   <PopoverTrigger asChild>
