@@ -6,7 +6,6 @@ import mermaid from 'mermaid';
 import VisualRenderer from './VisualRenderer';
 import { normalizeMermaidCode } from '../lib/markdownUtils';
 import 'highlight.js/styles/github-dark.css';
-import katex from 'katex';
 import 'katex/dist/katex.min.css';
 
 interface Props { content: string; }
@@ -230,25 +229,22 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       }
 
       if (trimmed) {
-        // Pass 1: Find and render KaTeX expressions to HTML strings
-        const katexHtml = trimmed.replace(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g, (match) => {
-          const isBlock = match.startsWith('$$');
-          const content = match.slice(isBlock ? 2 : 1, isBlock ? -2 : -1);
-          try {
-            return katex.renderToString(normalizeMathUnicode(content), {
-              throwOnError: false,
-              displayMode: isBlock,
-            });
-          } catch (e) {
-            console.error("KaTeX rendering failed:", e);
-            return match; // Return original on error
-          }
-        });
+        const katexRegex = /(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g;
+        const parts = trimmed.split(katexRegex);
 
-        // Pass 2: Parse the combined Markdown and KaTeX HTML
-        const finalHtml = marked.parse(katexHtml, { gfm: true, breaks: true }) as string;
-        
-        return <div key={i} dangerouslySetInnerHTML={{ __html: finalHtml }} />;
+        return parts.map((part, j) => {
+          if (!part) return null;
+          const t = part.trim();
+          if (t.startsWith('$$') && t.endsWith('$$')) {
+            return <BlockMath key={`${i}-${j}`}>{normalizeMathUnicode(part.slice(2, -2))}</BlockMath>;
+          }
+          if (t.startsWith('$') && t.endsWith('$')) {
+            return <InlineMath key={`${i}-${j}`}>{normalizeMathUnicode(part.slice(1, -1))}</InlineMath>;
+          }
+          // This is a regular markdown part, parse it fully
+          const html = marked.parse(part, { gfm: true, breaks: true }) as string;
+          return <div key={`${i}-${j}`} style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: html }} />;
+        });
       }
       return null;
     });
