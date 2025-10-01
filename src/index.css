@@ -182,19 +182,11 @@
 }
 
 .studious-custom-tooltip {
-  position: absolute;
-  z-index: 99999;
-  background-color: var(--popover);
-  color: var(--popover-foreground);
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  max-width: 300px;
-  text-align: left;
+  @apply absolute z-[99999] max-w-xs p-2 rounded-md shadow-lg;
+  @apply bg-popover text-popover-foreground text-sm;
+  
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.2s ease-in-out;
   line-height: 1.5;
-  border: 1px solid var(--border);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
