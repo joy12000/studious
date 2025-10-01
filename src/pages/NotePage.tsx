@@ -163,6 +163,36 @@ export default function NotePage() {
   
   const chatMessagesRef = useRef<Message[]>();
 
+  const fullNoteContext = useMemo(() => {
+    if (!note) return '';
+
+    let context = `--- 학습 노트 본문 ---\n${note.content}`;
+
+    if (note.attachments && note.attachments.length > 0) {
+      const decoder = new TextDecoder('utf-8');
+      
+      for (const attachment of note.attachments) {
+        if (attachment.type === 'file') {
+          let fileContent = '';
+          // Only try to decode text-based files
+          if (attachment.mimeType.startsWith('text/')) {
+            try {
+              fileContent = decoder.decode(attachment.data);
+            } catch (e) {
+              console.error(`Failed to decode attachment ${attachment.name}:`, e);
+              fileContent = '[첨부 파일 내용을 읽을 수 없습니다]';
+            }
+          } else {
+            fileContent = `[첨부 파일: ${attachment.name}, 타입: ${attachment.mimeType} - 내용 표시 불가]`;
+          }
+          
+          context += `\n\n--- 첨부 파일: ${attachment.name} ---\n${fileContent}`;
+        }
+      }
+    }
+    return context;
+  }, [note]);
+
   // ✨ 첨부 파일 클릭 핸들러 추가
   const handleAttachmentClick = (attachment: Attachment) => {
     setSelectedAttachment(attachment);
@@ -451,7 +481,7 @@ export default function NotePage() {
             {/* ChatUI Panel */}
             <div className={`h-full transition-all duration-300 ease-in-out flex-shrink-0 bg-background border-r ${isChatOpen ? 'w-[46vw] lg:w-[40vw] xl:w-[35vw]' : 'w-0'}`}>
                         {isChatOpen && <ChatUI 
-                            noteContext={note.content} 
+                            noteContext={fullNoteContext} 
                             onClose={() => {
                           setIsChatOpen(false);
                           setInitialChatMessage(undefined);
