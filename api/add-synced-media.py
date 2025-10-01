@@ -1,6 +1,7 @@
 from http.server import BaseHTTPRequestHandler
 import json
 import os
+import cgi
 from supabase import create_client, Client
 import uuid
 
@@ -53,11 +54,24 @@ class handler(BaseHTTPRequestHandler):
                     content_section = part.split(b'\r\n\r\n', 1)[1]
                     user_id = content_section.strip().decode('utf-8')
 
-            if not file_part or not user_id:
-                self.send_error(400, f"File or userId missing. Got file: {"yes" if file_part else "no"}, Got userId: {"yes" if user_id else "no"}")
+            # 3. Parse multipart form data using cgi
+            form = cgi.FieldStorage(
+                fp=self.rfile,
+                headers=self.headers,
+                environ={'REQUEST_METHOD': 'POST',
+                         'CONTENT_TYPE': self.headers['Content-Type']}
+            )
+
+            if 'file' not in form or 'userId' not in form:
+                self.send_error(400, "File or userId missing from form data.")
                 return
 
-            filename, file_bytes = file_part
+            file_item = form['file']
+            filename = file_item.filename
+            file_bytes = file_item.file.read()
+            content_type = file_item.type
+
+            user_id = form.getvalue('userId')
             file_extension = os.path.splitext(filename)[1]
             new_filename = f'public/{user_id}/{uuid.uuid4()}{file_extension}'
 
