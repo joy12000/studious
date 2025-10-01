@@ -241,9 +241,25 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
           if (t.startsWith('$') && t.endsWith('$')) {
             return <InlineMath key={`${i}-${j}`}>{normalizeMathUnicode(part.slice(1, -1))}</InlineMath>;
           }
-          // This is a regular markdown part, parse it fully
-          const html = marked.parse(part, { gfm: true, breaks: true }) as string;
-          return <div key={`${i}-${j}`} style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: html }} />;
+          // This is a regular markdown part.
+          // Determine if it contains block-level elements.
+          const containsBlockMarkdown = 
+            t.includes('\n') || // Contains newlines
+            t.startsWith('* ') || t.startsWith('- ') || t.startsWith('+ ') || // List item
+            t.match(/^\d+\.\s/) || // Numbered list item
+            t.startsWith('> ') || // Blockquote
+            t.startsWith('#'); // Heading
+
+          let html: string;
+          if (containsBlockMarkdown) {
+            // If it contains block-level markdown, use marked.parse()
+            html = marked.parse(part, { gfm: true, breaks: true }) as string;
+            return <div key={`${i}-${j}`} dangerouslySetInnerHTML={{ __html: html }} />;
+          } else {
+            // Otherwise, use marked.parseInline() for inline content
+            html = marked.parseInline(part, { gfm: true, breaks: true }) as string;
+            return <span key={`${i}-${j}`} dangerouslySetInnerHTML={{ __html: html }} />;
+          }
         });
       }
       return null;
