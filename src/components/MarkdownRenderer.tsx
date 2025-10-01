@@ -243,7 +243,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
               displayMode: isBlock,
             });
             katexParts.push(renderedKatex);
-            const placeholder = `__KATEX_PLACEHOLDER_${placeholderIndex++}__`;
+            const placeholder = `<!--KATEX_PLACEHOLDER_${placeholderIndex++}-->`;
             return isBlock ? `<div>${placeholder}</div>` : placeholder;
           } catch (e) {
             console.error("KaTeX rendering failed:", e);
@@ -256,7 +256,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
 
         // 3. Replace placeholders with the rendered KaTeX HTML
         for (let i = 0; i < katexParts.length; i++) {
-          finalHtml = finalHtml.replace(`__KATEX_PLACEHOLDER_${i}__`, katexParts[i]);
+          finalHtml = finalHtml.replace(`<!--KATEX_PLACEHOLDER_${i}-->`, katexParts[i]);
         }
 
         return <div key={i} dangerouslySetInnerHTML={{ __html: finalHtml }} />;
