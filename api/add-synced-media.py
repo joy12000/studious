@@ -8,7 +8,7 @@ import traceback # traceback 모듈 추가
 app = Flask(__name__)
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
-SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
+SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 @app.route('/api/add-synced-media', methods=['POST'])
