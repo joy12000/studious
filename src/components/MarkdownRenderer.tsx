@@ -254,10 +254,11 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
         // 2. Parse the markdown with placeholders
         let finalHtml = marked.parse(stringWithPlaceholders, { gfm: true, breaks: true }) as string;
 
-        // 3. Replace placeholders with the rendered KaTeX HTML
-        for (let i = 0; i < katexParts.length; i++) {
-          finalHtml = finalHtml.replace(`<!--KATEX_PLACEHOLDER_${i}-->`, katexParts[i]);
-        }
+        // 3. Replace placeholders with the rendered KaTeX HTML using a single regex replace
+        finalHtml = finalHtml.replace(/<!--KATEX_PLACEHOLDER_(\d+)-->/g, (match, indexStr) => {
+          const index = parseInt(indexStr, 10);
+          return katexParts[index] || match;
+        });
 
         return <div key={i} dangerouslySetInnerHTML={{ __html: finalHtml }} />;
       }
