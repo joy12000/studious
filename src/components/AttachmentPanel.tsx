@@ -24,7 +24,8 @@ const AttachmentItem = ({ attachment, onRemove, onClick, readOnly }: { attachmen
   const handleDownload = (e: React.MouseEvent, fileAttachment: Attachment & { type: 'file' }) => {
     e.preventDefault();
     e.stopPropagation(); // Prevent click from bubbling to the parent div
-    const url = URL.createObjectURL(fileAttachment.data);
+    const blob = new Blob([fileAttachment.data], { type: fileAttachment.mimeType });
+    const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
     a.download = fileAttachment.name;
@@ -58,7 +59,7 @@ const AttachmentItem = ({ attachment, onRemove, onClick, readOnly }: { attachmen
   }
 
   if (attachment.type === 'file') {
-    const fileSize = (attachment.data.size / 1024).toFixed(1); // in KB
+    const fileSize = (attachment.data.byteLength / 1024).toFixed(1); // in KB
     return (
       <div 
         className={`${commonClasses} ${clickableClasses}`}
