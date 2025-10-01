@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
-import { ArrowUp, Loader2, RefreshCw, Copy, Save, ChevronsUpDown, Check, X, Lightbulb, Plus, FileText, UploadCloud } from 'lucide-react';
+import { ArrowUp, Loader2, RefreshCw, Copy, Save, ChevronsUpDown, Check, X, Lightbulb, Plus, FileText, UploadCloud, StopCircle } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import MarkdownRenderer from './MarkdownRenderer';
@@ -51,6 +51,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const { updateNote, getNote } = useNotes();
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
@@ -359,6 +360,9 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
     setInputValue('');
     setIsLoading(true);
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     let uploadedBlobUrls: string[] = [];
     if (selectedFiles.length > 0) {
       try {
@@ -398,6 +402,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ history, model: selectedModel, noteContext, fileUrls: uploadedBlobUrls }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -471,17 +476,34 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
       }));
 
     } catch (error) {
-      console.error('API 통신 오류:', error);
-      const errorMessageText = `죄송합니다, 답변을 생성하는 중 오류가 발생했습니다.\n\n오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`;
-      setMessages((prev) => prev.map(msg => msg.id === botMessage.id ? {...msg, content: errorMessageText} : msg));
+      if (error.name === 'AbortError') {
+        console.log('Fetch aborted by user.');
+        setMessages(prev => prev.map(msg => 
+          msg.id === botMessage.id 
+            ? { ...msg, content: msg.content + '\n\n[답변 생성이 중단되었습니다.]' } 
+            : msg
+        ));
+      } else {
+        console.error('API 통신 오류:', error);
+        const errorMessageText = `죄송합니다, 답변을 생성하는 중 오류가 발생했습니다.\n\n오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`;
+        setMessages((prev) => prev.map(msg => msg.id === botMessage.id ? {...msg, content: errorMessageText} : msg));
+      }
     } finally {
       setIsLoading(false);
       setSelectedFiles([]); // Clear selected files after sending
+      abortControllerRef.current = null;
     }
   };
 
   const currentModelName = models.find(m => m.id === selectedModel)?.name || '모델 선택';
   
+  const handleStopStreaming = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
+
   const activeSuggestion = messages.find(msg => msg.suggestion);
 
   return (
@@ -595,65 +617,75 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
         </div>
       )}
 
-      <div className="p-4 border-t flex items-center gap-2">
-        <input ref={fileInputRef} type="file" multiple hidden onChange={handleFileChange} />
-        <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" onClick={() => fileInputRef.current?.click()}>
-          <Plus className="h-5 w-5" />
-        </Button>
-        {isMobile ? (
-          <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" title="모바일에서 업로드" onClick={handleMobileUploadClick}>
-            <UploadCloud className="h-5 w-5" />
-          </Button>
+      <div className="p-4 border-t">
+        {isLoading ? (
+          <div className="flex items-center justify-center">
+            <Button variant="outline" onClick={handleStopStreaming} className="w-full flex items-center gap-2">
+              <StopCircle className="h-5 w-5" />
+              생성 중단
+            </Button>
+          </div>
         ) : (
-          <Popover open={isSyncedMediaOpen} onOpenChange={setIsSyncedMediaOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" title="모바일에서 가져오기">
+          <div className="flex items-center gap-2">
+            <input ref={fileInputRef} type="file" multiple hidden onChange={handleFileChange} />
+            <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" onClick={() => fileInputRef.current?.click()}>
+              <Plus className="h-5 w-5" />
+            </Button>
+            {isMobile ? (
+              <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" title="모바일에서 업로드" onClick={handleMobileUploadClick}>
                 <UploadCloud className="h-5 w-5" />
               </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-80">
-              <div className="grid gap-4">
-                <div className="space-y-2">
-                  <h4 className="font-medium leading-none">모바일 업로드</h4>
-                  <p className="text-sm text-muted-foreground">
-                    모바일 기기에서 업로드된 이미지 목록입니다.
-                  </p>
-                </div>
-                <div className="grid grid-cols-3 gap-2 h-48 overflow-y-auto border p-2 rounded-lg">
-                  {isSyncLoading ? (
-                    <p className="col-span-3 text-center text-sm text-muted-foreground">불러오는 중...</p>
-                  ) : syncedImages.length === 0 ? (
-                    <p className="col-span-3 text-center text-sm text-muted-foreground">업로드된 이미지가 없습니다.</p>
-                  ) : (
-                    syncedImages.map((image) => (
-                      <button 
-                        key={image.id} 
-                        className="relative aspect-square rounded-md overflow-hidden hover:opacity-80 transition-opacity"
-                        onClick={() => handleSyncedImageClick(image.url)}
-                      >
-                        <img src={image.url} alt="Synced image" className="w-full h-full object-cover" />
-                      </button>
-                    ))
-                  )}
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+            ) : (
+              <Popover open={isSyncedMediaOpen} onOpenChange={setIsSyncedMediaOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" title="모바일에서 가져오기">
+                    <UploadCloud className="h-5 w-5" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80">
+                  <div className="grid gap-4">
+                    <div className="space-y-2">
+                      <h4 className="font-medium leading-none">모바일 업로드</h4>
+                      <p className="text-sm text-muted-foreground">
+                        모바일 기기에서 업로드된 이미지 목록입니다.
+                      </p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 h-48 overflow-y-auto border p-2 rounded-lg">
+                      {isSyncLoading ? (
+                        <p className="col-span-3 text-center text-sm text-muted-foreground">불러오는 중...</p>
+                      ) : syncedImages.length === 0 ? (
+                        <p className="col-span-3 text-center text-sm text-muted-foreground">업로드된 이미지가 없습니다.</p>
+                      ) : (
+                        syncedImages.map((image) => (
+                          <button 
+                            key={image.id} 
+                            className="relative aspect-square rounded-md overflow-hidden hover:opacity-80 transition-opacity"
+                            onClick={() => handleSyncedImageClick(image.url)}
+                          >
+                            <img src={image.url} alt="Synced image" className="w-full h-full object-cover" />
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
+            )}
+            <form id="chat-form" onSubmit={handleSendMessage} className="flex-1 flex items-center gap-2">
+              <input
+                ref={chatInputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder={"메시지를 입력하세요..."}
+                className="w-full px-4 py-2 border rounded-full focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-background text-foreground placeholder:text-muted-foreground"
+              />
+              <Button type="submit" size="icon" className="rounded-full" disabled={!inputValue.trim() && selectedFiles.length === 0}>
+                <ArrowUp className="h-5 w-5" />
+              </Button>
+            </form>
+          </div>
         )}
-        <form id="chat-form" onSubmit={handleSendMessage} className="flex-1 flex items-center gap-2">
-          <input
-            ref={chatInputRef}
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder={isLoading ? "답변을 생성 중입니다..." : "메시지를 입력하세요..."}
-            className="w-full px-4 py-2 border rounded-full focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-background text-foreground placeholder:text-muted-foreground"
-            disabled={isLoading}
-          />
-          <Button type="submit" size="icon" className="rounded-full" disabled={isLoading || (!inputValue.trim() && selectedFiles.length === 0)}>
-            {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowUp className="h-5 w-5" />}
-          </Button>
-        </form>
       </div>
     </div>
   );
