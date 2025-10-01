@@ -230,25 +230,31 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       }
 
       if (trimmed) {
-        // Pass 1: Find and render KaTeX expressions to HTML strings
-        const katexHtml = trimmed.replace(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g, (match) => {
-          const isBlock = match.startsWith('$$');
-          const content = match.slice(isBlock ? 2 : 1, isBlock ? -2 : -1);
-          try {
-            return katex.renderToString(normalizeMathUnicode(content), {
-              throwOnError: false,
-              displayMode: isBlock,
-            });
-          } catch (e) {
-            console.error("KaTeX rendering failed:", e);
-            return match; // Return original on error
+        const katexRegex = /(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g;
+        const parts = trimmed.split(katexRegex);
+
+        const renderedParts = parts.map((part, index) => {
+          if (part.match(katexRegex)) {
+            const isBlock = part.startsWith('$$');
+            const mathContent = part.slice(isBlock ? 2 : 1, isBlock ? -2 : -1);
+            try {
+              // Use react-katex components for proper React rendering
+              if (isBlock) {
+                return <BlockMath key={index}>{normalizeMathUnicode(mathContent)}</BlockMath>;
+              }
+              return <InlineMath key={index}>{normalizeMathUnicode(mathContent)}</InlineMath>;
+            } catch (e) {
+              console.error("KaTeX rendering failed:", e);
+              return <span key={index}>{part}</span>; // Return original on error
+            }
+          } else {
+            // Only process non-KaTeX parts with marked
+            const html = marked.parse(part, { gfm: true, breaks: true }) as string;
+            return <div key={index} dangerouslySetInnerHTML={{ __html: html }} />;
           }
         });
 
-        // Pass 2: Parse the combined Markdown and KaTeX HTML
-        const finalHtml = marked.parse(katexHtml, { gfm: true, breaks: true }) as string;
-        
-        return <div key={i} dangerouslySetInnerHTML={{ __html: finalHtml }} />;
+        return <div key={i}>{renderedParts}</div>;
       }
       return null;
     });
