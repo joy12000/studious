@@ -294,14 +294,20 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       const targetRect = target.getBoundingClientRect();
       const tooltipRect = tooltipElement.getBoundingClientRect();
       
-      let top = targetRect.bottom + 5 + window.scrollY;
-      let left = targetRect.left + window.scrollX;
+      // Default position: above the target
+      let top = targetRect.top - tooltipRect.height - 5 + window.scrollY;
+      let left = targetRect.left + (targetRect.width / 2) - (tooltipRect.width / 2) + window.scrollX;
 
-      if (left + tooltipRect.width > window.innerWidth) {
+      // Boundary checks
+      if (left < 5) {
+        left = 5;
+      }
+      if (left + tooltipRect.width > window.innerWidth - 5) {
         left = window.innerWidth - tooltipRect.width - 5;
       }
-      if (top + tooltipRect.height > window.innerHeight) {
-        top = targetRect.top - tooltipRect.height - 5 + window.scrollY;
+      // If not enough space above, flip to below
+      if (top - window.scrollY < 5) {
+        top = targetRect.bottom + 5 + window.scrollY;
       }
 
       tooltipElement.style.left = `${left}px`;
