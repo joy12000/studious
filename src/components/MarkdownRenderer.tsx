@@ -229,7 +229,8 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       }
 
       if (trimmed) {
-        return trimmed.split(/\n\n+/).map((p, j) => (<p key={`${i}-${j}`}>{renderInlineContent(p)}</p>));
+        const html = marked.parse(trimmed, { gfm: true, breaks: true }) as string;
+        return <div key={i} dangerouslySetInnerHTML={{ __html: html }} />;
       }
       return null;
     });
