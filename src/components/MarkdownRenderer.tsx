@@ -248,9 +248,9 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
               return <span key={index}>{part}</span>; // Return original on error
             }
           } else {
-            // Only process non-KaTeX parts with marked
-            const html = marked.parse(part, { gfm: true, breaks: true }) as string;
-            return <div key={index} dangerouslySetInnerHTML={{ __html: html }} />;
+            // Use marked.parseInline and a <span> for non-KaTeX parts to avoid block-level elements.
+            const html = marked.parseInline(part, { gfm: true, breaks: true }) as string;
+            return <span key={index} dangerouslySetInnerHTML={{ __html: html }} />;
           }
         });
 
