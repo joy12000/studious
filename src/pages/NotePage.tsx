@@ -266,22 +266,38 @@ export default function NotePage() {
 
     for (const file of newFiles) {
       if (file.type === 'application/pdf') {
-        setIsConverting(true);
-        try {
-          const images = await convertPdfToImages(file);
-          const newAttachments: Attachment[] = await Promise.all(images.map(async (imageFile) => ({
+        const convertToImages = window.confirm(
+          "PDF 파일을 이미지로 변환하시겠습니까?\n\n'확인'을 누르면 각 페이지가 이미지로 첨부됩니다.\n'취소'를 누르면 PDF 파일 원본이 그대로 첨부됩니다."
+        );
+
+        if (convertToImages) {
+          setIsConverting(true);
+          try {
+            const images = await convertPdfToImages(file);
+            const newAttachments: Attachment[] = await Promise.all(images.map(async (imageFile) => ({
+              id: uuidv4(),
+              type: 'file',
+              name: imageFile.name,
+              mimeType: imageFile.type,
+              data: await imageFile.arrayBuffer(),
+            })));
+            setEditAttachments(prev => [...prev, ...newAttachments]);
+          } catch (error) {
+            console.error("PDF to image conversion failed:", error);
+            alert("PDF를 이미지로 변환하는 데 실패했습니다.");
+          } finally {
+            setIsConverting(false);
+          }
+        } else {
+          // Attach the PDF file directly
+          const newAttachment: Attachment = {
             id: uuidv4(),
             type: 'file',
-            name: imageFile.name,
-            mimeType: imageFile.type,
-            data: await imageFile.arrayBuffer(),
-          })));
-          setEditAttachments(prev => [...prev, ...newAttachments]);
-        } catch (error) {
-          console.error("PDF to image conversion failed:", error);
-          alert("PDF를 이미지로 변환하는 데 실패했습니다.");
-        } finally {
-          setIsConverting(false);
+            name: file.name,
+            mimeType: file.type,
+            data: await file.arrayBuffer(),
+          };
+          setEditAttachments(prev => [...prev, newAttachment]);
         }
       } else {
         const newAttachment: Attachment = {
