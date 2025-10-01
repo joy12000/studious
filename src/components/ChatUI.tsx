@@ -52,6 +52,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { updateNote, getNote } = useNotes();
+  const messagesRef = useRef(messages);
+  messagesRef.current = messages;
   const prevMessagesLength = useRef(messages.length);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -206,16 +208,15 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
 
   useEffect(() => {
     loadChatHistory();
-  }, [loadChatHistory]); // loadChatHistory가 변경될 때마다 실행
 
-  // Auto-save chat history on unmount
-  useEffect(() => {
     return () => {
-      if (noteId && messages.length > 1) {
-        updateNote(noteId, { chatHistory: messages });
+      const currentMessages = messagesRef.current;
+      if (noteId && currentMessages.length > 1) {
+        updateNote(noteId, { chatHistory: currentMessages });
+        console.log('Chat history auto-saved on unmount.');
       }
-    };
-  }, [noteId, messages, updateNote]);
+    }
+  }, [noteId, getNote, updateNote, loadChatHistory]);
 
   const handleNewChat = async () => {
     setMessages([createInitialMessage()]); // UI 즉시 초기화
@@ -223,8 +224,6 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
       try {
         await updateNote(noteId, { chatHistory: [] }); // 노트의 chatHistory를 빈 배열로 업데이트
         console.log('Chat history cleared in note.');
-        // 노트 업데이트가 완료된 후, 다시 대화 기록을 로드하여 UI를 동기화
-        await loadChatHistory(); // <-- 추가
       } catch (error) {
         console.error('Failed to clear chat history in note:', error);
       }
