@@ -230,31 +230,36 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       }
 
       if (trimmed) {
-        const katexRegex = /(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g;
-        const parts = trimmed.split(katexRegex);
+        const katexParts: string[] = [];
+        let placeholderIndex = 0;
 
-        const renderedParts = parts.map((part, index) => {
-          if (part.match(katexRegex)) {
-            const isBlock = part.startsWith('$$');
-            const mathContent = part.slice(isBlock ? 2 : 1, isBlock ? -2 : -1);
-            try {
-              // Use react-katex components for proper React rendering
-              if (isBlock) {
-                return <BlockMath key={index}>{normalizeMathUnicode(mathContent)}</BlockMath>;
-              }
-              return <InlineMath key={index}>{normalizeMathUnicode(mathContent)}</InlineMath>;
-            } catch (e) {
-              console.error("KaTeX rendering failed:", e);
-              return <span key={index}>{part}</span>; // Return original on error
-            }
-          } else {
-            // Use marked.parseInline and a <span> for non-KaTeX parts to avoid block-level elements.
-            const html = marked.parseInline(part, { gfm: true, breaks: true }) as string;
-            return <span key={index} dangerouslySetInnerHTML={{ __html: html }} />;
+        // 1. Replace KaTeX with placeholders and store rendered HTML
+        const stringWithPlaceholders = trimmed.replace(/(\$\$[\s\S]*?\$\$|\$[\s\S]*?\$)/g, (match) => {
+          const isBlock = match.startsWith('$$');
+          const content = match.slice(isBlock ? 2 : 1, isBlock ? -2 : -1);
+          try {
+            const renderedKatex = katex.renderToString(normalizeMathUnicode(content), {
+              throwOnError: false,
+              displayMode: isBlock,
+            });
+            katexParts.push(renderedKatex);
+            const placeholder = `__KATEX_PLACEHOLDER_${placeholderIndex++}__`;
+            return isBlock ? `<div>${placeholder}</div>` : placeholder;
+          } catch (e) {
+            console.error("KaTeX rendering failed:", e);
+            return match; // Return original on error
           }
         });
 
-        return <div key={i}>{renderedParts}</div>;
+        // 2. Parse the markdown with placeholders
+        let finalHtml = marked.parse(stringWithPlaceholders, { gfm: true, breaks: true }) as string;
+
+        // 3. Replace placeholders with the rendered KaTeX HTML
+        for (let i = 0; i < katexParts.length; i++) {
+          finalHtml = finalHtml.replace(`__KATEX_PLACEHOLDER_${i}__`, katexParts[i]);
+        }
+
+        return <div key={i} dangerouslySetInnerHTML={{ __html: finalHtml }} />;
       }
       return null;
     });
