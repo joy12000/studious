@@ -214,6 +214,17 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
     prevMessagesLength.current = messages.length;
   }, [messages]);
 
+  useEffect(() => {
+    // 컴포넌트가 언마운트될 때 (또는 noteId, messages, updateNote가 변경되기 직전) 실행될 클린업 함수
+    return () => {
+      if (noteId && messages.length > 1) { // 초기 메시지 하나만 있는 경우는 저장하지 않음
+        updateNote(noteId, { chatHistory: messages })
+          .then(() => console.log('Chat history saved automatically.'))
+          .catch(error => console.error('Failed to auto-save chat history:', error));
+      }
+    };
+  }, [noteId, messages, updateNote]); // messages가 변경될 때마다 클린업 함수가 새로 등록됨
+
   const handleNewChat = () => {
     setMessages([createInitialMessage()]);
   };
