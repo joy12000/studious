@@ -4,6 +4,24 @@ import { Loader2, UploadCloud, CheckCircle, AlertTriangle, X, Camera } from 'luc
 import toast from 'react-hot-toast';
 import { useAuth } from '@clerk/clerk-react';
 
+// 파일을 Base64 문자열로 변환하는 헬퍼 함수
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => {
+      // "data:image/png;base64,..." 형식에서 "base64,..." 부분만 추출
+      const base64String = reader.result?.toString().split(',')[1];
+      if (base64String) {
+        resolve(base64String);
+      } else {
+        reject(new Error("Failed to convert file to base64."));
+      }
+    };
+    reader.onerror = error => reject(error);
+  });
+};
+
 export default function MobileUploadPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -37,7 +55,7 @@ export default function MobileUploadPage() {
 
     setIsUploading(true);
     let allUploadsSuccessful = true;
-    const uploadedUrls: string[] = [];
+    // const uploadedUrls: string[] = []; // 이 변수는 현재 사용되지 않으므로 제거하거나 필요에 따라 사용
 
     const token = await getToken({ template: 'supabase' });
     if (!token) {
@@ -47,17 +65,23 @@ export default function MobileUploadPage() {
     }
 
     for (const file of selectedFiles) {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('userId', userId);
-
       try {
+        const base64File = await fileToBase64(file);
+
+        const jsonBody = {
+          file_data: base64File,
+          file_name: file.name,
+          content_type: file.type,
+          user_id: userId,
+        };
+
         const response = await fetch('/api/add-synced-media', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json', // <-- Content-Type 추가
           },
-          body: formData,
+          body: JSON.stringify(jsonBody), // <-- JSON 본문으로 변경
         });
 
         if (!response.ok) {
@@ -65,8 +89,8 @@ export default function MobileUploadPage() {
           throw new Error(errorData.details || `파일 ${file.name} 업로드에 실패했습니다.`);
         }
 
-        const result = await response.json();
-        uploadedUrls.push(result.url);
+        // const result = await response.json(); // 서버 응답에서 url을 사용하지 않으므로 주석 처리
+        // uploadedUrls.push(result.url);
         toast.success(`파일 ${file.name} 업로드 성공!`);
 
       } catch (error) {
