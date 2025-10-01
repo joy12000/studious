@@ -24,7 +24,16 @@ const AttachmentItem = ({ attachment, onRemove, onClick, readOnly }: { attachmen
   const handleDownload = (e: React.MouseEvent, fileAttachment: Attachment & { type: 'file' }) => {
     e.preventDefault();
     e.stopPropagation(); // Prevent click from bubbling to the parent div
-    const blob = new Blob([fileAttachment.data], { type: fileAttachment.mimeType });
+
+    let data = fileAttachment.data;
+    // Defensively check if data is a plain object and convert back to ArrayBuffer if needed.
+    // This handles cases where IndexedDB/sync deserialization might corrupt the ArrayBuffer type.
+    if (!(data instanceof ArrayBuffer)) {
+      const values = Object.values(data);
+      data = new Uint8Array(values).buffer;
+    }
+
+    const blob = new Blob([data], { type: fileAttachment.mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
