@@ -4,23 +4,7 @@ import { Loader2, UploadCloud, CheckCircle, AlertTriangle, X, Camera } from 'luc
 import toast from 'react-hot-toast';
 import { useAuth } from '@clerk/clerk-react';
 
-// 파일을 Base64 문자열로 변환하는 헬퍼 함수
-const fileToBase64 = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      // "data:image/png;base64,..." 형식에서 "base64,..." 부분만 추출
-      const base64String = reader.result?.toString().split(',')[1];
-      if (base64String) {
-        resolve(base64String);
-      } else {
-        reject(new Error("Failed to convert file to base64."));
-      }
-    };
-    reader.onerror = error => reject(error);
-  });
-};
+// fileToBase64 헬퍼 함수 제거
 
 export default function MobileUploadPage() {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -66,22 +50,19 @@ export default function MobileUploadPage() {
 
     for (const file of selectedFiles) {
       try {
-        const base64File = await fileToBase64(file);
+        // const base64File = await fileToBase64(file); // Base64 인코딩 제거
 
-        const jsonBody = {
-          file_data: base64File,
-          file_name: file.name,
-          content_type: file.type,
-          user_id: userId,
-        };
+        const formData = new FormData(); // FormData 객체 생성
+        formData.append('file', file);
+        formData.append('userId', userId);
 
         const response = await fetch('/api/add-synced-media', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json', // <-- Content-Type 추가
+            // 'Content-Type': 'application/json', // Content-Type 제거 (FormData가 자동으로 설정)
           },
-          body: JSON.stringify(jsonBody), // <-- JSON 본문으로 변경
+          body: formData, // FormData 객체 사용
         });
 
         if (!response.ok) {
