@@ -225,8 +225,16 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
     };
   }, [noteId, messages, updateNote]); // messages가 변경될 때마다 클린업 함수가 새로 등록됨
 
-  const handleNewChat = () => {
+  const handleNewChat = async () => { // async로 변경
     setMessages([createInitialMessage()]);
+    if (noteId) {
+      try {
+        await updateNote(noteId, { chatHistory: [] }); // 노트의 chatHistory를 빈 배열로 업데이트
+        console.log('Chat history cleared in note.');
+      } catch (error) {
+        console.error('Failed to clear chat history in note:', error);
+      }
+    }
   };
 
   const handleCopy = (text: string) => navigator.clipboard.writeText(text);
