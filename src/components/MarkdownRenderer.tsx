@@ -243,7 +243,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
           }
           // This is a regular markdown part, parse it fully
           const html = marked.parse(part, { gfm: true, breaks: true }) as string;
-          return <span key={`${i}-${j}`} dangerouslySetInnerHTML={{ __html: html }} />;
+          return <div key={`${i}-${j}`} style={{ display: 'contents' }} dangerouslySetInnerHTML={{ __html: html }} />;
         });
       }
       return null;
