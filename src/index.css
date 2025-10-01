@@ -1,5 +1,3 @@
-
-
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 @tailwind base;
@@ -96,12 +94,14 @@
   dfn {
     @apply cursor-help relative border-b border-dashed border-foreground/50;
   }
+  /*
   dfn:hover::after {
     content: attr(title);
     @apply absolute bottom-full left-1/2 -translate-x-1/2 mb-2;
     @apply w-max max-w-xs p-2 rounded-md shadow-lg;
     @apply bg-card text-card-foreground text-xs z-10;
   }
+  */
 }
 
 .prose p {
@@ -179,4 +179,22 @@
 }
 .dark .prose li a {
   color: var(--foreground) !important; /* Use white for links in dark mode prose */
+}
+
+.studious-custom-tooltip {
+  position: absolute;
+  z-index: 99999;
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  max-width: 300px;
+  text-align: left;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+  line-height: 1.5;
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }

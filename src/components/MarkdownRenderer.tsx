@@ -269,6 +269,73 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
     });
   };
 
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const dfnElements = Array.from(containerRef.current.querySelectorAll('dfn[title]'));
+    let tooltipElement: HTMLDivElement | null = null;
+
+    const handleMouseEnter = (e: MouseEvent) => {
+      const target = e.currentTarget as HTMLElement;
+      const title = target.getAttribute('data-original-title') || target.getAttribute('title');
+      if (!title) return;
+
+      // Prevent native tooltip
+      if (target.getAttribute('title')) {
+        target.setAttribute('data-original-title', title);
+        target.removeAttribute('title');
+      }
+
+      tooltipElement = document.createElement('div');
+      tooltipElement.textContent = title;
+      tooltipElement.className = 'studious-custom-tooltip'; // Use a class for styling
+      document.body.appendChild(tooltipElement);
+
+      const targetRect = target.getBoundingClientRect();
+      const tooltipRect = tooltipElement.getBoundingClientRect();
+      
+      let top = targetRect.bottom + 5 + window.scrollY;
+      let left = targetRect.left + window.scrollX;
+
+      if (left + tooltipRect.width > window.innerWidth) {
+        left = window.innerWidth - tooltipRect.width - 5;
+      }
+      if (top + tooltipRect.height > window.innerHeight) {
+        top = targetRect.top - tooltipRect.height - 5 + window.scrollY;
+      }
+
+      tooltipElement.style.left = `${left}px`;
+      tooltipElement.style.top = `${top}px`;
+      tooltipElement.style.opacity = '1';
+    };
+
+    const handleMouseLeave = () => {
+      if (tooltipElement) {
+        document.body.removeChild(tooltipElement);
+        tooltipElement = null;
+      }
+    };
+
+    dfnElements.forEach(el => {
+      el.addEventListener('mouseenter', handleMouseEnter);
+      el.addEventListener('mouseleave', handleMouseLeave);
+    });
+
+    return () => {
+      dfnElements.forEach(el => {
+        el.removeEventListener('mouseenter', handleMouseEnter);
+        el.removeEventListener('mouseleave', handleMouseLeave);
+        const originalTitle = el.getAttribute('data-original-title');
+        if (originalTitle) {
+          el.setAttribute('title', originalTitle);
+        }
+      });
+      if (tooltipElement) {
+        try { document.body.removeChild(tooltipElement); } catch (e) {}
+      }
+    };
+  }, [content]);
+
   return <div ref={containerRef}>{renderParts()}</div>;
 };
 
