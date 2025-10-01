@@ -99,13 +99,18 @@ import os # os 모듈은 이미 있지만, 혹시 몰라 다시 명시
         # Supabase upload 메서드는 성공 시 data 키를 포함하는 딕셔너리를 반환합니다.
         # 오류 발생 시 예외를 발생시키거나 다른 형태의 응답을 반환할 수 있습니다.
         # httpx 로그에서 200 OK를 받았으므로, response 객체에 data가 있을 것으로 예상합니다.
-        if response and 'data' in response: # response 객체에 data 키가 있는지 확인
-            # 공개 URL 가져오기
+        # UploadResponse 객체는 'data' 속성을 가집니다.
+        # 이 'data' 속성 안에 업로드된 파일의 정보가 딕셔너리 형태로 들어있습니다.
+        if hasattr(response, 'data') and response.data: # response 객체에 'data' 속성이 있고, 그 값이 비어있지 않은지 확인
+            # public_url_response = supabase.storage.from_(bucket_name).get_public_url(path_on_storage) # 이 부분은 이미 response.data에 포함될 수 있음
+            # Supabase Storage upload 응답의 data 속성에는 파일 경로와 URL 정보가 포함될 수 있습니다.
+            # 정확한 구조는 Supabase-py 문서 또는 실제 response.data 값을 확인해야 합니다.
+            # 일단 public_url_response는 기존처럼 get_public_url로 가져오겠습니다.
             public_url_response = supabase.storage.from_(bucket_name).get_public_url(path_on_storage)
             print(f"File uploaded successfully. Public URL: {public_url_response}")
             return jsonify({"message": "File uploaded successfully", "public_url": public_url_response}), 200
         else:
-            # response 객체에 data가 없거나, 예상치 못한 응답일 경우
+            # response 객체에 data 속성이 없거나, data가 비어있을 경우
             error_details = str(response) # response 객체 자체를 문자열로 변환하여 로그
             print(f"Supabase upload failed or returned unexpected response. Details: {error_details}")
             return jsonify({"error": "Supabase upload failed or returned unexpected response", "details": error_details}), 500
