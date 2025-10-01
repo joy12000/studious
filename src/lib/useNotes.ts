@@ -393,27 +393,27 @@ export function useNotes(defaultFilters?: Filters) {
         return {newNote, newQuiz};
     };
     
-    const updateNote = async (id: string, patch: Partial<Note>) => {
+    const updateNote = useCallback(async (id: string, patch: Partial<Note>) => {
       await db.notes.update(id, { ...patch, updatedAt: new Date().getTime() });
-    };
+    }, []);
 
-    const deleteNote = async (id: string) => {
+    const deleteNote = useCallback(async (id: string) => {
       // Soft delete by setting a flag and updating the timestamp
       await db.notes.update(id, { is_deleted: true, updatedAt: Date.now() });
-    };
+    }, []);
 
-    const addSubject = async (name: string, color?: string) => {
+    const addSubject = useCallback(async (name: string, color?: string) => {
       const subjectColor = color || generatePastelColor();
       const newSubject: Subject = { id: uuidv4(), name, color: subjectColor };
       await db.subjects.add(newSubject);
       return newSubject;
-    };
+    }, []);
 
-    const updateSubject = async (id: string, name: string, color?: string) => {
+    const updateSubject = useCallback(async (id: string, name: string, color?: string) => {
       await db.subjects.update(id, { name, color });
-    };
+    }, []);
 
-    const updateSubjectAndSchedule = async (subjectId: string, scheduleId: string, newName: string, newStartTime: string, newEndTime: string, newDayOfWeek: string) => {
+    const updateSubjectAndSchedule = useCallback(async (subjectId: string, scheduleId: string, newName: string, newStartTime: string, newEndTime: string, newDayOfWeek: string) => {
       await db.transaction('rw', db.subjects, db.schedule, async () => {
         await db.subjects.update(subjectId, { name: newName });
         await db.schedule.update(scheduleId, {
@@ -422,9 +422,9 @@ export function useNotes(defaultFilters?: Filters) {
           dayOfWeek: newDayOfWeek,
         });
       });
-    };
+    }, []);
 
-    const deleteSubject = async (id: string) => {
+    const deleteSubject = useCallback(async (id: string) => {
       await db.transaction('rw', db.subjects, db.schedule, db.notes, async () => {
         // 연결된 시간표 항목 삭제
         await db.schedule.where('subjectId').equals(id).delete();
@@ -437,9 +437,9 @@ export function useNotes(defaultFilters?: Filters) {
         // 과목 자체 삭제
         await db.subjects.delete(id);
       });
-    };
+    }, []);
 
-    const importNote = async (noteData: Partial<Note>) => {
+    const importNote = useCallback(async (noteData: Partial<Note>) => {
         const newNote: Note = {
             id: uuidv4(),
             title: noteData.title || '제목 없음',
@@ -453,7 +453,7 @@ export function useNotes(defaultFilters?: Filters) {
         };
         await db.notes.add(newNote);
         return newNote;
-    };
+    }, []);
     
     // ... other CRUD functions for subjects, schedule, etc.
 
