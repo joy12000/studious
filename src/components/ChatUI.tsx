@@ -192,45 +192,30 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  useEffect(() => {
-    const loadChatHistory = async () => {
-        if (noteId) {
-            const note = await getNote(noteId);
-            const history = note?.chatHistory;
-            if (history && history.length > 0) {
-                setMessages(history);
-            } else {
-                setMessages([createInitialMessage()]);
-            }
-        }
-    };
-    loadChatHistory();
+  const loadChatHistory = useCallback(async () => {
+    if (noteId) {
+      const note = await getNote(noteId);
+      const history = note?.chatHistory;
+      if (history && history.length > 0) {
+        setMessages(history);
+      } else {
+        setMessages([createInitialMessage()]);
+      }
+    }
   }, [noteId, getNote]);
 
   useEffect(() => {
-    if (messages.length > prevMessagesLength.current) {
-      scrollToBottom();
-    }
-    prevMessagesLength.current = messages.length;
-  }, [messages]);
+    loadChatHistory();
+  }, [loadChatHistory]); // loadChatHistory가 변경될 때마다 실행
 
-  useEffect(() => {
-    // 컴포넌트가 언마운트될 때 (또는 noteId, messages, updateNote가 변경되기 직전) 실행될 클린업 함수
-    return () => {
-      if (noteId && messages.length > 1) { // 초기 메시지 하나만 있는 경우는 저장하지 않음
-        updateNote(noteId, { chatHistory: messages })
-          .then(() => console.log('Chat history saved automatically.'))
-          .catch(error => console.error('Failed to auto-save chat history:', error));
-      }
-    };
-  }, [noteId, messages, updateNote]); // messages가 변경될 때마다 클린업 함수가 새로 등록됨
-
-  const handleNewChat = async () => { // async로 변경
-    setMessages([createInitialMessage()]);
+  const handleNewChat = async () => {
+    setMessages([createInitialMessage()]); // UI 즉시 초기화
     if (noteId) {
       try {
         await updateNote(noteId, { chatHistory: [] }); // 노트의 chatHistory를 빈 배열로 업데이트
         console.log('Chat history cleared in note.');
+        // 노트 업데이트가 완료된 후, 다시 대화 기록을 로드하여 UI를 동기화
+        await loadChatHistory(); // <-- 추가
       } catch (error) {
         console.error('Failed to clear chat history in note:', error);
       }
