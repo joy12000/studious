@@ -4,6 +4,7 @@ import os
 from flask import Flask, request, jsonify
 from supabase import create_client, Client
 import traceback # traceback 모듈 추가
+import uuid # uuid 모듈 추가 (중복 제거)
 
 app = Flask(__name__)
 
