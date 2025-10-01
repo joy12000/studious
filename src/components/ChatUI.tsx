@@ -208,6 +208,15 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
     loadChatHistory();
   }, [loadChatHistory]); // loadChatHistory가 변경될 때마다 실행
 
+  // Auto-save chat history on unmount
+  useEffect(() => {
+    return () => {
+      if (noteId && messages.length > 1) {
+        updateNote(noteId, { chatHistory: messages });
+      }
+    };
+  }, [noteId, messages, updateNote]);
+
   const handleNewChat = async () => {
     setMessages([createInitialMessage()]); // UI 즉시 초기화
     if (noteId) {
