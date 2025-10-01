@@ -84,16 +84,21 @@ def add_synced_media():
             path=path_on_storage,
             file_options={"content-type": content_type}
         )
-        print(f"Supabase upload response status: {response.status_code}")
+        # print(f"Supabase upload response status: {response.status_code}") # 이 줄 제거
 
-        if response.status_code == 200:
+        # Supabase upload 메서드는 성공 시 data 키를 포함하는 딕셔너리를 반환합니다.
+        # 오류 발생 시 예외를 발생시키거나 다른 형태의 응답을 반환할 수 있습니다.
+        # httpx 로그에서 200 OK를 받았으므로, response 객체에 data가 있을 것으로 예상합니다.
+        if response and 'data' in response: # response 객체에 data 키가 있는지 확인
+            # 공개 URL 가져오기
             public_url_response = supabase.storage.from_(bucket_name).get_public_url(path_on_storage)
             print(f"File uploaded successfully. Public URL: {public_url_response}")
             return jsonify({"message": "File uploaded successfully", "public_url": public_url_response}), 200
         else:
-            error_details = response.text if hasattr(response, 'text') else str(response)
-            print(f"Supabase upload failed. Details: {error_details}")
-            return jsonify({"error": "Supabase upload failed", "details": error_details}), response.status_code
+            # response 객체에 data가 없거나, 예상치 못한 응답일 경우
+            error_details = str(response) # response 객체 자체를 문자열로 변환하여 로그
+            print(f"Supabase upload failed or returned unexpected response. Details: {error_details}")
+            return jsonify({"error": "Supabase upload failed or returned unexpected response", "details": error_details}), 500
 
     except Exception as e:
         print(f"--- An unexpected error occurred in add_synced_media: {e} ---") # 예외 발생 로그
