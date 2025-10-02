@@ -10,7 +10,7 @@ import { syncNotes } from '../lib/sync';
 import toast from 'react-hot-toast';
 import { Subject, Folder } from '../lib/types';
 
-// New FolderCard component
+// New FolderCard component with pointer-events-none fix
 const FolderCard = ({ folder, onDoubleClick, onDragOver, onDrop, isRenaming, newName, onNameChange, onRename, onCancelRename }) => (
   <div 
     className="relative group bg-muted/50 p-4 rounded-lg flex flex-col items-center justify-center aspect-square transition-all hover:bg-muted cursor-pointer"
@@ -18,7 +18,7 @@ const FolderCard = ({ folder, onDoubleClick, onDragOver, onDrop, isRenaming, new
     onDragOver={onDragOver}
     onDrop={onDrop}
   >
-    <FolderIcon className="w-16 h-16 text-yellow-500" />
+    <FolderIcon className="w-16 h-16 text-yellow-500 pointer-events-none" />
     {isRenaming ? (
       <input 
         type="text"
@@ -30,7 +30,7 @@ const FolderCard = ({ folder, onDoubleClick, onDragOver, onDrop, isRenaming, new
         autoFocus
       />
     ) : (
-      <p className="mt-2 text-sm font-medium text-center break-all">{folder.name}</p>
+      <p className="mt-2 text-sm font-medium text-center break-all pointer-events-none">{folder.name}</p>
     )}
   </div>
 );
