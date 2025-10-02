@@ -210,21 +210,89 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
   const detectSuggestion = (text: string) => {
     const patterns = [
       /```suggestion\s*\r?\n기존 내용\s*\r?\n([\s\S]*?)\s*\r?\n===>\s*\r?\n새로운 내용\s*\r?\n([\s\S]*?)\s*```/,
-      /```suggestion\s*[\r\n]+기존\s*내용\s*[\r\n]+([\s\S]*?)[\r\n]+==+>[\s\r\n]+새로운\s*내용\s*[\r\n]+([\s\S]*?)[\r\n]*```/,
+      /```suggestion\s*[\r\n]+기존\s*내용\s*[\r\n]+([\s\S]*?)[\r\n]+==+>\s*[\r\n]+새로운\s*내용\s*[\r\n]+([\s\S]*?)[\r\n]*```/,
+      /```suggestion[\s\S]*?기존[\s\S]*?내용[\s\S]*?([\s\S]*?)[\s\S]*?==+>[\s\S]*?새로운[\s\S]*?내용[\s\S]*?([\s\S]*?)[\s\S]*?```/,
     ];
-    for (const pattern of patterns) {
-      const match = text.match(pattern);
-      if (match && match.length >= 3) return { old: match[1].trim(), new: match[2].trim() };
+    for (let i = 0; i < patterns.length; i++) {
+      const match = text.match(patterns[i]);
+      if (match && match.length >= 3) {
+        return {
+          old: match[1].trim(),
+          new: match[2].trim()
+        };
+      }
+    }
+    if (text.includes('```suggestion') && text.includes('===>')) {
+      const suggestionStart = text.indexOf('```suggestion');
+      const suggestionEnd = text.indexOf('```', suggestionStart + 13);
+      if (suggestionStart !== -1 && suggestionEnd !== -1) {
+        const suggestionBlock = text.substring(suggestionStart + 13, suggestionEnd);
+        const arrowIndex = suggestionBlock.indexOf('===>');
+        if (arrowIndex !== -1) {
+          const oldPart = suggestionBlock.substring(0, arrowIndex);
+          const newPart = suggestionBlock.substring(arrowIndex + 4);
+          const cleanOld = oldPart.replace(/기존\s*내용/g, '').trim();
+          const cleanNew = newPart.replace(/새로운\s*내용/g, '').trim();
+          if (cleanOld && cleanNew) {
+            return {
+              old: cleanOld,
+              new: cleanNew
+            };
+          }
+        }
+      }
     }
     return null;
   };
 
+  const MAX_FILE_SIZE_MB = 10;
+  const MAX_TOTAL_SIZE_MB = 10;
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!event.target.files) return;
+
     const newFiles = Array.from(event.target.files);
-    // File size and type validation logic can be added here
-    setSelectedFiles(prev => [...prev, ...newFiles]);
-    if(fileInputRef.current) fileInputRef.current.value = '';
+    let filesToAdd: File[] = [];
+    let currentTotalSize = selectedFiles.reduce((sum, file) => sum + file.size, 0);
+
+    for (const file of newFiles) {
+      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        toast.error(`개별 파일 크기는 ${MAX_FILE_SIZE_MB}MB를 초과할 수 없습니다: ${file.name}`);
+        continue;
+      }
+      if (file.type === 'application/pdf') {
+        const isScanned = window.confirm("이 PDF가 스캔된 문서인가요? (텍스트 추출이 불가능한 경우) '확인'을 누르면 이미지로 변환하고, '취소'를 누르면 텍스트로 처리합니다.");
+        if (isScanned) {
+            setIsLoading(true);
+            try {
+              const images = await convertPdfToImages(file, (progress) => {
+                // No direct loading message for ChatUI, but can be added if needed
+              });
+              filesToAdd.push(...images);
+            } catch (error) {
+              console.error("PDF 변환 실패:", error);
+              toast.error('PDF 파일을 이미지로 변환하는 데 실패했습니다.');
+            } finally {
+              setIsLoading(false);
+            }
+        } else {
+            filesToAdd.push(file);
+        }
+      } else {
+        filesToAdd.push(file);
+      }
+    }
+
+    const totalSizeAfterAdding = currentTotalSize + filesToAdd.reduce((sum, file) => sum + file.size, 0);
+    if (totalSizeAfterAdding > MAX_TOTAL_SIZE_MB * 1024 * 1024) {
+      toast.error(`총 파일 크기는 ${MAX_TOTAL_SIZE_MB}MB를 초과할 수 없습니다.`);
+      return;
+    }
+
+    setSelectedFiles(prev => [...prev, ...filesToAdd]);
+    if(fileInputRef.current) {
+        fileInputRef.current.value = ''; // Clear input
+    }
   };
 
   const removeFile = (index: number) => {
