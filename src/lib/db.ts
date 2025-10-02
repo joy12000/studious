@@ -1,25 +1,26 @@
 import Dexie, { Table } from 'dexie';
-import { Note, AppSettings, TopicRule, Subject, ScheduleEvent, Quiz, ReviewItem } from './types'; // 🧠 ReviewItem 임포트
-
+import { Note, AppSettings, TopicRule, Subject, ScheduleEvent, Quiz, ReviewItem, Folder } from './types'; // Folder 임포트
 
 class AppDB extends Dexie {
   notes!: Table<Note, string>;
   subjects!: Table<Subject, string>;
+  folders!: Table<Folder, string>; // folders 테이블 정의
   schedule!: Table<ScheduleEvent, string>;
   quizzes!: Table<Quiz, string>;
-  reviewItems!: Table<ReviewItem, string>; // 🧠 복습 덱 테이블 추가
+  reviewItems!: Table<ReviewItem, string>;
   settings!: Table<AppSettings & { id: string }, string>;
   topicRules!: Table<TopicRule, number>;
 
   constructor() {
     super('selfdev-db');
-    // 🧠 스키마 버전업
-    this.version(6).stores({
-      notes: 'id, createdAt, noteType, subjectId, favorite, sourceType, attachments',
+    // 스키마 버전업 (-> 7)
+    this.version(7).stores({
+      notes: 'id, createdAt, noteType, subjectId, folderId, favorite, sourceType, attachments', // notes에 folderId 인덱스 추가
       subjects: '&id, name, color',
+      folders: '++id, name, subjectId, parentId', // folders 테이블 스키마 추가
       schedule: '&id, date, startTime, endTime, subjectId, dayOfWeek',
       quizzes: '&id, noteId',
-      reviewItems: '&id, noteId, nextReviewDate', // 🧠 새 테이블 정의
+      reviewItems: '&id, noteId, nextReviewDate',
       settings: 'id',
       topicRules: '++id, &topic, *keywords',
     });

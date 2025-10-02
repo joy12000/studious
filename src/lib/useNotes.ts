@@ -1,16 +1,16 @@
 import { useState, useCallback, useMemo, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from './db';
-import { Note, Subject, ScheduleEvent, Quiz, Attachment, NoteType, ReviewItem } from './types';
+import { Note, Subject, ScheduleEvent, Quiz, Attachment, NoteType, ReviewItem, Folder } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { format, addDays, startOfYear, endOfYear, startOfToday, endOfToday } from 'date-fns';
 import { upload } from '@vercel/blob/client';
 
 // Helper function to generate a random pastel HSL color
 const generatePastelColor = (): string => {
-  const hue = Math.floor(Math.random() * 360); // 0-360
-  const saturation = Math.floor(Math.random() * 20) + 40; // 40-60%
-  const lightness = Math.floor(Math.random() * 10) + 70; // 70-80%
+  const hue = Math.floor(Math.random() * 360);
+  const saturation = Math.floor(Math.random() * 20) + 40;
+  const lightness = Math.floor(Math.random() * 10) + 70;
   return `hsl(${hue}, ${saturation}%, ${lightness}%)`;
 };
 
@@ -68,6 +68,7 @@ export function useNotes(defaultFilters?: Filters) {
 
     const notes = useLiveQuery(() => db.notes.toArray(), []);
     const allSubjects = useLiveQuery(() => db.subjects.toArray(), []);
+    const allFolders = useLiveQuery(() => db.folders.toArray(), []); // Fetch all folders
 
     useEffect(() => {
         const assignMissingColors = async () => {
@@ -179,8 +180,6 @@ export function useNotes(defaultFilters?: Filters) {
         await db.notes.update(id, { favorite: !note.favorite, updatedAt: Date.now() });
     };
 
-
-
     const addNoteFromReview = async (args: AddNoteFromReviewPayload) => {
       const { aiConversationText, files, subjects, onProgress, onComplete, onError, noteDate } = args;
       try {
@@ -231,9 +230,6 @@ export function useNotes(defaultFilters?: Filters) {
             }
         }
 
-        // If subjectId is still undefined (e.g., no subjectName from API or no matching subject),
-        // we can either throw an error or assign a default subjectId.
-        // For now, let's throw an error if no subjectId is determined.
         if (!subjectId) {
             throw new Error(`API에서 유효한 과목명을 추론하지 못했거나, 일치하는 과목을 찾을 수 없습니다.`);
         }
@@ -398,13 +394,11 @@ export function useNotes(defaultFilters?: Filters) {
     }, []);
 
     const deleteNote = useCallback(async (id: string) => {
-      // Soft delete by setting a flag and updating the timestamp
       await db.notes.update(id, { is_deleted: true, updatedAt: Date.now() });
     }, []);
 
     const addSubject = useCallback(async (name: string, color?: string) => {
-      const subjectColor = color || generatePastelColor();
-      const newSubject: Subject = { id: uuidv4(), name, color: subjectColor };
+      const newSubject: Subject = { id: uuidv4(), name, color: color || generatePastelColor() };
       await db.subjects.add(newSubject);
       return newSubject;
     }, []);
@@ -425,16 +419,10 @@ export function useNotes(defaultFilters?: Filters) {
     }, []);
 
     const deleteSubject = useCallback(async (id: string) => {
-      await db.transaction('rw', db.subjects, db.schedule, db.notes, async () => {
-        // 연결된 시간표 항목 삭제
-        await db.schedule.where('subjectId').equals(id).delete();
-        
-        // 연결된 노트들의 subjectId를 null로 설정
-        const notesToUpdate = await db.notes.where('subjectId').equals(id).toArray();
-        const noteIdsToUpdate = notesToUpdate.map(note => note.id);
-        await db.notes.where('id').anyOf(noteIdsToUpdate).modify({ subjectId: null });
-
-        // 과목 자체 삭제
+      await db.transaction('rw', db.subjects, db.schedule, db.notes, db.folders, async () => {
+        await db.schedule.where({ subjectId: id }).delete();
+        await db.notes.where({ subjectId: id }).modify({ subjectId: undefined });
+        await db.folders.where({ subjectId: id }).delete();
         await db.subjects.delete(id);
       });
     }, []);
@@ -454,9 +442,29 @@ export function useNotes(defaultFilters?: Filters) {
         await db.notes.add(newNote);
         return newNote;
     }, []);
-    
-    // ... other CRUD functions for subjects, schedule, etc.
 
+    // Folder CRUD operations
+    const addFolder = useCallback(async (name: string, subjectId: string, parentId?: string) => {
+      const newFolder: Folder = { id: uuidv4(), name, subjectId, parentId };
+      await db.folders.add(newFolder);
+      return newFolder;
+    }, []);
+
+    const updateFolder = useCallback(async (id: string, patch: Partial<Folder>) => {
+      await db.folders.update(id, patch);
+    }, []);
+
+    const moveNoteToFolder = useCallback(async (noteId: string, folderId?: string) => {
+      await db.notes.update(noteId, { folderId, updatedAt: Date.now() });
+    }, []);
+
+    const deleteFolder = useCallback(async (id: string) => {
+      await db.transaction('rw', db.folders, db.notes, async () => {
+        await db.notes.where({ folderId: id }).modify({ folderId: undefined });
+        await db.folders.delete(id);
+      });
+    }, []);
+    
     const getNote = useCallback(async (id: string): Promise<Note | undefined> => db.notes.get(id), []);
     const getQuiz = useCallback(async (noteId: string): Promise<Quiz | undefined> => db.quizzes.where('noteId').equals(noteId).first(), []);
 
@@ -517,6 +525,7 @@ export function useNotes(defaultFilters?: Filters) {
         notes: filteredNotes || [],
         loading,
         allSubjects: allSubjects || [],
+        allFolders: allFolders || [],
         schedule: schedule || [],
         filters,
         setFilters,
@@ -529,7 +538,7 @@ export function useNotes(defaultFilters?: Filters) {
         deleteNote,
         addSubject,
         updateSubject,
-        updateSubjectAndSchedule, // 추가
+        updateSubjectAndSchedule,
         deleteSubject,
         getNote, 
         getQuiz,
@@ -541,5 +550,9 @@ export function useNotes(defaultFilters?: Filters) {
         activityData,
         saveReviewNote,
         startBackgroundTask,
+        addFolder,
+        updateFolder,
+        deleteFolder,
+        moveNoteToFolder,
     };
 }

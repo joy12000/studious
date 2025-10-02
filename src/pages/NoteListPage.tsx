@@ -1,51 +1,59 @@
-// src/pages/NoteListPage.tsx
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotes } from '../lib/useNotes';
 import NoteCard from '../components/NoteCard';
-import { Plus, LayoutGrid, List, Search, X, Youtube, BrainCircuit, Notebook, RefreshCw } from 'lucide-react';
+import { Plus, LayoutGrid, List, Search, X, Folder as FolderIcon, BrainCircuit, RefreshCw, Home } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@clerk/clerk-react';
 import { syncNotes } from '../lib/sync';
 import toast from 'react-hot-toast';
+import { Subject, Folder } from '../lib/types';
+
+// New FolderCard component
+const FolderCard = ({ folder, onDoubleClick, onDragOver, onDrop, isRenaming, newName, onNameChange, onRename, onCancelRename }) => (
+  <div 
+    className="relative group bg-muted/50 p-4 rounded-lg flex flex-col items-center justify-center aspect-square transition-all hover:bg-muted cursor-pointer"
+    onDoubleClick={onDoubleClick}
+    onDragOver={onDragOver}
+    onDrop={onDrop}
+  >
+    <FolderIcon className="w-16 h-16 text-yellow-500" />
+    {isRenaming ? (
+      <input 
+        type="text"
+        value={newName}
+        onChange={onNameChange}
+        onBlur={onCancelRename}
+        onKeyDown={(e) => e.key === 'Enter' && onRename()}
+        className="mt-2 w-full text-center bg-transparent border border-primary rounded-md"
+        autoFocus
+      />
+    ) : (
+      <p className="mt-2 text-sm font-medium text-center break-all">{folder.name}</p>
+    )}
+  </div>
+);
 
 export default function NoteListPage() {
-  const { notes, loading, filters, setFilters, toggleFavorite, importNote } = useNotes();
+  const { notes, allSubjects, allFolders, loading, filters, setFilters, toggleFavorite, addFolder, updateFolder, moveNoteToFolder } = useNotes();
   const navigate = useNavigate();
   const { getToken, userId } = useAuth();
   const [isSyncing, setIsSyncing] = useState(false);
 
-  const handleSync = async () => {
-    if (!getToken || !userId) {
-      toast.error('로그인이 필요합니다.');
-      return;
-    }
-
-    setIsSyncing(true);
-    const toastId = toast.loading('Supabase와 노트 동기화를 시작합니다...');
-
-    try {
-      const result = await syncNotes(userId, getToken);
-      toast.success(`동기화 완료! (가져오기: ${result.addedOrUpdated}, 로컬 삭제: ${result.deleted}, 원격 푸시: ${result.pushed})`, { id: toastId });
-    } catch (error) {
-      console.error("Sync failed", error);
-      toast.error(error instanceof Error ? error.message : '알 수 없는 오류로 동기화에 실패했습니다.', { id: toastId });
-    }
-
-    setIsSyncing(false);
-  };
-
-  const handleAddNewEmptyNote = async () => {
-    const newNote = await importNote({
-      title: '빈 노트 (테스트)',
-      content: '# 제목\n\n여기에 내용을 입력하세요.',
-    });
-    navigate(`/note/${newNote.id}`);
-  };
-  
   const [view, setView] = useState<'grid' | 'list'>('grid');
   const [localSearch, setLocalSearch] = useState(filters.search || '');
+
+  // State for folder navigation
+  const [currentSubjectId, setCurrentSubjectId] = useState<string | null>(null);
+  const [currentFolderId, setCurrentFolderId] = useState<string | undefined>(undefined);
+  const [breadcrumbs, setBreadcrumbs] = useState<(Subject | Folder)[]>([]);
+
+  // State for UI interactions
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
+  const [renamingFolderName, setRenamingFolderName] = useState('');
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -54,95 +62,206 @@ export default function NoteListPage() {
     return () => clearTimeout(handler);
   }, [localSearch, setFilters]);
 
-  const sortedNotes = useMemo(() => {
-    if (!notes) return [];
-    const arr = [...notes];
-    arr.sort((a, b) => a.title.localeCompare(b.title)); // Sort alphabetically by title
-    return arr;
-  }, [notes]);
-  
-  const handleNoteTypeFilter = (type: 'general' | 'review' | 'textbook' | 'assignment' | undefined) => {
-    setFilters({ ...filters, noteType: type });
+  const handleSubjectSelect = (subject: Subject) => {
+    setCurrentSubjectId(subject.id);
+    setCurrentFolderId(undefined);
+    setBreadcrumbs([subject]);
   };
-  
+
+  const handleFolderClick = (folder: Folder) => {
+    setCurrentFolderId(folder.id);
+    const newBreadcrumbs = [];
+    let current: Folder | Subject | undefined = folder;
+    let currentParentId = folder.parentId;
+    
+    const folderMap = new Map(allFolders.map(f => [f.id, f]));
+    const subjectMap = new Map(allSubjects.map(s => [s.id, s]));
+
+    newBreadcrumbs.unshift(current);
+
+    while(currentParentId) {
+      const parentFolder = folderMap.get(currentParentId);
+      if(parentFolder) {
+        newBreadcrumbs.unshift(parentFolder);
+        currentParentId = parentFolder.parentId;
+      } else {
+        break;
+      }
+    }
+    
+    const rootSubject = subjectMap.get(folder.subjectId);
+    if(rootSubject) newBreadcrumbs.unshift(rootSubject);
+
+    setBreadcrumbs(newBreadcrumbs);
+  };
+
+  const handleBreadcrumbClick = (item: Subject | Folder, index: number) => {
+    if (index === 0) { // Root subject
+      setCurrentFolderId(undefined);
+    } else { // A folder
+      setCurrentFolderId((item as Folder).id);
+    }
+    setBreadcrumbs(breadcrumbs.slice(0, index + 1));
+  };
+
+  const handleGoHome = () => {
+    setCurrentSubjectId(null);
+    setCurrentFolderId(undefined);
+    setBreadcrumbs([]);
+  }
+
+  const handleCreateFolder = async () => {
+    if (newFolderName.trim() && currentSubjectId) {
+      await addFolder(newFolderName.trim(), currentSubjectId, currentFolderId);
+      setIsCreatingFolder(false);
+      setNewFolderName('');
+    }
+  };
+
+  const startRename = (folder: Folder) => {
+    setRenamingFolderId(folder.id);
+    setRenamingFolderName(folder.name);
+  };
+
+  const handleRenameFolder = async () => {
+    if (renamingFolderId && renamingFolderName.trim()) {
+      await updateFolder(renamingFolderId, { name: renamingFolderName.trim() });
+    }
+    setRenamingFolderId(null);
+    setRenamingFolderName('');
+  };
+
+  // Filter items for the current view
+  const { filteredFolders, filteredNotesInCurrentView } = useMemo(() => {
+    if (!currentSubjectId) {
+      return { filteredFolders: [], filteredNotesInCurrentView: [] };
+    }
+    const foldersInView = allFolders.filter(f => f.subjectId === currentSubjectId && f.parentId === currentFolderId);
+    const notesInView = notes.filter(n => n.subjectId === currentSubjectId && n.folderId === currentFolderId);
+    return { filteredFolders: foldersInView, filteredNotesInCurrentView: notesInView };
+  }, [currentSubjectId, currentFolderId, allFolders, notes]);
+
+  // Drag and Drop handlers
+  const handleDragStart = (e: React.DragEvent, noteId: string) => {
+    e.dataTransfer.setData('noteId', noteId);
+  };
+
+  const handleDropOnFolder = (e: React.DragEvent, folderId: string) => {
+    e.preventDefault();
+    const noteId = e.dataTransfer.getData('noteId');
+    if (noteId) {
+      moveNoteToFolder(noteId, folderId);
+    }
+  };
+
+  const handleDropOnCanvas = (e: React.DragEvent) => {
+    e.preventDefault();
+    const noteId = e.dataTransfer.getData('noteId');
+    if (noteId) {
+      moveNoteToFolder(noteId, currentFolderId);
+    }
+  };
+
+  if (!currentSubjectId) {
+    return (
+      <div className="p-4 sm:p-8">
+        <h1 className="text-2xl font-bold mb-6">과목 선택</h1>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+          {allSubjects.map(subject => (
+            <div key={subject.id} onClick={() => handleSubjectSelect(subject)} className="bg-muted/50 p-4 rounded-lg flex flex-col items-center justify-center aspect-square transition-all hover:bg-muted cursor-pointer">
+              <BrainCircuit className="w-16 h-16" style={{ color: subject.color || '#ccc' }} />
+              <p className="mt-2 text-sm font-medium text-center break-all">{subject.name}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-full flex-col">
       <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b p-4">
-        <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold">내 노트</h1>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={handleSync} disabled={isSyncing} title="Supabase와 동기화">
-                    <RefreshCw className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
-                </Button>
-                <ToggleGroup type="single" value={view} onValueChange={(value) => { if (value) setView(value as 'grid' | 'list'); }}>
-                    <ToggleGroupItem value="grid"><LayoutGrid className="h-5 w-5" /></ToggleGroupItem>
-                    <ToggleGroupItem value="list"><List className="h-5 w-5" /></ToggleGroupItem>
-                </ToggleGroup>
-                <Button variant="outline" size="icon" onClick={handleAddNewEmptyNote} title="빈 노트 추가 (테스트용)">
-                    <Notebook className="h-5 w-5" />
-                </Button>
-                <Button variant="outline" size="icon" onClick={() => navigate('/')}>
-                    <Plus className="h-5 w-5" />
-                </Button>
-              </div>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                <div className="flex-1 relative w-full sm:w-auto">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <input
-                        value={localSearch}
-                        onChange={e => setLocalSearch(e.target.value)}
-                        placeholder="노트 제목 및 내용 검색..."
-                        className="w-full pl-9 pr-8 py-2 border bg-background rounded-full text-sm"
-                    />
-                    {localSearch && (
-                        <Button variant="ghost" size="icon" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setLocalSearch('')}>
-                            <X className="h-4 w-4" />
-                        </Button>
-                    )}
-                </div>
-                <ToggleGroup 
-                    type="single" 
-                    value={filters.noteType} 
-                    onValueChange={(value) => handleNoteTypeFilter(value as any)}
-                    className="justify-start w-full sm:w-auto"
-                >
-                    <ToggleGroupItem value="textbook" aria-label="Textbooks"><BrainCircuit className="h-4 w-4 mr-1.5"/>참고서</ToggleGroupItem>
-                    <ToggleGroupItem value="review" aria-label="Reviews"><Notebook className="h-4 w-4 mr-1.5"/>복습</ToggleGroupItem>
-                    <ToggleGroupItem value="general" aria-label="General Notes"><Youtube className="h-4 w-4 mr-1.5"/>요약</ToggleGroupItem>
-                </ToggleGroup>
+        <div className="max-w-7xl mx-auto flex flex-col gap-4">
+          {/* Breadcrumbs */}
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Button variant="ghost" size="icon" onClick={handleGoHome} className="h-6 w-6"><Home className="h-4 w-4"/></Button>
+            <span>/</span>
+            {breadcrumbs.map((item, index) => (
+              <React.Fragment key={item.id}>
+                <button onClick={() => handleBreadcrumbClick(item, index)} className="hover:text-foreground">
+                  {item.name}
+                </button>
+                <span>/</span>
+              </React.Fragment>
+            ))}
+          </div>
+          <div className="flex items-center justify-between">
+            <h1 className="text-xl font-bold">{breadcrumbs[breadcrumbs.length - 1]?.name || '노트'}</h1>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="icon" onClick={() => setIsCreatingFolder(true)} title="새 폴더">
+                <FolderIcon className="h-5 w-5" /><Plus className="h-3 w-3 -ml-2 -mt-3"/>
+              </Button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-4">
+      <main 
+        className="flex-1 overflow-y-auto p-4"
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={handleDropOnCanvas}
+      >
         <div className="max-w-7xl mx-auto">
-          {loading && (
-            <div className="text-center text-muted-foreground py-20">
-              <p>노트를 불러오는 중...</p>
-            </div>
-          )}
-          {!loading && sortedNotes.length === 0 && (
-            <div className="text-center text-muted-foreground py-20">
-              <h2 className="text-lg font-semibold">노트가 없습니다</h2>
-              <p className="mt-2">홈 화면에서 새로운 노트를 만들어보세요.</p>
-            </div>
-          )}
+          {(loading || isSyncing) && <p>로딩 중...</p>}
           
-          <div className={view === 'grid' 
-            ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4" // 👈 간격과 컬럼 수 조정
-            : "grid grid-cols-1 md:grid-cols-2 gap-4"
-          }>
-            {sortedNotes.map(n => (
-              <NoteCard key={n.id} note={n} onToggleFavorite={toggleFavorite} view={view} />
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {/* Render Folders */}
+            {filteredFolders.map(folder => (
+              <FolderCard 
+                key={folder.id} 
+                folder={folder} 
+                onDoubleClick={() => handleFolderClick(folder)}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => handleDropOnFolder(e, folder.id)}
+                isRenaming={renamingFolderId === folder.id}
+                newName={renamingFolderName}
+                onNameChange={(e) => setRenamingFolderName(e.target.value)}
+                onRename={handleRenameFolder}
+                onCancelRename={() => setRenamingFolderId(null)}
+              />
+            ))}
+
+            {/* Render New Folder Input */}
+            {isCreatingFolder && (
+              <div className="bg-muted/50 p-4 rounded-lg flex flex-col items-center justify-center aspect-square">
+                <FolderIcon className="w-16 h-16 text-yellow-500 opacity-50" />
+                <input 
+                  type="text"
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
+                  onBlur={() => { setIsCreatingFolder(false); setNewFolderName(''); }}
+                  placeholder="폴더 이름"
+                  className="mt-2 w-full text-center bg-transparent border border-primary rounded-md"
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {/* Render Notes */}
+            {filteredNotesInCurrentView.map(n => (
+              <div key={n.id} draggable onDragStart={(e) => handleDragStart(e, n.id)}>
+                <NoteCard note={n} onToggleFavorite={toggleFavorite} view={'grid'} />
+              </div>
             ))}
           </div>
+
+          {!loading && filteredFolders.length === 0 && filteredNotesInCurrentView.length === 0 && !isCreatingFolder && (
+             <div className="text-center text-muted-foreground py-20">
+              <h2 className="text-lg font-semibold">폴더나 노트가 없습니다</h2>
+              <p className="mt-2">새 폴더나 노트를 만들어보세요.</p>
+            </div>
+          )}
         </div>
       </main>
     </div>

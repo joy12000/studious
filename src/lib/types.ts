@@ -30,6 +30,13 @@ export interface Subject {
   color?: string;
 }
 
+export interface Folder {
+  id: string;
+  name: string;
+  subjectId: string;
+  parentId?: string; // For future nesting
+}
+
 export interface ScheduleEvent {
   id: string;
   subjectId: string;
@@ -69,6 +76,7 @@ export interface Note {
   content: string;
   noteType: NoteType;
   subjectId?: string;
+  folderId?: string; // Added for folder structure
   sourceType: SourceType;
   sourceUrl?: string | null;
   createdAt: string;
