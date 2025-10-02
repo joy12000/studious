@@ -10,7 +10,7 @@ class Handler(BaseHTTPRequestHandler):
         try:
             # Get Supabase client with service role key for admin tasks
             supabase_url = os.environ.get('VITE_PUBLICSUPABASE_URL')
-            supabase_service_key = os.environ.get('SUPABASE_SERVICE_KEY')
+            supabase_service_key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
 
             if not supabase_url or not supabase_service_key:
                 self.send_error(500, "Supabase environment variables not set.")
