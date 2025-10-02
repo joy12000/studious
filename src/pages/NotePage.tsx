@@ -58,7 +58,7 @@ const TableOfContents = ({ sections }: { sections: TextbookSection[] }) => {
             <li key={section.id}>
               <button 
                 onClick={() => handleScrollTo(section.id)}
-                className="text-primary hover:underline text-left"
+                className="text-primary dark:text-foreground hover:underline text-left"
               >
                 {section.title}
               </button>
