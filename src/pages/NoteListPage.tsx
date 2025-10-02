@@ -56,6 +56,66 @@ const ContextMenu = ({ x, y, visible, folder, onRename, onDelete, onClose }) => 
   );
 };
 
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useNotes } from '../lib/useNotes';
+import NoteCard from '../components/NoteCard';
+import { Plus, LayoutGrid, List, Search, X, Folder as FolderIcon, BrainCircuit, RefreshCw, Home, Edit, Trash2, Inbox } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@clerk/clerk-react';
+import { syncNotes } from '../lib/sync';
+import toast from 'react-hot-toast';
+import { Subject, Folder } from '../lib/types';
+
+// FolderCard component with context menu and rename logic
+const FolderCard = ({ folder, onDoubleClick, onDragOver, onDrop, onContextMenu, isRenaming, newName, onNameChange, onRenameConfirm, onRenameCancel }) => (
+  <div 
+    className="relative group bg-muted/50 p-4 rounded-lg flex flex-col items-center justify-center aspect-square transition-all hover:bg-muted cursor-pointer"
+    onDoubleClick={onDoubleClick}
+    onDragOver={onDragOver}
+    onDrop={onDrop}
+    onContextMenu={onContextMenu}
+  >
+    <FolderIcon className="w-16 h-16 text-yellow-500 pointer-events-none" />
+    {isRenaming ? (
+      <input 
+        type="text"
+        value={newName}
+        onChange={onNameChange}
+        onBlur={onRenameCancel}
+        onKeyDown={(e) => e.key === 'Enter' && onRenameConfirm()}
+        className="mt-2 w-full text-center bg-transparent border border-primary rounded-md z-10"
+        autoFocus
+        onClick={(e) => e.stopPropagation()} // Prevent double click from firing
+      />
+    ) : (
+      <p className="mt-2 text-sm font-medium text-center break-all pointer-events-none">{folder.name}</p>
+    )}
+  </div>
+);
+
+// Context Menu Component
+const ContextMenu = ({ x, y, visible, folder, onRename, onDelete, onClose }) => {
+  if (!visible) return null;
+  return (
+    <div 
+      className="fixed z-50 bg-background border rounded-md shadow-lg p-1"
+      style={{ top: y, left: x }}
+      onClick={onClose} // Close on click inside menu
+    >
+      <button onClick={() => onRename(folder)} className="flex items-center w-full text-left px-3 py-1.5 text-sm hover:bg-muted rounded-sm">
+        <Edit className="w-4 h-4 mr-2" /> 이름 변경
+      </button>
+      <button onClick={() => onDelete(folder)} className="flex items-center w-full text-left px-3 py-1.5 text-sm text-destructive hover:bg-destructive hover:text-destructive-foreground rounded-sm">
+        <Trash2 className="w-4 h-4 mr-2" /> 삭제
+      </button>
+    </div>
+  );
+};
+
+const UNCLASSIFIED_ID = '__unclassified__';
+
 export default function NoteListPage() {
   const { notes, allSubjects, allFolders, loading, toggleFavorite, addFolder, updateFolder, deleteFolder, moveNoteToFolder } = useNotes();
   const navigate = useNavigate();
@@ -80,17 +140,15 @@ export default function NoteListPage() {
     return () => window.removeEventListener('click', handleClick);
   }, [contextMenu]);
 
-  const handleSubjectSelect = (subject: Subject) => {
+  const handleSubjectSelect = (subject: Subject | {id: string, name: string}) => {
     setCurrentSubjectId(subject.id);
     setCurrentFolderId(undefined);
-    setBreadcrumbs([subject]);
+    setBreadcrumbs([subject as Subject]);
   };
 
   const handleFolderClick = (folder: Folder) => {
     setCurrentFolderId(folder.id);
-    // This breadcrumb logic can be simplified, but works for now
-    const newCrumbs = [...breadcrumbs, folder];
-    setBreadcrumbs(newCrumbs);
+    setBreadcrumbs(prev => [...prev, folder]);
   };
 
   const handleBreadcrumbClick = (item: Subject | Folder, index: number) => {
@@ -109,7 +167,7 @@ export default function NoteListPage() {
   }
 
   const handleCreateFolder = async () => {
-    if (newFolderName.trim() && currentSubjectId) {
+    if (newFolderName.trim() && currentSubjectId && currentSubjectId !== UNCLASSIFIED_ID) {
       await addFolder(newFolderName.trim(), currentSubjectId, currentFolderId);
       setIsCreatingFolder(false);
       setNewFolderName('');
@@ -117,6 +175,7 @@ export default function NoteListPage() {
   };
 
   const startRename = (folder: Folder) => {
+    setContextMenu({ ...contextMenu, visible: false });
     setRenamingFolderId(folder.id);
     setRenamingFolderName(folder.name);
   };
@@ -146,8 +205,20 @@ export default function NoteListPage() {
     if (!currentSubjectId) {
       return { filteredFolders: [], filteredNotesInCurrentView: [] };
     }
-    const foldersInView = allFolders.filter(f => f.subjectId === currentSubjectId && f.parentId === currentFolderId);
-    const notesInView = notes.filter(n => n.subjectId === currentSubjectId && n.folderId === currentFolderId);
+
+    const isUnclassified = currentSubjectId === UNCLASSIFIED_ID;
+
+    const foldersInView = isUnclassified 
+      ? [] 
+      : allFolders.filter(f => f.subjectId === currentSubjectId && f.parentId === currentFolderId);
+
+    const notesInView = notes.filter(n => {
+      const subjectMatch = isUnclassified
+        ? (n.subjectId === undefined || n.subjectId === null)
+        : (n.subjectId === currentSubjectId);
+      return subjectMatch && n.folderId === currentFolderId;
+    });
+
     return { filteredFolders: foldersInView, filteredNotesInCurrentView: notesInView };
   }, [currentSubjectId, currentFolderId, allFolders, notes]);
 
@@ -174,8 +245,7 @@ export default function NoteListPage() {
   const handleDropOnCanvas = (e: React.DragEvent) => {
     e.preventDefault();
     const noteId = e.dataTransfer.getData('noteId');
-    if (noteId) {
-      // Move to current folder level (or subject root if currentFolderId is undefined)
+    if (noteId && currentSubjectId !== UNCLASSIFIED_ID) {
       moveNoteToFolder(noteId, currentFolderId);
     }
     setIsDragging(false);
@@ -192,6 +262,10 @@ export default function NoteListPage() {
               <p className="mt-2 text-sm font-medium text-center break-all">{subject.name}</p>
             </div>
           ))}
+          <div key={UNCLASSIFIED_ID} onClick={() => handleSubjectSelect({ id: UNCLASSIFIED_ID, name: '미분류' })} className="bg-muted/50 p-4 rounded-lg flex flex-col items-center justify-center aspect-square transition-all hover:bg-muted cursor-pointer">
+            <Inbox className="w-16 h-16 text-slate-500" />
+            <p className="mt-2 text-sm font-medium text-center break-all">미분류 노트</p>
+          </div>
         </div>
       </div>
     );
@@ -217,11 +291,13 @@ export default function NoteListPage() {
             </div>
             <div className="flex items-center justify-between">
               <h1 className="text-xl font-bold">{breadcrumbs[breadcrumbs.length - 1]?.name || '노트'}</h1>
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={() => setIsCreatingFolder(true)} title="새 폴더">
-                  <FolderIcon className="h-5 w-5" /><Plus className="h-3 w-3 -ml-2 -mt-3"/>
-                </Button>
-              </div>
+              {currentSubjectId !== UNCLASSIFIED_ID && (
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="icon" onClick={() => setIsCreatingFolder(true)} title="새 폴더">
+                    <FolderIcon className="h-5 w-5" /><Plus className="h-3 w-3 -ml-2 -mt-3"/>
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </header>
