@@ -1,60 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useNotes } from '../lib/useNotes';
-import NoteCard from '../components/NoteCard';
-import { Plus, LayoutGrid, List, Search, X, Folder as FolderIcon, BrainCircuit, RefreshCw, Home, Edit, Trash2 } from 'lucide-react';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@clerk/clerk-react';
-import { syncNotes } from '../lib/sync';
-import toast from 'react-hot-toast';
-import { Subject, Folder } from '../lib/types';
 
-// FolderCard component with context menu and rename logic
-const FolderCard = ({ folder, onDoubleClick, onDragOver, onDrop, onContextMenu, isRenaming, newName, onNameChange, onRenameConfirm, onRenameCancel }) => (
-  <div 
-    className="relative group bg-muted/50 p-4 rounded-lg flex flex-col items-center justify-center aspect-square transition-all hover:bg-muted cursor-pointer"
-    onDoubleClick={onDoubleClick}
-    onDragOver={onDragOver}
-    onDrop={onDrop}
-    onContextMenu={onContextMenu}
-  >
-    <FolderIcon className="w-16 h-16 text-yellow-500 pointer-events-none" />
-    {isRenaming ? (
-      <input 
-        type="text"
-        value={newName}
-        onChange={onNameChange}
-        onBlur={onRenameCancel}
-        onKeyDown={(e) => e.key === 'Enter' && onRenameConfirm()}
-        className="mt-2 w-full text-center bg-transparent border border-primary rounded-md z-10"
-        autoFocus
-        onClick={(e) => e.stopPropagation()} // Prevent double click from firing
-      />
-    ) : (
-      <p className="mt-2 text-sm font-medium text-center break-all pointer-events-none">{folder.name}</p>
-    )}
-  </div>
-);
-
-// Context Menu Component
-const ContextMenu = ({ x, y, visible, folder, onRename, onDelete, onClose }) => {
-  if (!visible) return null;
-  return (
-    <div 
-      className="fixed z-50 bg-background border rounded-md shadow-lg p-1"
-      style={{ top: y, left: x }}
-      onClick={onClose} // Close on click inside menu
-    >
-      <button onClick={() => onRename(folder)} className="flex items-center w-full text-left px-3 py-1.5 text-sm hover:bg-muted rounded-sm">
-        <Edit className="w-4 h-4 mr-2" /> 이름 변경
-      </button>
-      <button onClick={() => onDelete(folder)} className="flex items-center w-full text-left px-3 py-1.5 text-sm text-destructive hover:bg-destructive hover:text-destructive-foreground rounded-sm">
-        <Trash2 className="w-4 h-4 mr-2" /> 삭제
-      </button>
-    </div>
-  );
-};
 
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -64,7 +8,7 @@ import { Plus, Folder as FolderIcon, BrainCircuit, RefreshCw, Home, Edit, Trash2
 import { Button } from '@/components/ui/button';
 import { Subject, Folder, Note } from '../lib/types';
 
-// FolderCard component
+// Corrected: Components are defined once.
 const FolderCard = ({ folder, onDoubleClick, onDragOver, onDrop, onContextMenu, isRenaming, newName, onNameChange, onRenameConfirm, onRenameCancel }) => (
   <div 
     className="relative group bg-muted/50 p-4 rounded-lg flex flex-col items-center justify-center aspect-square transition-all hover:bg-muted cursor-pointer"
@@ -91,7 +35,6 @@ const FolderCard = ({ folder, onDoubleClick, onDragOver, onDrop, onContextMenu, 
   </div>
 );
 
-// Context Menu Components
 const ContextMenu = ({ x, y, visible, children, onClose }) => {
   if (!visible) return null;
   return (
