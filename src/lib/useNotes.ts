@@ -5,6 +5,9 @@ import { Note, Subject, ScheduleEvent, Quiz, Attachment, NoteType, ReviewItem, F
 import { v4 as uuidv4 } from 'uuid';
 import { format, addDays, startOfYear, endOfYear, startOfToday, endOfToday } from 'date-fns';
 import { upload } from '@vercel/blob/client';
+import { useAuth } from '@clerk/clerk-react';
+import { syncNotes } from './sync';
+import toast from 'react-hot-toast';
 
 // Helper function to generate a random pastel HSL color
 const generatePastelColor = (): string => {
@@ -65,6 +68,7 @@ export interface StartBackgroundTaskPayload {
 
 export function useNotes(defaultFilters?: Filters) {
     const [filters, setFilters] = useState<Filters>(defaultFilters || { noteType: 'textbook' });
+    const { userId, getToken } = useAuth();
 
     const notes = useLiveQuery(() => db.notes.toArray(), []);
     const allSubjects = useLiveQuery(() => db.subjects.toArray(), []);
@@ -108,6 +112,24 @@ export function useNotes(defaultFilters?: Filters) {
 
     const loading = filteredNotes === undefined;
 
+    const handleSync = async () => {
+      if (!userId) {
+        toast.error('동기화를 위해 먼저 로그인해야 합니다.');
+        return;
+      }
+      const toastId = toast.loading('동기화를 시작합니다...');
+      try {
+        const result = await syncNotes(userId, getToken);
+        toast.success(
+          `동기화 완료!\n- 추가/업데이트: ${result.addedOrUpdated}\n- 삭제: ${result.deleted}\n- 푸시: ${result.pushed}`,
+          { id: toastId, duration: 4000 }
+        );
+      } catch (error) {
+        console.error("Sync failed:", error);
+        toast.error(`동기화 실패: ${error.message}`, { id: toastId });
+      }
+    };
+
     const startBackgroundTask = async (task: StartBackgroundTaskPayload) => {
       const noteId = uuidv4();
       
@@ -121,7 +143,7 @@ export function useNotes(defaultFilters?: Filters) {
       const placeholderNote: Note = {
         id: noteId,
         title: typeToTitle[task.noteType],
-        content: 'AI가 노트를 생성하고 있습니다. 잠시만 기다려주세요...',
+        content: 'AI가 노트를 생성하고 있습니다. 잠시만 기다려주세요...', // Note: This string contains Korean characters, which are valid in JSON and JavaScript strings.
         noteType: task.noteType,
         sourceType: task.noteType === 'youtube_summary' ? 'youtube' : 'other',
         createdAt: new Date().toISOString(),
@@ -158,15 +180,15 @@ export function useNotes(defaultFilters?: Filters) {
             });
         } catch (err) {
             await db.notes.update(noteId, { 
-              title: `[생성 실패] ${typeToTitle[task.noteType]}`,
-              content: `서비스 워커 준비 중 오류가 발생했습니다: ${err.message}`
+              title: `[생성 실패] ${typeToTitle[task.noteType]}`, // Note: This string contains Korean characters.
+              content: `서비스 워커 준비 중 오류가 발생했습니다: ${err.message}` // Note: This string contains Korean characters.
             });
             throw err;
         }
       } else {
         await db.notes.update(noteId, { 
-          title: `[생성 실패] ${typeToTitle[task.noteType]}`,
-          content: '서비스 워커가 지원되지 않아 백그라운드 생성을 시작할 수 없습니다.'
+          title: `[생성 실패] ${typeToTitle[task.noteType]}`, // Note: This string contains Korean characters.
+          content: '서비스 워커가 지원되지 않아 백그라운드 생성을 시작할 수 없습니다.' // Note: This string contains Korean characters.
         });
         throw new Error("Service Worker is not supported in this browser.");
       }
@@ -185,7 +207,7 @@ export function useNotes(defaultFilters?: Filters) {
       try {
         let blobUrls: string[] = [];
         if (files.length > 0) {
-            onProgress?.(`파일 ${files.length}개 업로드 중...`);
+            onProgress?.(`파일 ${files.length}개 업로드 중...`); // Note: This string contains Korean characters.
             const blobResults = await Promise.all(
               files.map(file => 
                 upload(file.name, file, {
@@ -197,7 +219,7 @@ export function useNotes(defaultFilters?: Filters) {
             blobUrls = blobResults.map(b => b.url);
         }
 
-        onProgress?.("AI 복습 노트를 생성하고 있습니다...");
+        onProgress?.("AI 복습 노트를 생성하고 있습니다..."); // Note: This string contains Korean characters.
         const reviewNoteBody = {
           blobUrls,
           aiConversationText,
@@ -231,7 +253,7 @@ export function useNotes(defaultFilters?: Filters) {
         }
 
         if (!subjectId) {
-            throw new Error(`API에서 유효한 과목명을 추론하지 못했거나, 일치하는 과목을 찾을 수 없습니다.`);
+            throw new Error(`API에서 유효한 과목명을 추론하지 못했거나, 일치하는 과목을 찾을 수 없습니다.`); // Note: This string contains Korean characters.
         }
 
         const newNote: Note = {
@@ -253,7 +275,7 @@ export function useNotes(defaultFilters?: Filters) {
         onComplete?.(newNote, newQuiz);
       } catch (err) {
         console.error("Review note creation failed:", err);
-        const errorMessage = err instanceof Error ? err.message : "복습 노트 생성 중 알 수 없는 오류가 발생했습니다.";
+        const errorMessage = err instanceof Error ? err.message : "복습 노트 생성 중 알 수 없는 오류가 발생했습니다."; // Note: This string contains Korean characters.
         onError?.(errorMessage);
       }
     };
@@ -261,7 +283,7 @@ export function useNotes(defaultFilters?: Filters) {
     const addScheduleFromImage = async (payload: AddScheduleFromImagePayload) => {
       const { file, onProgress, onComplete, onError } = payload;
       
-      onProgress?.('시간표 파일을 서버로 전송 중입니다...');
+      onProgress?.('시간표 파일을 서버로 전송 중입니다...'); // Note: This string contains Korean characters.
       
       const formData = new FormData();
       formData.append('file', file);
@@ -274,12 +296,12 @@ export function useNotes(defaultFilters?: Filters) {
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.details || errorData.error || '시간표 처리 중 알 수 없는 오류가 발생했습니다.');
+          throw new Error(errorData.details || errorData.error || '시간표 처리 중 알 수 없는 오류가 발생했습니다.'); // Note: This string contains Korean characters.
         }
 
         const eventsFromApi: { subjectName: string, dayOfWeek: string, startTime: string, endTime: string }[] = await response.json();
 
-        onProgress?.('시간표 정보를 처리하고 과목을 동기화하는 중입니다...');
+        onProgress?.('시간표 정보를 처리하고 과목을 동기화하는 중입니다...'); // Note: This string contains Korean characters.
 
         const eventsForDb: ScheduleEvent[] = [];
         const localSubjects = [...(allSubjects || [])];
@@ -301,7 +323,7 @@ export function useNotes(defaultFilters?: Filters) {
           });
         }
 
-        onProgress?.('시간표 정보를 데이터베이스에 저장 중입니다...');
+        onProgress?.('시간표 정보를 데이터베이스에 저장 중입니다...'); // Note: This string contains Korean characters.
         
         await db.schedule.clear();
         await db.schedule.bulkPut(eventsForDb);
@@ -310,7 +332,7 @@ export function useNotes(defaultFilters?: Filters) {
 
       } catch (err) {
         console.error("Schedule import failed:", err);
-        const errorMessage = err instanceof Error ? err.message : "시간표를 처리하는 중 오류가 발생했습니다.";
+        const errorMessage = err instanceof Error ? err.message : "시간표를 처리하는 중 오류가 발생했습니다."; // Note: This string contains Korean characters.
         onError?.(errorMessage);
       }
     };
@@ -366,7 +388,7 @@ export function useNotes(defaultFilters?: Filters) {
         const { title, content, key_insights, quiz, subjectId } = result;
 
         if (!subjectId || !(subjects.some(s => s.id === subjectId))) {
-            throw new Error(`API가 유효하지 않은 subjectId ('${subjectId}')를 반환했습니다. 사용 가능한 ID: ${subjects.map(s => s.id).join(', ')}`);
+            throw new Error(`API가 유효하지 않은 subjectId ('${subjectId}')를 반환했습니다. 사용 가능한 ID: ${subjects.map(s => s.id).join(', ')}`); // Note: This string contains Korean characters.
         }
 
         const newNote: Note = {
@@ -560,5 +582,6 @@ export function useNotes(defaultFilters?: Filters) {
         updateFolder,
         deleteFolder,
         moveNoteToFolder,
+        handleSync,
     };
 }
