@@ -1,6 +1,6 @@
 import { db } from './db';
 import { createClient } from '@supabase/supabase-js';
-import { Note, Subject } from './types';
+import { Note, Subject, Folder } from './types';
 
 // Supabase 'notes' table schema mapped to a type
 type RemoteNote = {
@@ -56,7 +56,27 @@ export async function syncNotes(
         await db.subjects.bulkPut(subjectsToPutLocally as Subject[]);
     }
 
-    // --- 2. NOTE SYNC ---
+    // --- 2. FOLDER SYNC ---
+    const { data: remoteFolders, error: remoteFoldersError } = await supabase.from('folders').select('*');
+    if (remoteFoldersError) throw new Error(`Failed to fetch folders: ${remoteFoldersError.message}`);
+    
+    const localFolders = await db.folders.toArray();
+    const remoteFoldersMap = new Map(remoteFolders.map(f => [f.id, f]));
+
+    // Push local folders that don't exist on remote
+    const foldersToUpsert = localFolders.filter(localFolder => !remoteFoldersMap.has(localFolder.id));
+    if (foldersToUpsert.length > 0) {
+        const { error } = await supabase.from('folders').upsert(foldersToUpsert.map(f => ({ ...f, user_id: userId })));
+        if (error) throw new Error(`Failed to upsert folders: ${error.message}`);
+    }
+
+    // Pull remote folders that don't exist locally
+    const foldersToPutLocally = remoteFolders.filter(remoteFolder => !localFolders.some(localFolder => localFolder.id === remoteFolder.id));
+    if (foldersToPutLocally.length > 0) {
+        await db.folders.bulkPut(foldersToPutLocally as Folder[]);
+    }
+
+    // --- 3. NOTE SYNC ---
     const { data: remoteNotesData, error: remoteError } = await supabase
         .from('notes')
         .select('*');
@@ -129,7 +149,7 @@ export async function syncNotes(
             note_date: n.noteDate,
             key_insights: n.key_insights,
             favorite: n.favorite,
-            // attachments: n.attachments,
+            attachments: n.attachments,
             is_deleted: n.is_deleted || false,
         }));
         const { error } = await supabase.from('notes').upsert(upsertData);
