@@ -95,9 +95,29 @@ export async function syncNotes(
         }
     }
 
+    const baseNoteColumns = [
+        'id',
+        'user_id',
+        'title',
+        'content',
+        'note_type',
+        'subject_id',
+        'source_type',
+        'source_url',
+        'created_at',
+        'updated_at',
+        'note_date',
+        'key_insights',
+        'favorite',
+        'attachments',
+        'is_deleted',
+    ];
+
+    const noteSelect = supportsFolderId ? '*' : baseNoteColumns.join(',');
+
     const { data: remoteNotesData, error: remoteError } = await supabase
         .from('notes')
-        .select('*');
+        .select(noteSelect);
 
     if (remoteError) throw remoteError;
 
@@ -177,7 +197,7 @@ export async function syncNotes(
 
             return base;
         });
-        const { error } = await supabase.from('notes').upsert(upsertData);
+        const { error } = await supabase.from('notes').upsert(upsertData, { returning: 'minimal' });
         if (error) throw new Error(`Failed to upsert notes to Supabase: ${error.message}`);
     }
 
