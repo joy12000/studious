@@ -60,15 +60,11 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useNotes } from '../lib/useNotes';
 import NoteCard from '../components/NoteCard';
-import { Plus, LayoutGrid, List, Search, X, Folder as FolderIcon, BrainCircuit, RefreshCw, Home, Edit, Trash2, Inbox } from 'lucide-react';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Plus, Folder as FolderIcon, BrainCircuit, RefreshCw, Home, Edit, Trash2, Inbox, Notebook, ArrowUpFromLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@clerk/clerk-react';
-import { syncNotes } from '../lib/sync';
-import toast from 'react-hot-toast';
-import { Subject, Folder } from '../lib/types';
+import { Subject, Folder, Note } from '../lib/types';
 
-// FolderCard component with context menu and rename logic
+// FolderCard component
 const FolderCard = ({ folder, onDoubleClick, onDragOver, onDrop, onContextMenu, isRenaming, newName, onNameChange, onRenameConfirm, onRenameCancel }) => (
   <div 
     className="relative group bg-muted/50 p-4 rounded-lg flex flex-col items-center justify-center aspect-square transition-all hover:bg-muted cursor-pointer"
@@ -87,7 +83,7 @@ const FolderCard = ({ folder, onDoubleClick, onDragOver, onDrop, onContextMenu, 
         onKeyDown={(e) => e.key === 'Enter' && onRenameConfirm()}
         className="mt-2 w-full text-center bg-transparent border border-primary rounded-md z-10"
         autoFocus
-        onClick={(e) => e.stopPropagation()} // Prevent double click from firing
+        onClick={(e) => e.stopPropagation()}
       />
     ) : (
       <p className="mt-2 text-sm font-medium text-center break-all pointer-events-none">{folder.name}</p>
@@ -95,21 +91,16 @@ const FolderCard = ({ folder, onDoubleClick, onDragOver, onDrop, onContextMenu, 
   </div>
 );
 
-// Context Menu Component
-const ContextMenu = ({ x, y, visible, folder, onRename, onDelete, onClose }) => {
+// Context Menu Components
+const ContextMenu = ({ x, y, visible, children, onClose }) => {
   if (!visible) return null;
   return (
     <div 
       className="fixed z-50 bg-background border rounded-md shadow-lg p-1"
       style={{ top: y, left: x }}
-      onClick={onClose} // Close on click inside menu
+      onClick={onClose}
     >
-      <button onClick={() => onRename(folder)} className="flex items-center w-full text-left px-3 py-1.5 text-sm hover:bg-muted rounded-sm">
-        <Edit className="w-4 h-4 mr-2" /> 이름 변경
-      </button>
-      <button onClick={() => onDelete(folder)} className="flex items-center w-full text-left px-3 py-1.5 text-sm text-destructive hover:bg-destructive hover:text-destructive-foreground rounded-sm">
-        <Trash2 className="w-4 h-4 mr-2" /> 삭제
-      </button>
+      {children}
     </div>
   );
 };
@@ -117,28 +108,28 @@ const ContextMenu = ({ x, y, visible, folder, onRename, onDelete, onClose }) => 
 const UNCLASSIFIED_ID = '__unclassified__';
 
 export default function NoteListPage() {
-  const { notes, allSubjects, allFolders, loading, toggleFavorite, addFolder, updateFolder, deleteFolder, moveNoteToFolder } = useNotes();
+  const { notes, allSubjects, allFolders, loading, toggleFavorite, addFolder, updateFolder, deleteFolder, moveNoteToFolder, importNote } = useNotes();
   const navigate = useNavigate();
 
-  // State for folder navigation
   const [currentSubjectId, setCurrentSubjectId] = useState<string | null>(null);
   const [currentFolderId, setCurrentFolderId] = useState<string | undefined>(undefined);
   const [breadcrumbs, setBreadcrumbs] = useState<(Subject | Folder)[]>([]);
-
-  // State for UI interactions
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [renamingFolderId, setRenamingFolderId] = useState<string | null>(null);
   const [renamingFolderName, setRenamingFolderName] = useState('');
   const [isDragging, setIsDragging] = useState(false);
-  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number; folder: Folder | null }>({ visible: false, x: 0, y: 0, folder: null });
+  const [folderContextMenu, setFolderContextMenu] = useState<{ visible: boolean; x: number; y: number; folder: Folder | null }>({ visible: false, x: 0, y: 0, folder: null });
+  const [noteContextMenu, setNoteContextMenu] = useState<{ visible: boolean; x: number; y: number; note: Note | null }>({ visible: false, x: 0, y: 0, note: null });
 
-  // Close context menu on any click
   useEffect(() => {
-    const handleClick = () => setContextMenu({ ...contextMenu, visible: false });
+    const handleClick = () => {
+      setFolderContextMenu(prev => ({ ...prev, visible: false }));
+      setNoteContextMenu(prev => ({ ...prev, visible: false }));
+    };
     window.addEventListener('click', handleClick);
     return () => window.removeEventListener('click', handleClick);
-  }, [contextMenu]);
+  }, []);
 
   const handleSubjectSelect = (subject: Subject | {id: string, name: string}) => {
     setCurrentSubjectId(subject.id);
@@ -151,13 +142,11 @@ export default function NoteListPage() {
     setBreadcrumbs(prev => [...prev, folder]);
   };
 
-  const handleBreadcrumbClick = (item: Subject | Folder, index: number) => {
-    if (index === 0) {
-      setCurrentFolderId(undefined);
-    } else {
-      setCurrentFolderId((item as Folder).id);
+  const handleBreadcrumbClick = (index: number) => {
+    if (index < breadcrumbs.length - 1) {
+        setCurrentFolderId(index === 0 ? undefined : (breadcrumbs[index] as Folder).id);
+        setBreadcrumbs(breadcrumbs.slice(0, index + 1));
     }
-    setBreadcrumbs(breadcrumbs.slice(0, index + 1));
   };
 
   const handleGoHome = () => {
@@ -169,13 +158,12 @@ export default function NoteListPage() {
   const handleCreateFolder = async () => {
     if (newFolderName.trim() && currentSubjectId && currentSubjectId !== UNCLASSIFIED_ID) {
       await addFolder(newFolderName.trim(), currentSubjectId, currentFolderId);
-      setIsCreatingFolder(false);
-      setNewFolderName('');
     }
+    setIsCreatingFolder(false);
+    setNewFolderName('');
   };
 
   const startRename = (folder: Folder) => {
-    setContextMenu({ ...contextMenu, visible: false });
     setRenamingFolderId(folder.id);
     setRenamingFolderName(folder.name);
   };
@@ -194,60 +182,64 @@ export default function NoteListPage() {
     }
   };
 
-  const handleContextMenu = (e: React.MouseEvent, folder: Folder) => {
+  const handleNoteContextMenu = (e: React.MouseEvent, note: Note) => {
     e.preventDefault();
     e.stopPropagation();
-    setContextMenu({ visible: true, x: e.clientX, y: e.clientY, folder });
+    setNoteContextMenu({ visible: true, x: e.clientX, y: e.clientY, note });
   };
 
-  // Filter items for the current view
+  const handleFolderContextMenu = (e: React.MouseEvent, folder: Folder) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setFolderContextMenu({ visible: true, x: e.clientX, y: e.clientY, folder });
+  };
+
+  const handleMoveNoteToParent = (note: Note) => {
+    if (!note.folderId) return; // Already at the root of the subject
+    const currentFolder = allFolders.find(f => f.id === note.folderId);
+    moveNoteToFolder(note.id, currentFolder?.parentId);
+  };
+
+  const handleAddNewEmptyNote = async () => {
+    const newNote = await importNote({
+      title: '빈 노트',
+      content: '# 제목\n\n',
+      subjectId: currentSubjectId === UNCLASSIFIED_ID ? undefined : currentSubjectId,
+      folderId: currentFolderId,
+    });
+    navigate(`/note/${newNote.id}`);
+  };
+
   const { filteredFolders, filteredNotesInCurrentView } = useMemo(() => {
-    if (!currentSubjectId) {
-      return { filteredFolders: [], filteredNotesInCurrentView: [] };
-    }
-
+    if (!currentSubjectId) return { filteredFolders: [], filteredNotesInCurrentView: [] };
     const isUnclassified = currentSubjectId === UNCLASSIFIED_ID;
-
-    const foldersInView = isUnclassified 
-      ? [] 
-      : allFolders.filter(f => f.subjectId === currentSubjectId && f.parentId === currentFolderId);
-
+    const foldersInView = isUnclassified ? [] : allFolders.filter(f => f.subjectId === currentSubjectId && f.parentId === currentFolderId);
     const notesInView = notes.filter(n => {
-      const subjectMatch = isUnclassified
-        ? (n.subjectId === undefined || n.subjectId === null)
-        : (n.subjectId === currentSubjectId);
+      const subjectMatch = isUnclassified ? !n.subjectId : n.subjectId === currentSubjectId;
       return subjectMatch && n.folderId === currentFolderId;
     });
-
     return { filteredFolders: foldersInView, filteredNotesInCurrentView: notesInView };
   }, [currentSubjectId, currentFolderId, allFolders, notes]);
 
-  // Drag and Drop handlers
   const handleDragStart = (e: React.DragEvent, noteId: string) => {
     e.dataTransfer.setData('noteId', noteId);
     setIsDragging(true);
   };
   
-  const handleDragEnd = () => {
-      setIsDragging(false);
-  }
+  const handleDragEnd = () => setIsDragging(false);
 
   const handleDropOnFolder = (e: React.DragEvent, folderId: string) => {
     e.preventDefault();
     e.stopPropagation();
     const noteId = e.dataTransfer.getData('noteId');
-    if (noteId) {
-      moveNoteToFolder(noteId, folderId);
-    }
+    if (noteId) moveNoteToFolder(noteId, folderId);
     setIsDragging(false);
   };
 
   const handleDropOnCanvas = (e: React.DragEvent) => {
     e.preventDefault();
     const noteId = e.dataTransfer.getData('noteId');
-    if (noteId && currentSubjectId !== UNCLASSIFIED_ID) {
-      moveNoteToFolder(noteId, currentFolderId);
-    }
+    if (noteId && currentSubjectId !== UNCLASSIFIED_ID) moveNoteToFolder(noteId, currentFolderId);
     setIsDragging(false);
   };
 
@@ -273,7 +265,26 @@ export default function NoteListPage() {
 
   return (
     <>
-      <ContextMenu {...contextMenu} onRename={startRename} onDelete={handleDeleteFolder} onClose={() => setContextMenu({ ...contextMenu, visible: false })} />
+      <ContextMenu {...folderContextMenu} onClose={() => setFolderContextMenu(prev => ({...prev, visible: false}))}>
+        {folderContextMenu.folder && (
+          <>
+            <button onClick={() => startRename(folderContextMenu.folder!)} className="flex items-center w-full text-left px-3 py-1.5 text-sm hover:bg-muted rounded-sm">
+              <Edit className="w-4 h-4 mr-2" /> 이름 변경
+            </button>
+            <button onClick={() => handleDeleteFolder(folderContextMenu.folder!)} className="flex items-center w-full text-left px-3 py-1.5 text-sm text-destructive hover:bg-destructive hover:text-destructive-foreground rounded-sm">
+              <Trash2 className="w-4 h-4 mr-2" /> 삭제
+            </button>
+          </>
+        )}
+      </ContextMenu>
+      <ContextMenu {...noteContextMenu} onClose={() => setNoteContextMenu(prev => ({...prev, visible: false}))}>
+        {noteContextMenu.note && (
+          <button onClick={() => handleMoveNoteToParent(noteContextMenu.note!)} className="flex items-center w-full text-left px-3 py-1.5 text-sm hover:bg-muted rounded-sm">
+            <ArrowUpFromLine className="w-4 h-4 mr-2" /> 상위 폴더로 이동
+          </button>
+        )}
+      </ContextMenu>
+
       <div className="flex h-full flex-col">
         <header className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b p-4">
           <div className="max-w-7xl mx-auto flex flex-col gap-4">
@@ -282,7 +293,7 @@ export default function NoteListPage() {
               <span>/</span>
               {breadcrumbs.map((item, index) => (
                 <React.Fragment key={item.id}>
-                  <button onClick={() => handleBreadcrumbClick(item, index)} className="hover:text-foreground">
+                  <button onClick={() => handleBreadcrumbClick(index)} className="hover:text-foreground">
                     {item.name}
                   </button>
                   <span>/</span>
@@ -291,13 +302,19 @@ export default function NoteListPage() {
             </div>
             <div className="flex items-center justify-between">
               <h1 className="text-xl font-bold">{breadcrumbs[breadcrumbs.length - 1]?.name || '노트'}</h1>
-              {currentSubjectId !== UNCLASSIFIED_ID && (
-                <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="icon" onClick={handleAddNewEmptyNote} title="새 노트">
+                    <Notebook className="h-5 w-5" />
+                </Button>
+                {currentSubjectId !== UNCLASSIFIED_ID && (
                   <Button variant="outline" size="icon" onClick={() => setIsCreatingFolder(true)} title="새 폴더">
                     <FolderIcon className="h-5 w-5" /><Plus className="h-3 w-3 -ml-2 -mt-3"/>
                   </Button>
-                </div>
-              )}
+                )}
+                 <Button variant="outline" size="icon" disabled title="Supabase와 동기화">
+                    <RefreshCw className={`h-5 w-5`} />
+                </Button>
+              </div>
             </div>
           </div>
         </header>
@@ -318,7 +335,7 @@ export default function NoteListPage() {
                   onDoubleClick={() => handleFolderClick(folder)}
                   onDragOver={(e) => e.preventDefault()}
                   onDrop={(e) => handleDropOnFolder(e, folder.id)}
-                  onContextMenu={(e) => handleContextMenu(e, folder)}
+                  onContextMenu={(e) => handleFolderContextMenu(e, folder)}
                   isRenaming={renamingFolderId === folder.id}
                   newName={renamingFolderName}
                   onNameChange={(e) => setRenamingFolderName(e.target.value)}
@@ -344,7 +361,7 @@ export default function NoteListPage() {
               )}
 
               {filteredNotesInCurrentView.map(n => (
-                <div key={n.id} draggable onDragStart={(e) => handleDragStart(e, n.id)} onDragEnd={handleDragEnd}>
+                <div key={n.id} draggable onDragStart={(e) => handleDragStart(e, n.id)} onDragEnd={handleDragEnd} onContextMenu={(e) => handleNoteContextMenu(e, n)}>
                   <NoteCard note={n} onToggleFavorite={toggleFavorite} view={'grid'} />
                 </div>
               ))}

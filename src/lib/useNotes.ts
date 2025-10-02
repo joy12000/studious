@@ -460,7 +460,13 @@ export function useNotes(defaultFilters?: Filters) {
 
     const deleteFolder = useCallback(async (id: string) => {
       await db.transaction('rw', db.folders, db.notes, async () => {
-        await db.notes.where({ folderId: id }).modify({ folderId: undefined });
+        const folderToDelete = await db.folders.get(id);
+        if (!folderToDelete) return;
+
+        // Move notes from the deleted folder to its parent folder (or subject root)
+        await db.notes.where({ folderId: id }).modify({ folderId: folderToDelete.parentId });
+        
+        // TODO: Handle nested folder deletion recursively in the future
         await db.folders.delete(id);
       });
     }, []);
