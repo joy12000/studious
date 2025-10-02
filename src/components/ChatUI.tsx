@@ -8,7 +8,7 @@ import MarkdownRenderer from './MarkdownRenderer';
 import { useNotes } from '../lib/useNotes';
 import { upload } from '@vercel/blob/client';
 import { convertPdfToImages } from '../lib/pdfUtils';
-import { Message, Note } from '../lib/types'; // Import Message and Note from types.ts
+import { Message, Note } from '../lib/types'; // Import Message and Note
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 import { useAuth } from '@clerk/clerk-react';
@@ -50,31 +50,26 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
-  const { notes, updateNote, getNote } = useNotes(); // ✨ Get all notes
+  const { notes, updateNote, getNote } = useNotes(); // Get all notes
   const messagesRef = useRef(messages);
   messagesRef.current = messages;
-  const prevMessagesLength = useRef(messages.length);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
-  // ✨ State for note selection
+  // State for note selection
   const [selectedNotes, setSelectedNotes] = useState<Note[]>([]);
   const [isNotePickerOpen, setIsNotePickerOpen] = useState(false);
   const [noteSearchQuery, setNoteSearchQuery] = useState('');
 
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   const handleMobileUploadClick = () => {
-    if (isMobile) {
-      navigate('/m/upload');
-    }
+    if (isMobile) navigate('/m/upload');
   };
 
   const [selectedModel, setSelectedModel] = useState(models[0].id);
@@ -85,28 +80,18 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
   const { getToken } = useAuth();
 
   useEffect(() => {
-    if (!isSyncedMediaOpen) {
-      return;
-    }
+    if (!isSyncedMediaOpen) return;
 
     const fetchInitialImages = async () => {
       setIsSyncLoading(true);
       try {
         const token = await getToken({ template: 'supabase' });
-        if (!token) {
-          throw new Error("인증 토큰을 가져올 수 없습니다.");
-        }
+        if (!token) throw new Error("인증 토큰을 가져올 수 없습니다.");
 
         const authedSupabase = createClient(
           import.meta.env.VITE_PUBLICSUPABASE_URL!,
           import.meta.env.VITE_PUBLICSUPABASE_ANON_KEY!,
-          {
-            global: {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            },
-          }
+          { global: { headers: { Authorization: `Bearer ${token}` } } }
         );
 
         const { data, error } = await authedSupabase
@@ -160,33 +145,21 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const MAX_FILE_SIZE_MB = 5;
-  const MAX_TOTAL_SIZE_MB = 10;
-
   useEffect(() => {
     const handlePaste = (event: ClipboardEvent) => {
       const items = event.clipboardData?.items;
       if (!items) return;
-
       for (let i = 0; i < items.length; i++) {
         if (items[i].type.indexOf('image') !== -1) {
           const file = items[i].getAsFile();
-          if (file) {
-            setSelectedFiles(prev => [...prev, file]);
-          }
+          if (file) setSelectedFiles(prev => [...prev, file]);
         }
       }
     };
-
     const inputElement = chatInputRef.current;
-    if (inputElement) {
-      inputElement.addEventListener('paste', handlePaste as EventListener);
-    }
-
+    if (inputElement) inputElement.addEventListener('paste', handlePaste as EventListener);
     return () => {
-      if (inputElement) {
-        inputElement.removeEventListener('paste', handlePaste as EventListener);
-      }
+      if (inputElement) inputElement.removeEventListener('paste', handlePaste as EventListener);
     };
   }, [setSelectedFiles]);
 
@@ -198,22 +171,16 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
     if (noteId) {
       const note = await getNote(noteId);
       const history = note?.chatHistory;
-      if (history && history.length > 0) {
-        setMessages(history);
-      } else {
-        setMessages([createInitialMessage()]);
-      }
+      setMessages(history && history.length > 0 ? history : [createInitialMessage()]);
     }
   }, [noteId, getNote]);
 
   useEffect(() => {
     loadChatHistory();
-
     return () => {
       const currentMessages = messagesRef.current;
       if (noteId && currentMessages.length > 1) {
         updateNote(noteId, { chatHistory: currentMessages });
-        console.log('Chat history auto-saved on unmount.');
       }
     }
   }, [noteId, getNote, updateNote, loadChatHistory]);
@@ -223,53 +190,47 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
     if (noteId) {
       try {
         await updateNote(noteId, { chatHistory: [] });
-        console.log('Chat history cleared in note.');
       } catch (error) {
         console.error('Failed to clear chat history in note:', error);
       }
     }
   };
 
-  const handleCopy = (text: string) => navigator.clipboard.writeText(text);
-
   const handleSaveChat = useCallback(async () => {
     if (!noteId || messages.length <= 1) return;
     try {
       await updateNote(noteId, { chatHistory: messages });
-      alert('대화 내용이 노트에 성공적으로 저장되었습니다!');
+      toast.success('대화 내용이 노트에 저장되었습니다!');
     } catch (error) {
       console.error('Failed to save chat to note:', error);
-      alert('대화 내용을 노트에 저장하는 데 실패했습니다.');
+      toast.error('대화 내용을 저장하는 데 실패했습니다.');
     }
   }, [noteId, messages, updateNote]);
 
-  const handleApplyChange = (messageId: number, suggestion: { old: string; new: string }) => {
-    if (onSuggestionAccepted) onSuggestionAccepted(suggestion);
-    setMessages(prev => prev.map(msg => 
-      msg.id === messageId ? { ...msg, suggestion: undefined } : msg
-    ));
-    alert('변경 사항이 적용되었습니다.');
-  };
-
-  const handleReject = (messageId: number) => {
-    setMessages(prev => prev.map(msg => 
-      msg.id === messageId ? { ...msg, suggestion: undefined } : msg
-    ));
-  };
-
   const detectSuggestion = (text: string) => {
-    // ... (suggestion detection logic remains the same)
+    const patterns = [
+      /```suggestion\s*\r?\n기존 내용\s*\r?\n([\s\S]*?)\s*\r?\n===>\s*\r?\n새로운 내용\s*\r?\n([\s\S]*?)\s*```/,
+      /```suggestion\s*[\r\n]+기존\s*내용\s*[\r\n]+([\s\S]*?)[\\r\\n]+==+>\\s*[\\r\\n]+새로운\s*내용\s*[\\r\\n]+([\\s\\S]*?)[\\r\\n]*```/,
+    ];
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match && match.length >= 3) return { old: match[1].trim(), new: match[2].trim() };
+    }
+    return null;
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    // ... (file change logic remains the same)
+    if (!event.target.files) return;
+    const newFiles = Array.from(event.target.files);
+    // File size and type validation logic can be added here
+    setSelectedFiles(prev => [...prev, ...newFiles]);
+    if(fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const removeFile = (index: number) => {
     setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
-  // ✨ Note selection logic
   const filteredNotes = (notes || []).filter(note => 
     !note.is_deleted && (
       note.title.toLowerCase().includes(noteSearchQuery.toLowerCase()) ||
@@ -290,15 +251,12 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
   };
 
   const handleSendMessage = async (text: string | React.FormEvent) => {
-    if (typeof text === 'object') {
-        text.preventDefault();
-    }
+    if (typeof text === 'object') text.preventDefault();
     const currentInput = (typeof text === 'string' ? text : inputValue).trim();
     if ((currentInput === '' && selectedFiles.length === 0 && selectedNotes.length === 0) || isLoading) return;
 
     const userMessage: Message = { id: Date.now(), type: 'text', content: currentInput, sender: 'user' };
-    const currentMessages = [...messages, userMessage];
-    setMessages(currentMessages);
+    setMessages(prev => [...prev, userMessage]);
     setInputValue('');
     setIsLoading(true);
 
@@ -309,41 +267,29 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
     if (selectedFiles.length > 0) {
       try {
         const blobResults = await Promise.all(
-          selectedFiles.map(file => 
-            upload(file.name, file, {
-              access: 'public',
-              handleUploadUrl: '/api/upload/route',
-            })
-          )
+          selectedFiles.map(file => upload(file.name, file, { access: 'public', handleUploadUrl: '/api/upload/route' }))
         );
         uploadedBlobUrls = blobResults.map(b => b.url);
       } catch (error) {
         console.error("File upload failed:", error);
-        alert("파일 업로드 중 오류가 발생했습니다.");
+        toast.error("파일 업로드 중 오류가 발생했습니다.");
         setIsLoading(false);
         return;
       }
     }
 
-    // ✨ Combine note contexts
     const additionalContext = selectedNotes.length > 0 
-      ? selectedNotes.map(note => `--- 참고 노트: ${note.title} ---\n${note.content}`).join('\n\n')
+      ? selectedNotes.map(note => `--- 참고 노트: ${note.title} ---\\n${note.content}`).join('\\n\\n')
       : '';
     
-    const combinedNoteContext = [noteContext, additionalContext].filter(Boolean).join('\n\n');
+    const combinedNoteContext = [noteContext, additionalContext].filter(Boolean).join('\\n\\n');
 
-    const history: GeminiHistory[] = currentMessages.map(msg => ({
+    const history: GeminiHistory[] = [...messages, userMessage].map(msg => ({
       role: msg.sender === 'user' ? 'user' : 'model',
       parts: [{ text: msg.content }],
     }));
 
-    const botMessage: Message = {
-      id: Date.now() + 1,
-      type: 'text',
-      content: '',
-      sender: 'bot',
-      fileUrls: uploadedBlobUrls,
-    };
+    const botMessage: Message = { id: Date.now() + 1, type: 'text', content: '', sender: 'bot', fileUrls: uploadedBlobUrls };
     setMessages(prev => [...prev, botMessage]);
 
     try {
@@ -354,49 +300,106 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
         signal: controller.signal,
       });
 
-      // ... (streaming response handling remains the same)
+      if (!response.ok || !response.body) throw new Error('API 응답 오류');
 
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\\n');
+        buffer = lines.pop() || '';
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.slice(6);
+            if (jsonStr.trim() === '[DONE]') continue;
+            try {
+              const data = JSON.parse(jsonStr);
+              if (data.type === 'token' && data.content) {
+                setMessages(prev => prev.map(msg => 
+                  msg.id === botMessage.id ? { ...msg, content: msg.content + data.content } : msg
+                ));
+              }
+            } catch (e) {
+              console.error('스트림 데이터 파싱 오류:', e, '원본:', jsonStr);
+            }
+          }
+        }
+      }
+      setMessages(prev => prev.map(msg => {
+        if (msg.id === botMessage.id && msg.content && !msg.suggestion) {
+          const suggestion = detectSuggestion(msg.content);
+          return suggestion ? { ...msg, suggestion } : msg;
+        }
+        return msg;
+      }));
     } catch (error) {
-      // ... (error handling remains the same)
+      if (error.name !== 'AbortError') {
+        console.error('API 통신 오류:', error);
+        const errorMsg = `죄송합니다, 답변 생성 중 오류가 발생했습니다: ${error.message}`;
+        setMessages(prev => prev.map(msg => msg.id === botMessage.id ? { ...msg, content: errorMsg } : msg));
+      }
     } finally {
       setIsLoading(false);
       setSelectedFiles([]);
-      setSelectedNotes([]); // ✨ Clear selected notes
+      setSelectedNotes([]);
       abortControllerRef.current = null;
     }
+  };
+
+  const handleStopStreaming = () => {
+    if (abortControllerRef.current) abortControllerRef.current.abort();
   };
 
   const currentModelName = models.find(m => m.id === selectedModel)?.name || '모델 선택';
-  
-  const handleStopStreaming = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-  };
-
-  const activeSuggestion = messages.find(msg => msg.suggestion);
 
   return (
     <div className={`flex flex-col bg-card pb-4 ${isMobile ? 'fixed inset-0 z-[9999]' : 'h-full border-r rounded-r-lg shadow-lg'}`}>
-      {/* Header */}
       <div className="p-2 sm:p-4 border-b flex justify-between items-center">
-        {/* ... (header content remains the same) */}
-      </div>
-
-      {/* Messages Area */}
-      <div ref={messagesEndRef} className="flex-1 p-4 overflow-y-auto">
-        {/* ... (messages rendering remains the same) */}
-      </div>
-      
-      {/* Suggestion Bar */}
-      {activeSuggestion && (
-        <div className="p-3 border-t bg-blue-50/50 dark:bg-blue-900/20">
-          {/* ... (suggestion bar content remains the same) */}
+        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" role="combobox" className="w-[180px] sm:w-[250px] justify-between">
+              <span className="truncate">{currentModelName}</span>
+              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-[200px] sm:w-[280px] p-0">
+            {models.map((model) => (
+              <Button key={model.id} variant="ghost" className="w-full justify-start h-auto py-2" onClick={() => { setSelectedModel(model.id); setIsPopoverOpen(false); }}>
+                <Check className={`mr-2 h-4 w-4 ${selectedModel === model.id ? 'opacity-100' : 'opacity-0'}`} />
+                <span className="whitespace-normal text-left">{model.name}</span>
+              </Button>
+            ))}
+          </PopoverContent>
+        </Popover>
+        <div className="flex items-center gap-1">
+          {noteId && <Button variant="ghost" size="icon" onClick={handleSaveChat} title="현재 노트에 대화 저장"><Save className="h-4 w-4" /></Button>}
+          <Button variant="ghost" size="icon" onClick={handleNewChat} title="새 대화"><RefreshCw className="h-4 w-4" /></Button>
+          {onClose && <Button variant="ghost" size="icon" onClick={onClose} title="닫기"><X className="h-5 w-5" /></Button>}
         </div>
-      )}
+      </div>
 
-      {/* Attachments Area */}
+      <div ref={messagesEndRef} className="flex-1 p-4 overflow-y-auto">
+        {messages.length > 0 ? (
+          <div className="space-y-4">
+            {messages.map((msg) => (
+              <div key={msg.id} className={`flex items-start gap-3 group ${msg.sender === 'user' ? 'justify-end' : ''}`}>
+                {msg.sender === 'bot' && <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">AI</div>}
+                <div className={`relative px-4 py-1 rounded-lg max-w-xl prose dark:prose-invert prose-p:my-0 ${msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                  <MarkdownRenderer content={msg.content} />
+                </div>
+              </div>
+            ))}
+            {isLoading && <div className="flex items-start gap-3"><div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">AI</div><div className="px-4 py-2 rounded-lg bg-muted"><Loader2 className="h-5 w-5 animate-spin" /></div></div>}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-full"><p className="text-muted-foreground">AI에게 무엇이든 물어보세요!</p></div>
+        )}
+      </div>
+
       {(selectedFiles.length > 0 || selectedNotes.length > 0) && (
         <div className="p-2 border-t bg-muted/50 space-y-2">
           {selectedFiles.length > 0 && (
@@ -405,11 +408,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
               <ul className="flex flex-wrap gap-2">
                 {selectedFiles.map((file, index) => (
                   <li key={index} className="flex items-center gap-1 bg-muted px-2 py-1 rounded-full text-xs">
-                    <FileText className="h-3 w-3" />
-                    {file.name}
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => removeFile(index)}>
-                      <X className="h-3 w-3" />
-                    </Button>
+                    <FileText className="h-3 w-3" />{file.name}
+                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => removeFile(index)}><X className="h-3 w-3" /></Button>
                   </li>
                 ))}
               </ul>
@@ -421,11 +421,8 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
               <ul className="flex flex-wrap gap-2">
                 {selectedNotes.map((note) => (
                   <li key={note.id} className="flex items-center gap-1 bg-muted px-2 py-1 rounded-full text-xs">
-                    <FileText className="h-3 w-3" />
-                    {note.title || '제목 없음'}
-                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleRemoveSelectedNote(note.id)}>
-                      <X className="h-3 w-3" />
-                    </Button>
+                    <FileText className="h-3 w-3" />{note.title || '제목 없음'}
+                    <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => handleRemoveSelectedNote(note.id)}><X className="h-3 w-3" /></Button>
                   </li>
                 ))}
               </ul>
@@ -434,84 +431,62 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
         </div>
       )}
 
-      {/* Input Area */}
       <div className="p-4 border-t">
         {isLoading ? (
           <div className="flex items-center justify-center">
-            <Button variant="outline" onClick={handleStopStreaming} className="w-full flex items-center gap-2">
-              <StopCircle className="h-5 w-5" />
-              생성 중단
-            </Button>
+            <Button variant="outline" onClick={handleStopStreaming} className="w-full flex items-center gap-2"><StopCircle className="h-5 w-5" />생성 중단</Button>
           </div>
         ) : (
           <div className="flex items-center gap-2">
             <input ref={fileInputRef} type="file" multiple hidden onChange={handleFileChange} />
-            <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" onClick={() => fileInputRef.current?.click()} title="파일 첨부">
-              <Plus className="h-5 w-5" />
-            </Button>
+            <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" onClick={() => fileInputRef.current?.click()} title="파일 첨부"><Plus className="h-5 w-5" /></Button>
             
-            {/* ✨ Note Picker Button and Popover */}
             <Popover open={isNotePickerOpen} onOpenChange={setIsNotePickerOpen}>
               <PopoverTrigger asChild>
-                <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" title="노트 첨부">
-                  <FileText className="h-5 w-5" />
-                </Button>
+                <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" title="노트 첨부"><FileText className="h-5 w-5" /></Button>
               </PopoverTrigger>
               <PopoverContent className="w-[300px] sm:w-[400px] p-0">
                 <div className="p-2">
-                  <input 
-                    type="text" 
-                    placeholder="노트 검색..." 
-                    className="w-full p-2 border rounded-md mb-2 bg-transparent"
-                    value={noteSearchQuery}
-                    onChange={(e) => setNoteSearchQuery(e.target.value)}
-                  />
+                  <input type="text" placeholder="노트 검색..." className="w-full p-2 border rounded-md mb-2 bg-transparent" value={noteSearchQuery} onChange={(e) => setNoteSearchQuery(e.target.value)} />
                   <div className="max-h-60 overflow-y-auto">
-                    {filteredNotes.length > 0 ? (
-                      filteredNotes.map(note => (
-                        <div key={note.id} className="flex items-center justify-between p-2 hover:bg-muted rounded-md">
-                          <label htmlFor={`note-chat-${note.id}`} className="flex items-center gap-2 cursor-pointer flex-1 truncate">
-                            <input 
-                              type="checkbox" 
-                              id={`note-chat-${note.id}`}
-                              checked={selectedNotes.some(n => n.id === note.id)}
-                              onChange={() => handleToggleNoteSelection(note)}
-                              className="form-checkbox h-4 w-4 text-primary rounded focus:ring-primary"
-                            />
-                            <span className="text-sm truncate">{note.title || '제목 없음'}</span>
-                          </label>
-                        </div>
-                      ))
-                    ) : ( <p className="text-sm text-muted-foreground text-center p-4">일치하는 노트가 없습니다.</p> )}
+                    {filteredNotes.length > 0 ? filteredNotes.map(note => (
+                      <div key={note.id} className="flex items-center justify-between p-2 hover:bg-muted rounded-md">
+                        <label htmlFor={`note-chat-${note.id}`} className="flex items-center gap-2 cursor-pointer flex-1 truncate">
+                          <input type="checkbox" id={`note-chat-${note.id}`} checked={selectedNotes.some(n => n.id === note.id)} onChange={() => handleToggleNoteSelection(note)} className="form-checkbox h-4 w-4 text-primary rounded focus:ring-primary" />
+                          <span className="text-sm truncate">{note.title || '제목 없음'}</span>
+                        </label>
+                      </div>
+                    )) : <p className="text-sm text-muted-foreground text-center p-4">일치하는 노트가 없습니다.</p>}
                   </div>
                 </div>
-                <div className="p-2 border-t bg-background">
-                  <Button onClick={() => setIsNotePickerOpen(false)} className="w-full">선택 완료</Button>
-                </div>
+                <div className="p-2 border-t bg-background"><Button onClick={() => setIsNotePickerOpen(false)} className="w-full">선택 완료</Button></div>
               </PopoverContent>
             </Popover>
 
             {isMobile ? (
-              <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" title="모바일에서 업로드" onClick={handleMobileUploadClick}>
-                <UploadCloud className="h-5 w-5" />
-              </Button>
+              <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" title="모바일에서 업로드" onClick={handleMobileUploadClick}><UploadCloud className="h-5 w-5" /></Button>
             ) : (
               <Popover open={isSyncedMediaOpen} onOpenChange={setIsSyncedMediaOpen}>
-                {/* ... (synced media popover remains the same) */}
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="icon" className="rounded-full flex-shrink-0" title="모바일에서 가져오기"><UploadCloud className="h-5 w-5" /></Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-80">
+                  <div className="grid gap-4">
+                    <div className="space-y-2"><h4 className="font-medium leading-none">모바일 업로드</h4><p className="text-sm text-muted-foreground">모바일 기기에서 업로드된 이미지 목록입니다.</p></div>
+                    <div className="grid grid-cols-3 gap-2 h-48 overflow-y-auto border p-2 rounded-lg">
+                      {isSyncLoading ? <p className="col-span-3 text-center text-sm text-muted-foreground">불러오는 중...</p> : syncedImages.length === 0 ? <p className="col-span-3 text-center text-sm text-muted-foreground">업로드된 이미지가 없습니다.</p> : syncedImages.map((image) => (
+                        <button key={image.id} className="relative aspect-square rounded-md overflow-hidden hover:opacity-80 transition-opacity" onClick={() => handleSyncedImageClick(image.url)}>
+                          <img src={image.url} alt="Synced image" className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </PopoverContent>
               </Popover>
             )}
             <form id="chat-form" onSubmit={handleSendMessage} className="flex-1 flex items-center gap-2">
-              <input
-                ref={chatInputRef}
-                type="text"
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder={"메시지를 입력하세요..."}
-                className="w-full px-4 py-2 border rounded-full focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-background text-foreground placeholder:text-muted-foreground"
-              />
-              <Button type="submit" size="icon" className="rounded-full" disabled={!inputValue.trim() && selectedFiles.length === 0 && selectedNotes.length === 0}>
-                <ArrowUp className="h-5 w-5" />
-              </Button>
+              <input ref={chatInputRef} type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={"메시지를 입력하세요..."} className="w-full px-4 py-2 border rounded-full focus:ring-2 focus:ring-primary focus:border-transparent transition-all bg-background text-foreground placeholder:text-muted-foreground" />
+              <Button type="submit" size="icon" className="rounded-full" disabled={!inputValue.trim() && selectedFiles.length === 0 && selectedNotes.length === 0}><ArrowUp className="h-5 w-5" /></Button>
             </form>
           </div>
         )}
