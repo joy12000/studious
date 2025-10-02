@@ -66,7 +66,14 @@ export async function syncNotes(
     // Push local folders that don't exist on remote
     const foldersToUpsert = localFolders.filter(localFolder => !remoteFoldersMap.has(localFolder.id));
     if (foldersToUpsert.length > 0) {
-        const { error } = await supabase.from('folders').upsert(foldersToUpsert.map(f => ({ ...f, user_id: userId })));
+        const foldersUpsertData = foldersToUpsert.map(f => ({
+            id: f.id,
+            name: f.name,
+            subject_id: f.subjectId,
+            parent_id: f.parentId,
+            user_id: userId
+        }));
+        const { error } = await supabase.from('folders').upsert(foldersUpsertData);
         if (error) throw new Error(`Failed to upsert folders: ${error.message}`);
     }
 
