@@ -166,7 +166,7 @@ export default function NoteListPage() {
     const isUnclassified = currentSubjectId === UNCLASSIFIED_ID;
     const foldersInView = isUnclassified ? [] : allFolders.filter(f => f.subjectId === currentSubjectId && f.parentId === currentFolderId);
     const notesInView = notes.filter(n => {
-      const subjectMatch = isUnclassified ? !n.subjectId : n.subjectId === currentSubjectId;
+      const subjectMatch = isUnclassified ? (n.subjectId == null) : n.subjectId === currentSubjectId;
       return subjectMatch && n.folderId === currentFolderId;
     });
     return { filteredFolders: foldersInView, filteredNotesInCurrentView: notesInView };
