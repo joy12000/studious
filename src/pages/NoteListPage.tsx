@@ -51,7 +51,7 @@ const ContextMenu = ({ x, y, visible, children, onClose }) => {
 const UNCLASSIFIED_ID = '__unclassified__';
 
 export default function NoteListPage() {
-  const { notes, allSubjects, allFolders, loading, toggleFavorite, addFolder, updateFolder, deleteFolder, moveNoteToFolder, importNote } = useNotes();
+  const { notes, allSubjects, allFolders, loading, toggleFavorite, addFolder, updateFolder, deleteFolder, moveNoteToFolder, importNote, handleSync } = useNotes();
   const navigate = useNavigate();
 
   const [currentSubjectId, setCurrentSubjectId] = useState<string | null>(null);
@@ -64,6 +64,7 @@ export default function NoteListPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [folderContextMenu, setFolderContextMenu] = useState<{ visible: boolean; x: number; y: number; folder: Folder | null }>({ visible: false, x: 0, y: 0, folder: null });
   const [noteContextMenu, setNoteContextMenu] = useState<{ visible: boolean; x: number; y: number; note: Note | null }>({ visible: false, x: 0, y: 0, note: null });
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     const handleClick = () => {
@@ -73,6 +74,13 @@ export default function NoteListPage() {
     window.addEventListener('click', handleClick);
     return () => window.removeEventListener('click', handleClick);
   }, []);
+
+  const onSyncClick = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    await handleSync();
+    setIsSyncing(false);
+  };
 
   const handleSubjectSelect = (subject: Subject | {id: string, name: string}) => {
     setCurrentSubjectId(subject.id);
@@ -254,8 +262,8 @@ export default function NoteListPage() {
                     <FolderIcon className="h-5 w-5" /><Plus className="h-3 w-3 -ml-2 -mt-3"/>
                   </Button>
                 )}
-                 <Button variant="outline" size="icon" disabled title="Supabase와 동기화">
-                    <RefreshCw className={`h-5 w-5`} />
+                 <Button variant="outline" size="icon" onClick={onSyncClick} disabled={isSyncing} title="Supabase와 동기화">
+                    <RefreshCw className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} />
                 </Button>
               </div>
             </div>
