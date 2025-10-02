@@ -129,7 +129,7 @@ export async function syncNotes(
             note_date: n.noteDate,
             key_insights: n.key_insights,
             favorite: n.favorite,
-            attachments: n.attachments,
+            // attachments: n.attachments,
             is_deleted: n.is_deleted || false,
         }));
         const { error } = await supabase.from('notes').upsert(upsertData);
