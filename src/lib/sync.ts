@@ -10,7 +10,7 @@ type RemoteNote = {
     content: string | null;
     note_type: Note['noteType'] | null;
     subject_id: string | null;
-    folder_id: string | null;
+    folder_id?: string | null;
     source_type: Note['sourceType'] | null;
     source_url: string | null;
     created_at: string;
@@ -84,6 +84,17 @@ export async function syncNotes(
     }
 
     // --- 3. NOTE SYNC ---
+
+    let supportsFolderId = true;
+    const { error: folderColumnCheckError } = await supabase.from('notes').select('folder_id').limit(1);
+    if (folderColumnCheckError) {
+        if (folderColumnCheckError.message.includes("'folder_id'")) {
+            supportsFolderId = false;
+        } else {
+            throw new Error(`Failed to verify folder column: ${folderColumnCheckError.message}`);
+        }
+    }
+
     const { data: remoteNotesData, error: remoteError } = await supabase
         .from('notes')
         .select('*');
@@ -116,7 +127,7 @@ export async function syncNotes(
                 content: remoteNote.content || '',
                 noteType: remoteNote.note_type || 'general',
                 subjectId: remoteNote.subject_id || undefined,
-                folderId: remoteNote.folder_id || undefined,
+                folderId: supportsFolderId ? remoteNote.folder_id || undefined : undefined,
                 sourceType: remoteNote.source_type || 'other',
                 sourceUrl: remoteNote.source_url,
                 createdAt: remoteNote.created_at,
@@ -141,24 +152,31 @@ export async function syncNotes(
 
     // Execute DB operations
     if (notesToUpsertToRemote.length > 0) {
-        const upsertData = notesToUpsertToRemote.map(n => ({
-            id: n.id,
-            user_id: userId,
-            title: n.title,
-            content: n.content,
-            note_type: n.noteType,
-            subject_id: n.subjectId,
-            folder_id: n.folderId,
-            source_type: n.sourceType,
-            source_url: n.sourceUrl,
-            created_at: n.createdAt,
-            updated_at: new Date(n.updatedAt).toISOString(),
-            note_date: n.noteDate,
-            key_insights: n.key_insights,
-            favorite: n.favorite,
-            attachments: n.attachments,
-            is_deleted: n.is_deleted || false,
-        }));
+        const upsertData = notesToUpsertToRemote.map(n => {
+            const base = {
+                id: n.id,
+                user_id: userId,
+                title: n.title,
+                content: n.content,
+                note_type: n.noteType,
+                subject_id: n.subjectId,
+                source_type: n.sourceType,
+                source_url: n.sourceUrl,
+                created_at: n.createdAt,
+                updated_at: new Date(n.updatedAt).toISOString(),
+                note_date: n.noteDate,
+                key_insights: n.key_insights,
+                favorite: n.favorite,
+                attachments: n.attachments,
+                is_deleted: n.is_deleted || false,
+            } as Record<string, unknown>;
+
+            if (supportsFolderId) {
+                base.folder_id = n.folderId ?? null;
+            }
+
+            return base;
+        });
         const { error } = await supabase.from('notes').upsert(upsertData);
         if (error) throw new Error(`Failed to upsert notes to Supabase: ${error.message}`);
     }
