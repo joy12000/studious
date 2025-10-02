@@ -25,7 +25,7 @@ const renderInlineContent = (text: string) => {
     const t = part.trim();
     if (t.startsWith('$$') && t.endsWith('$$')) return <BlockMath key={i}>{normalizeMathUnicode(part.slice(2, -2))}</BlockMath>;
     if (t.startsWith('$') && t.endsWith('$')) return <InlineMath key={i}>{normalizeMathUnicode(part.slice(1, -1))}</InlineMath>;
-    return <span key={i} dangerouslySetInnerHTML={{ __html: marked.parseInline(part, { gfm: true, breaks: true }) as string }} />;
+    return <span key={i} dangerouslySetInnerHTML={{ __html: marked.parseInline(part, { gfm: true, breaks: true, smartypants: false }) as string }} />;
   });
 };
 
@@ -208,7 +208,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
       }
 
       if (trimmed.startsWith('```')) {
-        const html = marked.parse(trimmed, { gfm: true, breaks: true }) as string;
+        const html = marked.parse(trimmed, { gfm: true, breaks: true, smartypants: false }) as string;
         return <div key={i} dangerouslySetInnerHTML={{ __html: html }} />;
       }
 
@@ -221,7 +221,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
 
         return (
           <details key={i} className="prose dark:prose-invert max-w-none my-4 border rounded-lg">
-            <summary className="cursor-pointer p-4 font-semibold" dangerouslySetInnerHTML={{ __html: marked.parseInline(summaryContent, { gfm: true, breaks: true }) }} />
+            <summary className="cursor-pointer p-4 font-semibold" dangerouslySetInnerHTML={{ __html: marked.parseInline(summaryContent, { gfm: true, breaks: true, smartypants: false }) }} />
             <div className="p-4 border-t">
               <MarkdownRenderer content={mainContent} />
             </div>
@@ -252,7 +252,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
         });
 
         // 2. Parse the markdown with placeholders
-        let finalHtml = marked.parse(stringWithPlaceholders, { gfm: true, breaks: true }) as string;
+        let finalHtml = marked.parse(stringWithPlaceholders, { gfm: true, breaks: true, smartypants: false }) as string;
 
         // 3. Pre-emptively decode any placeholders that were escaped inside code blocks
         finalHtml = finalHtml.replace(/&lt;!--KATEX_PLACEHOLDER_(\d+)--&gt;/g, '<!--KATEX_PLACEHOLDER_$1-->');
