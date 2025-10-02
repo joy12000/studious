@@ -210,7 +210,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
   const detectSuggestion = (text: string) => {
     const patterns = [
       /```suggestion\s*\r?\n기존 내용\s*\r?\n([\s\S]*?)\s*\r?\n===>\s*\r?\n새로운 내용\s*\r?\n([\s\S]*?)\s*```/,
-      /```suggestion\s*[\r\n]+기존\s*내용\s*[\r\n]+([\s\S]*?)[\\r\\n]+==+>\\s*[\\r\\n]+새로운\s*내용\s*[\\r\\n]+([\\s\\S]*?)[\\r\\n]*```/,
+      /```suggestion\s*[\r\n]+기존\s*내용\s*[\r\n]+([\s\S]*?)[\r\n]+==+>[\s\r\n]+새로운\s*내용\s*[\r\n]+([\s\S]*?)[\r\n]*```/,
     ];
     for (const pattern of patterns) {
       const match = text.match(pattern);
@@ -279,10 +279,10 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
     }
 
     const additionalContext = selectedNotes.length > 0 
-      ? selectedNotes.map(note => `--- 참고 노트: ${note.title} ---\\n${note.content}`).join('\\n\\n')
+      ? selectedNotes.map(note => `--- 참고 노트: ${note.title} ---\n${note.content}`).join('\n\n')
       : '';
     
-    const combinedNoteContext = [noteContext, additionalContext].filter(Boolean).join('\\n\\n');
+    const combinedNoteContext = [noteContext, additionalContext].filter(Boolean).join('\n\n');
 
     const history: GeminiHistory[] = [...messages, userMessage].map(msg => ({
       role: msg.sender === 'user' ? 'user' : 'model',
@@ -310,7 +310,7 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\\n');
+        const lines = buffer.split('\n');
         buffer = lines.pop() || '';
         for (const line of lines) {
           if (line.startsWith('data: ')) {
