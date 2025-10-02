@@ -77,9 +77,10 @@ class handler(BaseHTTPRequestHandler):
                 -   예시: `<dfn title="매질 없이 열이 직접 전달되는 현상">복사</dfn>`
 
             4.  **이미지 (Image):**
-            -   **절대로 외부 이미지 링크(예: `imgur.com`)를 생성하거나 사용하지 마세요.**
-            -   학습 자료에 포함된 이미지를 본문에 삽입해야 할 경우, `[이미지: 이미지에 대한 상세한 설명]` 형식의 텍스트 설명으로 대체하세요. 이 설명은 이미지를 보지 않고도 내용을 이해할 수 있을 만큼 구체적이어야 합니다.
-            -   예시: `[이미지: 뉴런의 구조를 보여주는 다이어그램. 세포체, 축삭, 수상돌기가 표시되어 있음.]`
+            -   본문에 이미지를 포함해야 할 경우, 내가 제공하는 공개 URL을 사용해야 합니다. 각 이미지는 `--- 다음은 이미지 #N에 대한 컨텍스트입니다. 이 이미지의 공개 URL은 [URL] 입니다. ---` 형식으로 제공됩니다.
+            -   이미지를 삽입할 때는 반드시 `<img src="[제공된 URL]" alt="이미지에 대한 상세한 설명"/>` HTML 태그를 사용하세요. `alt` 속성에는 이미지를 보지 않고도 내용을 이해할 수 있을 만큼 구체적인 설명을 포함해야 합니다.
+            -   **절대로 `imgur.com` 등 외부 이미지 링크를 생성하거나 사용하지 마세요.** 제공된 URL만 사용해야 합니다.
+            -   예시: `<img src="https://.../image.png" alt="뉴런의 구조를 보여주는 다이어그램. 세포체, 축삭, 수상돌기가 표시되어 있음."/>`
 
             # 🖼️ 절대 규칙: 모든 시각 자료는 반드시 지정된 언어의 코드 블록 안에 포함하여 출력해야 합니다. 이 규칙은 선택이 아닌 필수입니다. 코드 블록 바깥에 순수한 JSON이나 다이어그램 코드를 절대로 출력해서는 안 됩니다. 이 규칙을 위반한 출력은 실패한 것으로 간주됩니다.
 
@@ -142,6 +143,7 @@ class handler(BaseHTTPRequestHandler):
             
             request_contents = [prompt]
             text_materials = []
+            image_counter = 1
             import google.ai.generativelanguage as glm
 
             for url in blob_urls:
@@ -152,7 +154,10 @@ class handler(BaseHTTPRequestHandler):
                     content_type = response.headers.get('content-type', 'application/octet-stream')
 
                     if 'image/' in content_type:
+                        request_contents.append(f"--- 다음은 이미지 #{image_counter}에 대한 컨텍스트입니다. 이 이미지의 공개 URL은 {url} 입니다. ---")
                         request_contents.append(Image.open(io.BytesIO(file_content)))
+                        request_contents.append(f"--- 이미지 #{image_counter}의 끝 ---")
+                        image_counter += 1
                     elif 'application/pdf' in content_type:
                         request_contents.append(glm.Part(inline_data=glm.Blob(mime_type='application/pdf', data=file_content)))
                     else:
