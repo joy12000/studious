@@ -195,7 +195,7 @@ export default function HomePage() {
 
         <div className="flex-grow-[1]"></div>
 
-        <div className="w-full max-w-3xl text-center">
+        <div className="w-full max-w-3xl text-center mb-8">
           <div className="relative flex items-center w-full gap-2 bg-card border rounded-full p-2 shadow-lg">
             <Popover>
               <PopoverTrigger asChild>
@@ -237,7 +237,7 @@ export default function HomePage() {
             </form>
           </div>
 
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-xl mx-auto">
             <Card 
               className="text-left hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
               onClick={() => navigate('/textbook')}
