@@ -172,6 +172,43 @@ export default function NotePage() {
   const [initialChatMessage, setInitialChatMessage] = useState<string | undefined>();
   const [isConverting, setIsConverting] = useState(false);
   const [selectedAttachment, setSelectedAttachment] = useState<Attachment | null>(null); // ✨ 뷰어에서 볼 파일 상태
+
+  const [chatPanelWidth, setChatPanelWidth] = useState(450);
+  const resizeRef = useRef<HTMLDivElement>(null);
+  const chatPanelRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const getInitialWidth = () => {
+      const screenWidth = window.innerWidth;
+      if (screenWidth >= 1280) return screenWidth * 0.35;
+      if (screenWidth >= 1024) return screenWidth * 0.40;
+      return screenWidth * 0.46;
+    };
+    setChatPanelWidth(getInitialWidth());
+  }, []);
+
+  const handleMouseDownOnResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = chatPanelRef.current?.offsetWidth || chatPanelWidth;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = startWidth + e.clientX - startX;
+      const minWidth = window.innerWidth * 0.2;
+      const maxWidth = window.innerWidth * 0.8;
+      if (newWidth > minWidth && newWidth < maxWidth) {
+        setChatPanelWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
   
   const chatMessagesRef = useRef<Message[]>();
 
@@ -509,7 +546,12 @@ export default function NotePage() {
     <>
       <div className="flex h-screen w-full overflow-hidden">
             {/* ChatUI Panel */}
-            <div className={`h-full transition-all duration-300 ease-in-out flex-shrink-0 bg-background border-r ${isChatOpen ? 'w-[46vw] lg:w-[40vw] xl:w-[35vw]' : 'w-0'}`}>
+            <div
+              ref={chatPanelRef}
+              style={{ width: isChatOpen ? chatPanelWidth : 0 }}
+              className={`h-full flex-shrink-0 bg-background border-r overflow-hidden ${
+                isChatOpen ? 'transition-none' : 'transition-all duration-300 ease-in-out'
+              }`}>
                         {isChatOpen && <ChatUI 
                             noteContext={fullNoteContext} 
                             onClose={() => {
@@ -521,6 +563,15 @@ export default function NotePage() {
                         noteId={note.id}
                         onSuggestionAccepted={handleSuggestionAccepted}
                       />}         </div>
+
+            {/* Resizer */}
+            {isChatOpen && (
+              <div
+                ref={resizeRef}
+                className="w-1.5 h-full cursor-col-resize bg-muted hover:bg-primary/20 transition-colors"
+                onMouseDown={handleMouseDownOnResize}
+              />
+            )}
         
         {/* Note Content Panel */}
         <div className={`flex h-full flex-col bg-background flex-1 min-w-0`}>
