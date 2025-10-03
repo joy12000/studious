@@ -265,7 +265,7 @@ export default function HomePage() {
             </form>
           </div>
 
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="mt-24 grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card 
               className="text-left hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
               onClick={() => navigate('/textbook')}
