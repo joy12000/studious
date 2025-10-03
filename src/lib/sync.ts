@@ -10,7 +10,6 @@ type RemoteNote = {
     content: string | null;
     note_type: Note['noteType'] | null;
     subject_id: string | null;
-    folder_id: string | null;
     source_type: Note['sourceType'] | null;
     source_url: string | null;
     created_at: string;
@@ -116,7 +115,6 @@ export async function syncNotes(
                 content: remoteNote.content || '',
                 noteType: remoteNote.note_type || 'general',
                 subjectId: remoteNote.subject_id || undefined,
-                folderId: remoteNote.folder_id || undefined,
                 sourceType: remoteNote.source_type || 'other',
                 sourceUrl: remoteNote.source_url,
                 createdAt: remoteNote.created_at,
@@ -148,7 +146,6 @@ export async function syncNotes(
             content: n.content,
             note_type: n.noteType,
             subject_id: n.subjectId,
-            folder_id: n.folderId,
             source_type: n.sourceType,
             source_url: n.sourceUrl,
             created_at: n.createdAt,
