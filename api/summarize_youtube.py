@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler
 # ==============================================================================
 # CONFIGURATION
 # ==============================================================================
-GENAI_MODEL = os.getenv("GENAI_MODEL", "models/gemini-2.5-flash")
+GENAI_MODEL = os.getenv("GENAI_MODEL", "models/gemini-1.5-flash") # 모델명을 최신으로 업데이트하는 것을 권장합니다.
 API_KEY = os.getenv("GEMINI_API_KEY_QUATERNARY")
 APIFY_ENDPOINT = os.getenv("APIFY_ENDPOINT")
 APIFY_TOKEN = os.getenv("APIFY_TOKEN")
@@ -52,10 +52,47 @@ COMBINED_PROMPT = """당신은 영상 콘텐츠 요약 및 분류 전문가입�
 {text}
 """
 
+# ✨ 강의/학습용 상세 요약 프롬프트 추가
+DETAILED_PROMPT = """당신은 뛰어난 학습 노트 정리 전문가입니다.
+제공된 영상 스크립트를 분석하여, 학생들이 학습 내용을 놓치지 않도록 상세하고 구조화된 학습 노트를 생성해주세요.
+
+[학습 노트 생성 규칙]
+- **목표:** 단순 요약이 아닌, **학습 내용을 충실하게 전달**하는 것이 목표입니다. 원본의 핵심 내용, 예시, 단계별 설명 등을 생략하지 마세요.
+- **구조화:**
+  - `##` (h2)와 `###` (h3) 마크다운을 사용하여 내용의 계층 구조를 명확히 표현하세요.
+  - 중요한 항목은 `- 글머리 기호`나 `1. 숫자 목록`을 사용하여 체계적으로 정리합니다.
+- **가독성 (마크다운):**
+  - 핵심 키워드나 문장은 `**굵은 글씨**`로 강조하세요.
+  - 개념을 명확히 구분해야 할 경우, `---`를 사용하여 수평선을 추가할 수 있습니다.
+  - 문단과 문단 사이는 줄바꿈을 확실히 하여 시각적으로 분리합니다.
+- **JSON 이스케이프:** `summary` 필드 내의 모든 특수 문자(예: `\n`, `\t`)는 JSON 규칙에 따라 이중 백슬래시로 이스케이프 처리(`\\n`, `\\t`)되어야 합니다.
+
+[분류 규칙]
+1.  **제목 (`title`):** 학습 노트의 핵심 주제를 담아 명확하게 생성합니다.
+2.  **주제 태그 (`tag`):** 영상의 대주제를 나타내는 가장 포괄적인 단 하나의 단어로 생성합니다. (예: IT, 경제, 과학, 역사, 자기계발, 건강, 문화, 시사, 예능, 교육)
+
+[결과 출력 형식]
+- 반드시 아래 JSON 형식에 맞춰 응답해야 합니다.
+- `summary`는 내용이 길어지더라도, 전체 JSON 구조가 깨지지 않도록 완벽하게 마무리되어야 합니다.
+
+{{
+  "title": "AI가 생성한 학습 노트 제목",
+  "tag": "AI가 생성한 포괄적 주제 태그",
+  "summary": "마크다운으로 구조화된, 원본의 핵심 내용과 구조를 최대한 보존한 상세 학습 노트 본문.",
+  "key_insights": [
+    "학습자가 반드시 기억해야 할 핵심 원리 또는 개념 1",
+    "강의에서 강조된 중요한 시사점 또는 결론 2",
+    "주요 용어 또는 주목할 만한 데이터"
+  ]
+}}
+
+[Transcript]
+{text}
+"""
+
 # ==============================================================================
 # HELPER FUNCTIONS
 # ==============================================================================
-
 
 def extract_first_json(text: str):
     """Finds and decodes the first valid JSON object block in a string."""
@@ -88,7 +125,7 @@ def get_transcript_from_apify(youtube_url: str) -> str:
     print(f"--- DEBUGGING ---")
     print(f"APIFY_ENDPOINT from env: {os.getenv("APIFY_ENDPOINT")}")
     print(f"APIFY_TOKEN from env is set: {bool(os.getenv("APIFY_TOKEN"))}")
-    
+
     if not APIFY_ENDPOINT or not APIFY_TOKEN:
         raise ValueError("APIFY_ENDPOINT and APIFY_TOKEN must be set.")
 
@@ -120,15 +157,19 @@ def get_transcript_from_apify(youtube_url: str) -> str:
             text_parts.append(item)
 
     full_text = " ".join(text_parts).strip()
-    
+
     if len(full_text) < 50:
         raise ValueError("Transcript from Apify is too short or empty.")
 
     return full_text
 
-def summarize_text(model, text: str):
+def summarize_text(model, text: str, summary_type: str = 'default'):
     """Summarizes and categorizes text content using the Gemini API."""
-    prompt = COMBINED_PROMPT.format(text=text)
+    if summary_type == 'lecture':
+        prompt = DETAILED_PROMPT.format(text=text)
+    else:
+        prompt = COMBINED_PROMPT.format(text=text)
+
     resp = model.generate_content(prompt)
     result_data = extract_first_json(resp.text)
     return result_data
@@ -152,7 +193,9 @@ class Handler(BaseHTTPRequestHandler):
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             body = json.loads(post_data)
+
             url = body.get("youtubeUrl")
+            summary_type = body.get("summaryType", "default") # 'summaryType' 파라미터 받기
 
             if not url:
                 return self._send_json(400, {"error": "youtubeUrl is required."})
@@ -161,14 +204,14 @@ class Handler(BaseHTTPRequestHandler):
             model = genai.GenerativeModel(GENAI_MODEL)
 
             transcript = get_transcript_from_apify(url)
-            result = summarize_text(model, transcript)
-            
+            result = summarize_text(model, transcript, summary_type) # summary_type 전달
+
             return self._send_json(200, {**result, "mode": "transcript", "sourceUrl": url})
 
         except (ValueError, TypeError) as e:
             return self._send_json(400, {"error": str(e)})
         except requests.HTTPError as e:
-            try: 
+            try:
                 error_details = e.response.json()
             except:
                 error_details = e.response.text[:200]

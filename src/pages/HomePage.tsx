@@ -1,17 +1,13 @@
 import { generateFallbackIconDataUrl } from '../lib/utils';
-
 import React, { useState, useEffect } from "react";
 import { useNotes } from "../lib/useNotes";
 import { useNavigate, useLocation } from "react-router-dom";
 import toast from 'react-hot-toast';
-import { Loader2, Youtube, ArrowRight, File, BrainCircuit, AppWindow, Pencil, Check, Trash2, Plus, ExternalLink } from "lucide-react";
+import { Loader2, Youtube, ArrowRight, File, BrainCircuit, AppWindow, Pencil, Check, Trash2, Plus, ExternalLink, Book } from "lucide-react"; // Book 아이콘 추가
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-
-
-
-
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"; // ToggleGroup 컴포넌트 import
 
 interface ExternalLinkItem {
   id: string;
@@ -37,12 +33,12 @@ export default function HomePage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
-  
+  const [summaryType, setSummaryType] = useState('default'); // ✨ 요약 타입 상태 추가
 
-  const [externalLinks, setExternalLinks] = useState<ExternalLinkItem[]>([]); // Add externalLinks state
-  const [isEditLinks, setIsEditLinks] = useState(false); // Add isEditLinks state
+  const [externalLinks, setExternalLinks] = useState<ExternalLinkItem[]>([]);
+  const [isEditLinks, setIsEditLinks] = useState(false);
 
-  useEffect(() => { // useEffect for loading links from localStorage
+  useEffect(() => {
     try {
       const storedLinks = localStorage.getItem(LINKS_STORAGE_KEY);
       if (storedLinks) {
@@ -56,12 +52,12 @@ export default function HomePage() {
     }
   }, []);
 
-  const saveLinks = (links: ExternalLinkItem[]) => { // saveLinks function
+  const saveLinks = (links: ExternalLinkItem[]) => {
     setExternalLinks(links);
     localStorage.setItem(LINKS_STORAGE_KEY, JSON.stringify(links));
   };
 
-  const handleAddLink = () => { // handleAddLink function
+  const handleAddLink = () => {
     const name = prompt("추가할 사이트의 이름을 입력하세요:");
     if (!name) return;
     const url = prompt(`'${name}'의 전체 주소(URL)를 입력하세요 (https:// 포함):`);
@@ -82,13 +78,11 @@ export default function HomePage() {
     }
   };
 
-  const handleDeleteLink = (id: string) => { // handleDeleteLink function
+  const handleDeleteLink = (id: string) => {
     if (confirm("이 바로가기를 삭제하시겠습니까?")) {
       saveLinks(externalLinks.filter(link => link.id !== id));
     }
   };
-
-
 
   const handleYoutubeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,7 +95,7 @@ export default function HomePage() {
     try {
       await startBackgroundTask({
         noteType: 'youtube_summary',
-        payload: { youtubeUrl },
+        payload: { youtubeUrl, summaryType }, // ✨ summaryType을 payload에 추가
       });
       toast.success('YouTube 요약이 백그라운드에서 시작되었습니다!');
       setYoutubeUrl('');
@@ -122,7 +116,7 @@ export default function HomePage() {
         try {
           await startBackgroundTask({
             noteType: 'youtube_summary',
-            payload: { youtubeUrl: shareUrl },
+            payload: { youtubeUrl: shareUrl, summaryType: 'default' }, // 공유 기능은 기본 요약 사용
           });
           toast.dismiss();
           toast.success('백그라운드에서 요약이 시작되었습니다!');
@@ -136,7 +130,6 @@ export default function HomePage() {
       processShare();
     }
   }, []); // Run only once on mount
-
 
   return (
     <>
@@ -203,6 +196,23 @@ export default function HomePage() {
         <div className="flex-grow-[1]"></div>
 
         <div className="w-full max-w-xl text-center">
+          {/* ✨ 요약 타입 선택 UI 추가 */}
+          <ToggleGroup 
+            type="single" 
+            value={summaryType} 
+            onValueChange={(value) => { if (value) setSummaryType(value); }}
+            className="mb-4"
+          >
+            <ToggleGroupItem value="default" aria-label="일반 요약">
+              <Book className="h-4 w-4 mr-2" />
+              일반 요약
+            </ToggleGroupItem>
+            <ToggleGroupItem value="lecture" aria-label="강의 노트">
+              <BrainCircuit className="h-4 w-4 mr-2" />
+              강의 노트
+            </ToggleGroupItem>
+          </ToggleGroup>
+          
           <form onSubmit={handleYoutubeSubmit} className="flex items-center gap-2 bg-card border rounded-full p-2 shadow-lg w-full">
             <Youtube className="h-5 w-5 text-muted-foreground ml-3 flex-shrink-0" />
             <input
