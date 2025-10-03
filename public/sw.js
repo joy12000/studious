@@ -151,8 +151,8 @@ self.addEventListener('message', (event) => {
 
         const result = await response.json();
 
-        // Determine noteType based on the response structure
-        const noteType = result.key_terms ? 'lecture' : 'general';
+        // Determine noteType based on the new response structure
+        const noteType = result.review_questions ? 'lecture' : 'general';
 
         const updatePayload = {
           title: result.title,
@@ -161,7 +161,7 @@ self.addEventListener('message', (event) => {
           updatedAt: Date.now(),
           sourceUrl: result.sourceUrl,
           ...(result.key_insights && { key_insights: result.key_insights }),
-          ...(result.key_terms && { key_terms: result.key_terms }),
+          // key_terms is no longer sent, it's embedded in the summary with <dfn>
           ...(result.review_questions && { review_questions: result.review_questions }),
           ...(result.further_study && { further_study: result.further_study }),
         };
