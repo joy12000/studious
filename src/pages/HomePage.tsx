@@ -1,13 +1,13 @@
 import { generateFallbackIconDataUrl } from '../lib/utils';
 import React, { useState, useEffect } from "react";
-import { useNotes } from "../lib/useNotes";
+import { useNotes, Subject } from "../lib/useNotes";
 import { useNavigate, useLocation } from "react-router-dom";
 import toast from 'react-hot-toast';
-import { Loader2, Youtube, ArrowRight, File, BrainCircuit, AppWindow, Pencil, Check, Trash2, Plus, ExternalLink, Book, ChevronsUpDown } from "lucide-react"; // Book 아이콘 추가
+import { Loader2, Youtube, ArrowRight, File, BrainCircuit, AppWindow, Pencil, Check, Trash2, Plus, ExternalLink, Book, ChevronsUpDown, BookMarked } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"; // ToggleGroup 컴포넌트 import
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 interface ExternalLinkItem {
   id: string;
@@ -27,13 +27,15 @@ const defaultLinks: ExternalLinkItem[] = [
 const LINKS_STORAGE_KEY = 'studious-external-links';
 
 export default function HomePage() {
-  const { startBackgroundTask } = useNotes();
+  const { startBackgroundTask, allSubjects } = useNotes();
   const navigate = useNavigate();
   const location = useLocation();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [youtubeUrl, setYoutubeUrl] = useState('');
-  const [summaryType, setSummaryType] = useState('default'); // ✨ 요약 타입 상태 추가
+  const [summaryType, setSummaryType] = useState('default');
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+  const [isSubjectPopoverOpen, setIsSubjectPopoverOpen] = useState(false);
 
   const [externalLinks, setExternalLinks] = useState<ExternalLinkItem[]>([]);
   const [isEditLinks, setIsEditLinks] = useState(false);
@@ -64,12 +66,11 @@ export default function HomePage() {
     if (!url) return;
 
     try {
-      const domain = new URL(url).hostname;
       const newLink: ExternalLinkItem = {
         id: crypto.randomUUID(),
         name,
         url,
-        iconUrl: '', // Directly use empty string to force fallback for user-added links
+        iconUrl: '', 
         fallbackIconDataUrl: generateFallbackIconDataUrl(name)
       };
       saveLinks([...externalLinks, newLink]);
@@ -93,12 +94,19 @@ export default function HomePage() {
     
     setIsSubmitting(true);
     try {
+      const payload = {
+        youtubeUrl,
+        summaryType,
+        subjectId: summaryType === 'lecture' ? selectedSubject?.id : undefined,
+      };
+
       await startBackgroundTask({
         noteType: 'youtube_summary',
-        payload: { youtubeUrl, summaryType }, // ✨ summaryType을 payload에 추가
+        payload: payload,
       });
       toast.success('YouTube 요약이 백그라운드에서 시작되었습니다!');
       setYoutubeUrl('');
+      setSelectedSubject(null);
     } catch (error) {
       console.error("YouTube 요약 시작 중 오류 발생:", error);
       toast.error(`요약 시작 중 오류가 발생했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
@@ -116,20 +124,20 @@ export default function HomePage() {
         try {
           await startBackgroundTask({
             noteType: 'youtube_summary',
-            payload: { youtubeUrl: shareUrl, summaryType: 'default' }, // 공유 기능은 기본 요약 사용
+            payload: { youtubeUrl: shareUrl, summaryType: 'default' },
           });
           toast.dismiss();
           toast.success('백그라운드에서 요약이 시작되었습니다!');
-          navigate('.', { replace: true }); // Clear query params
+          navigate('.', { replace: true });
         } catch (error) {
           toast.dismiss();
           toast.error(`요약 시작 중 오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
-          navigate('.', { replace: true }); // Clear query params
+          navigate('.', { replace: true });
         }
       };
       processShare();
     }
-  }, []); // Run only once on mount
+  }, []);
 
   return (
     <>
@@ -219,6 +227,26 @@ export default function HomePage() {
                 </ToggleGroup>
               </PopoverContent>
             </Popover>
+
+            {summaryType === 'lecture' && (
+              <Popover open={isSubjectPopoverOpen} onOpenChange={setIsSubjectPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" role="combobox" className="rounded-full px-4 py-2 flex-shrink-0 w-[150px] justify-between">
+                    <BookMarked className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                    <span className="truncate">{selectedSubject ? selectedSubject.name : "과목 선택"}</span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[150px] p-0">
+                  {(allSubjects || []).map((subject) => (
+                    <Button key={subject.id} variant="ghost" className="w-full justify-start" onClick={() => { setSelectedSubject(subject); setIsSubjectPopoverOpen(false); }}>
+                      <Check className={`mr-2 h-4 w-4 ${selectedSubject?.id === subject.id ? 'opacity-100' : 'opacity-0'}`} />
+                      {subject.name}
+                    </Button>
+                  ))}
+                </PopoverContent>
+              </Popover>
+            )}
 
             <div className="h-6 w-px bg-border mx-1"></div>
 
