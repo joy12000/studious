@@ -196,7 +196,7 @@ export default function HomePage() {
         <div className="flex-grow-[1]"></div>
 
         <div className="w-full max-w-3xl text-center">
-          <div className="relative flex items-center w-full gap-2 bg-card border rounded-full p-2 shadow-lg">
+          <div className="relative flex items-center w-full gap-2 bg-card border rounded-full p-2 shadow-lg mb-8">
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="ghost" className="rounded-full px-4 py-2 flex-shrink-0">
