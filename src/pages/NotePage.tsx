@@ -205,7 +205,7 @@ export default function NotePage() {
     return context;
   }, [note]);
 
-  const isLearningNote = useMemo(() => note?.key_terms || note?.review_questions || note?.further_study, [note]);
+  const isLearningNote = useMemo(() => note?.noteType === 'lecture', [note]);
 
   // ✨ 첨부 파일 클릭 핸들러 추가
   const handleAttachmentClick = (attachment: Attachment) => {
@@ -331,11 +331,11 @@ export default function NotePage() {
   };
   
   const textbookSections = useMemo(() => {
-    if (note && (note.noteType === 'textbook' || isLearningNote)) {
+    if (note && (note.noteType === 'textbook' || note.noteType === 'lecture')) {
       return parseTextbookContent(note.content);
     }
     return [];
-  }, [note, isLearningNote]);
+  }, [note]);
 
   const handleSuggestionAccepted = (suggestion: { old: string; new: string }) => {
     if (!note) return;

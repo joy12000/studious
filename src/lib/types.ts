@@ -6,7 +6,7 @@ export type SourceType = typeof SOURCE_TYPES[number];
 export const THEMES = ['light', 'dark'] as const;
 export type Theme = typeof THEMES[number];
 
-export type NoteType = 'general' | 'review' | 'textbook' | 'assignment';
+export type NoteType = 'general' | 'review' | 'textbook' | 'assignment' | 'lecture';
 
 export type FileAttachment = {
   id: string;

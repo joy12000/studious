@@ -151,10 +151,13 @@ self.addEventListener('message', (event) => {
 
         const result = await response.json();
 
+        // Determine noteType based on the response structure
+        const noteType = result.key_terms ? 'lecture' : 'general';
+
         const updatePayload = {
           title: result.title,
           content: result.summary,
-          noteType: 'general',
+          noteType: noteType, // Set the determined noteType
           updatedAt: Date.now(),
           sourceUrl: result.sourceUrl,
           ...(result.key_insights && { key_insights: result.key_insights }),
