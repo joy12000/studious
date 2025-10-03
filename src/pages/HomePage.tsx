@@ -195,7 +195,7 @@ export default function HomePage() {
 
         <div className="flex-grow-[1]"></div>
 
-        <div className="w-full max-w-xl text-center">
+        <div className="w-full max-w-3xl text-center">
           <div className="relative flex items-center w-full gap-2 bg-card border rounded-full p-2 shadow-lg">
             <Popover>
               <PopoverTrigger asChild>
