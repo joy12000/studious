@@ -458,9 +458,14 @@ export function useNotes(defaultFilters?: Filters) {
             sourceType: noteData.sourceType || 'other',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().getTime(),
-                    favorite: false,
-                    key_insights: [],
-                    ...noteData,        };
+            favorite: false,
+            key_insights: [],
+            attachments: [],
+            subjectId: noteData.subjectId,
+            folderId: noteData.folderId,
+            noteDate: noteData.noteDate,
+            sourceUrl: noteData.sourceUrl,
+        };
         await db.notes.add(newNote);
         return newNote;
     }, []);
