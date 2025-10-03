@@ -331,11 +331,11 @@ export default function NotePage() {
   };
   
   const textbookSections = useMemo(() => {
-    if (note && note.noteType === 'textbook') {
+    if (note && (note.noteType === 'textbook' || isLearningNote)) {
       return parseTextbookContent(note.content);
     }
     return [];
-  }, [note]);
+  }, [note, isLearningNote]);
 
   const handleSuggestionAccepted = (suggestion: { old: string; new: string }) => {
     if (!note) return;
