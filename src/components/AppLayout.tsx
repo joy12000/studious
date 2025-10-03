@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Home, Settings, X, List, Menu, Calendar, GraduationCap, LayoutDashboard, BrainCircuit, MessageCircle } from 'lucide-react';
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from 'framer-motion';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react";
 
 import { Toaster } from 'react-hot-toast';
@@ -160,13 +161,21 @@ const AppLayout = ({ children, SignedIn, SignedOut, SignInButton, SignUpButton, 
                 </Button>
 
                 {/* Page Content */}
-                <main className={`flex-1 flex flex-col p-4 pt-12 sm:p-6 ${
-                    ['/notes', '/review-deck', '/assignment', '/schedule'].includes(location.pathname)
-                        ? 'overflow-y-auto'
-                        : ''
-                }`}>
-                    {children}
-                </main>
+                <AnimatePresence mode="wait">
+                  <motion.main
+                    key={location.pathname}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className={`flex-1 flex flex-col p-4 pt-12 sm:p-6 ${
+                        ['/notes', '/review-deck', '/assignment', '/schedule'].includes(location.pathname)
+                            ? 'overflow-y-auto'
+                            : ''
+                    }`}>
+                      {children}
+                  </motion.main>
+                </AnimatePresence>
             </div>
         </div>
     </SidebarContext.Provider>
