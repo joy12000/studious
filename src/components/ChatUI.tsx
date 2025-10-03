@@ -5,6 +5,7 @@ import { ArrowUp, Loader2, RefreshCw, Copy, Save, ChevronsUpDown, Check, X, Ligh
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import MarkdownRenderer from './MarkdownRenderer';
+import { SuggestionBlock } from './SuggestionBlock';
 import { useNotes } from '../lib/useNotes';
 import { upload } from '@vercel/blob/client';
 import { convertPdfToImages } from '../lib/pdfUtils';
@@ -456,8 +457,24 @@ export const ChatUI: React.FC<ChatUIProps> = ({ noteContext = '무엇이든 물�
             {messages.map((msg) => (
               <div key={msg.id} className={`flex items-start gap-3 group ${msg.sender === 'user' ? 'justify-end' : ''}`}>
                 {msg.sender === 'bot' && <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center flex-shrink-0">AI</div>}
-                <div className={`relative px-4 py-1 rounded-lg max-w-xl prose dark:prose-invert prose-p:my-0 ${msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
-                  <MarkdownRenderer content={msg.content} />
+                <div className={`relative px-4 py-1 rounded-lg max-w-xl ${msg.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                  <div className="prose dark:prose-invert prose-p:my-0">
+                    <MarkdownRenderer content={msg.content.replace(/```suggestion[\s\S]*?```/, '').trim()} />
+                  </div>
+                  {msg.suggestion && (
+                    <SuggestionBlock
+                      oldContent={msg.suggestion.old}
+                      newContent={msg.suggestion.new}
+                      onAccept={(newContent) => {
+                        if (onSuggestionAccepted) {
+                          onSuggestionAccepted({ old: msg.suggestion.old, new: newContent });
+                        }
+                      }}
+                      onReject={() => {
+                        // The block will hide itself.
+                      }}
+                    />
+                  )}
                 </div>
               </div>
             ))}
