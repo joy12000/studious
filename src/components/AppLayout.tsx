@@ -105,6 +105,7 @@ interface AppLayoutProps {
 }
 
 import { Outlet, useLocation } from 'react-router-dom';
+import { motion } from 'framer-motion';
 
 // ... (imports and other components remain the same)
 
