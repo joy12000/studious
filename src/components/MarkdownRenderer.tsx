@@ -179,7 +179,7 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   const renderParts = () => {
     if (!content) return null;
     // Un-escape newline characters for content coming from the API
-    const processedContent = content.replace(/\\n/g, '\n');
+    const processedContent = content.replace(/\\n/g, '\n').replace(/\cdotp/g, '\\cdot');
     const blockRegex = /(```(?:mermaid|visual|chart|[\s\S]*?)```|<details[\s\S]*?<\/details>|[\s\S]+?(?=```|<details|$))/g;
     const blocks = processedContent.match(blockRegex) || [];
 
