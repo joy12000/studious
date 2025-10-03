@@ -9,7 +9,7 @@ import MarkdownRenderer from '../components/MarkdownRenderer';
 import { convertPdfToImages } from '../lib/pdfUtils';
 import { v4 as uuidv4 } from 'uuid';
 import { 
-  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit, Bot, ChevronsUpDown, ClipboardCopy, List, MessageSquarePlus, Loader2
+  ArrowLeft, ExternalLink, Calendar, Edit, Check, X, Star, Trash2, Share2, Youtube, BrainCircuit, Bot, ChevronsUpDown, ClipboardCopy, List, MessageSquarePlus, Loader2, Lightbulb, HelpCircle, BookOpen, Key
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,18 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ErrorBoundary from '../components/ErrorBoundary'; // ErrorBoundary 임포트
 import FileViewer from '../components/FileViewer'; // ✨ FileViewer 임포트
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+
+interface LearningNote extends Note {
+  key_terms?: { term: string; definition: string; }[];
+  review_questions?: string[];
+  further_study?: string[];
+}
 
 type TextbookSection = {
   title: string;
@@ -148,7 +160,7 @@ export default function NotePage() {
   const navigate = useNavigate();
   const { getNote, updateNote, deleteNote, getQuiz, addQuizToReviewDeck } = useNotes();
   
-  const [note, setNote] = useState<Note | null>(null);
+  const [note, setNote] = useState<LearningNote | null>(null);
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -192,6 +204,8 @@ export default function NotePage() {
     }
     return context;
   }, [note]);
+
+  const isLearningNote = useMemo(() => note?.key_terms || note?.review_questions || note?.further_study, [note]);
 
   // ✨ 첨부 파일 클릭 핸들러 추가
   const handleAttachmentClick = (attachment: Attachment) => {
@@ -611,9 +625,73 @@ export default function NotePage() {
                           </ErrorBoundary>
                         </div>
                       )}
-                      {note.key_insights && note.key_insights.length > 0 && (
+                      {/* 새로운 학습 섹션 렌더링 */}
+                      {!editing && isLearningNote && (
+                        <div className="mt-12">
+                          <h2 className="text-2xl font-bold mb-4 border-b pb-2">학습 도구</h2>
+                          <Accordion type="multiple" defaultValue={['key_terms', 'review_questions']} className="w-full">
+                            
+                            {note.key_terms && note.key_terms.length > 0 && (
+                              <AccordionItem value="key_terms">
+                                <AccordionTrigger className="text-lg font-semibold">
+                                  <div className="flex items-center gap-2">
+                                    <Key className="h-5 w-5" /> 주요 용어
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                  <ul className="space-y-4 mt-2">
+                                    {note.key_terms.map((item, index) => (
+                                      <li key={index} className="p-4 bg-muted/50 rounded-lg">
+                                        <p className="font-bold text-md">{item.term}</p>
+                                        <p className="text-muted-foreground mt-1">{item.definition}</p>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </AccordionContent>
+                              </AccordionItem>
+                            )}
+
+                            {note.review_questions && note.review_questions.length > 0 && (
+                              <AccordionItem value="review_questions">
+                                <AccordionTrigger className="text-lg font-semibold">
+                                   <div className="flex items-center gap-2">
+                                    <HelpCircle className="h-5 w-5" /> 복습 퀴즈
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                  <ul className="list-decimal list-inside space-y-3 mt-2 pl-2">
+                                    {note.review_questions.map((q, index) => (
+                                      <li key={index} className="text-md">{q}</li>
+                                    ))}
+                                  </ul>
+                                </AccordionContent>
+                              </AccordionItem>
+                            )}
+                            
+                            {note.further_study && note.further_study.length > 0 && (
+                               <AccordionItem value="further_study">
+                                <AccordionTrigger className="text-lg font-semibold">
+                                   <div className="flex items-center gap-2">
+                                    <BookOpen className="h-5 w-5" /> 심화 학습
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent>
+                                   <ul className="list-disc list-inside space-y-3 mt-2 pl-2">
+                                    {note.further_study.map((s, index) => (
+                                      <li key={index} className="text-md">{s}</li>
+                                    ))}
+                                  </ul>
+                                </AccordionContent>
+                              </AccordionItem>
+                            )}
+                          </Accordion>
+                        </div>
+                      )}
+
+                      {/* 기존 'key_insights' 섹션 (일반 요약 시 표시) */}
+                      {!editing && !isLearningNote && note.key_insights && note.key_insights.length > 0 && (
                         <div className="mt-8">
-                          <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">💡 핵심 인사이트</h3>
+                          <h3 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2"><Lightbulb className="h-5 w-5"/> 핵심 인사이트</h3>
                           <div className="space-y-3">
                             {note.key_insights.map((insight, index) => (
                               <div key={index} className="flex items-start gap-3 p-4 bg-primary/5 border-l-4 border-primary/40 rounded-r-lg">
