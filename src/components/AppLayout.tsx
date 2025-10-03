@@ -3,7 +3,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Home, Settings, X, List, Menu, Calendar, GraduationCap, LayoutDashboard, BrainCircuit, MessageCircle } from 'lucide-react';
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from 'framer-motion';
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/clerk-react";
 
 import { Toaster } from 'react-hot-toast';
@@ -105,11 +104,13 @@ interface AppLayoutProps {
   UserButton: typeof UserButton;
 }
 
-const AppLayout = ({ children, SignedIn, SignedOut, SignInButton, SignUpButton, UserButton }: AppLayoutProps) => {
+import { Outlet, useLocation } from 'react-router-dom';
+
+// ... (imports and other components remain the same)
+
+const AppLayout = ({ SignedIn, SignedOut, SignInButton, SignUpButton, UserButton }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktopCollapsed, setIsDesktopCollapsed] = useState(true);
-  const [isMobileNavCollapsed, setIsMobileNavCollapsed] = useState(true);
-
   const location = useLocation();
 
   const handleLinkClick = () => {
@@ -120,13 +121,11 @@ const AppLayout = ({ children, SignedIn, SignedOut, SignInButton, SignUpButton, 
 
   const desktopAsideWidth = isDesktopCollapsed ? "md:w-[70px]" : "md:w-[180px]";
   const desktopMainContentMargin = isDesktopCollapsed ? "md:ml-[70px]" : "md:ml-[180px]";
-  const mobileAsideWidth = isMobileNavCollapsed ? "w-[70px]" : "w-[200px]";
 
   return (
     <SidebarContext.Provider value={{ isSidebarOpen, setIsSidebarOpen }}>
         <Toaster position="bottom-center" />
-        <div className="flex flex-col h-screen w-full">
-            {/* Mobile Overlay */}
+        <div className="flex flex-col h-screen w-full bg-background">
             {isSidebarOpen && (
                 <div 
                     className="fixed inset-0 z-30 bg-black/60 md:hidden"
@@ -134,16 +133,13 @@ const AppLayout = ({ children, SignedIn, SignedOut, SignInButton, SignUpButton, 
                 />
             )}
 
-            {/* Sidebar */}
             <aside 
                 className={`fixed inset-y-0 left-0 z-40 border-r transition-all duration-300 ease-in-out bg-muted dark:bg-background
                 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-                md:translate-x-0 ${desktopAsideWidth} ${mobileAsideWidth}`}>
+                md:translate-x-0 ${desktopAsideWidth}`}>
                 <SidebarContent 
                     isCollapsed={isDesktopCollapsed} 
                     onCollapse={() => setIsDesktopCollapsed(!isDesktopCollapsed)} 
-                    isMobile={true}
-                    onMobileCollapse={() => setIsMobileNavCollapsed(!isMobileNavCollapsed)}
                     onLinkClick={handleLinkClick}
                     SignedIn={SignedIn}
                     SignedOut={SignedOut}
@@ -153,31 +149,21 @@ const AppLayout = ({ children, SignedIn, SignedOut, SignInButton, SignUpButton, 
                 />
             </aside>
 
-            {/* Main Content */}
             <div className={`flex flex-col flex-1 h-full transition-all duration-300 ease-in-out ${desktopMainContentMargin}`}>
                 <Button variant="outline" size="icon" className="shrink-0 md:hidden absolute top-2 left-2 z-50" onClick={() => setIsSidebarOpen(true)}>
                     <Menu className="h-5 w-5" />
                     <span className="sr-only">Toggle navigation menu</span>
                 </Button>
 
-                {/* Page Content */}
-                <main className={`flex-1 flex flex-col p-4 pt-12 sm:p-6 ${
-                    ['/notes', '/review-deck', '/assignment', '/schedule'].includes(location.pathname)
-                        ? 'overflow-y-auto'
-                        : ''
-                }`}>
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      key={location.pathname}
-                      initial={{ scale: 0.95, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      {children}
-                    </motion.div>
-                  </AnimatePresence>
-                </main>
+                <motion.main
+                    key={location.pathname}
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{ duration: 0.2, ease: "easeInOut" }}
+                    className={`flex-1 flex flex-col p-4 pt-12 sm:p-6 overflow-y-auto`}>
+                    <Outlet />
+                </motion.main>
             </div>
         </div>
     </SidebarContext.Provider>

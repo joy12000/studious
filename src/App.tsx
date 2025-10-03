@@ -24,37 +24,42 @@ import {
   UserButton,
 } from "@clerk/clerk-react";
 
+import { AnimatePresence, motion } from 'framer-motion';
+
 function App() {
-  const navigate = useNavigate();
-  const { importNote } = useNotes();
-  // ... (useEffect 로직은 동일) ...
+  const location = useLocation();
 
   return (
-    <AppLayout
-      SignedIn={SignedIn}
-      SignedOut={SignedOut}
-      SignInButton={SignInButton}
-      SignUpButton={SignUpButton}
-      UserButton={UserButton}
-    >
-      <ShareHandler />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/notes" element={<NoteListPage />} />
-        <Route path="/note/:id" element={<NotePage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="/schedule" element={<SchedulePage />} />
-        <Route path="/review" element={<ReviewPage />} />
-        <Route path="/assignment" element={<AssignmentHelperPage />} />
-        <Route path="/dashboard" element={<DashboardPage />} /> {/* 📈 대시보드 라우트 추가 */}
-        <Route path="/review-deck" element={<ReviewDeckPage />} /> {/* 🧠 복습 덱 라우트 추가 */}
-        <Route path="/share" element={<ShareHandler />} />
-        <Route path="/shared-note" element={<SharedNotePage />} />
-        <Route path="/textbook" element={<TextbookPage />} />
-        <Route path="/chat" element={<ChatPage />} />
-        <Route path="/m/upload" element={<MobileUploadPage />} />
+    <AnimatePresence mode="wait">
+      <Routes location={location} key={location.pathname}>
+        <Route 
+          element={
+            <AppLayout 
+              SignedIn={SignedIn} 
+              SignedOut={SignedOut} 
+              SignInButton={SignInButton} 
+              SignUpButton={SignUpButton} 
+              UserButton={UserButton} 
+            />
+          }
+        >
+          <Route path="/" element={<HomePage />} />
+          <Route path="/notes" element={<NoteListPage />} />
+          <Route path="/note/:id" element={<NotePage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/schedule" element={<SchedulePage />} />
+          <Route path="/review" element={<ReviewPage />} />
+          <Route path="/assignment" element={<AssignmentHelperPage />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/review-deck" element={<ReviewDeckPage />} />
+          <Route path="/share" element={<ShareHandler />} />
+          <Route path="/shared-note" element={<SharedNotePage />} />
+          <Route path="/textbook" element={<TextbookPage />} />
+          <Route path="/chat" element={<ChatPage />} />
+          <Route path="/m/upload" element={<MobileUploadPage />} />
+        </Route>
       </Routes>
-    </AppLayout>
+    </AnimatePresence>
   );
 }
 
