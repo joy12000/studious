@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useNotes } from "../lib/useNotes";
 import { useNavigate, useLocation } from "react-router-dom";
 import toast from 'react-hot-toast';
-import { Loader2, Youtube, ArrowRight, File, BrainCircuit, AppWindow, Pencil, Check, Trash2, Plus, ExternalLink, Book, ChevronsUpDown } from "lucide-react"; // Book 아이콘 추가
+import { Loader2, Youtube, ArrowRight, File, BrainCircuit, AppWindow, Pencil, Check, Trash2, Plus, ExternalLink, Book } from "lucide-react"; // Book 아이콘 추가
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -195,49 +195,39 @@ export default function HomePage() {
 
         <div className="flex-grow-[1]"></div>
 
-        <div className="w-full max-w-3xl text-center mb-8">
-          <div className="relative flex items-center w-full gap-2 bg-card border rounded-full p-2 shadow-lg">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" className="rounded-full px-4 py-2 flex-shrink-0">
-                  {summaryType === 'lecture' ? '강의 노트' : '일반 요약'}
-                  <ChevronsUpDown className="h-4 w-4 ml-2 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-1">
-                <ToggleGroup
-                  type="single"
-                  value={summaryType}
-                  onValueChange={(value) => { if (value) setSummaryType(value); }}
-                >
-                  <ToggleGroupItem value="default" aria-label="일반 요약">
-                    <Book className="h-4 w-4 mr-2" /> 일반 요약
-                  </ToggleGroupItem>
-                  <ToggleGroupItem value="lecture" aria-label="강의 노트">
-                    <BrainCircuit className="h-4 w-4 mr-2" /> 강의 노트
-                  </ToggleGroupItem>
-                </ToggleGroup>
-              </PopoverContent>
-            </Popover>
+        <div className="w-full max-w-xl text-center">
+          {/* ✨ 요약 타입 선택 UI 추가 */}
+          <ToggleGroup 
+            type="single" 
+            value={summaryType} 
+            onValueChange={(value) => { if (value) setSummaryType(value); }}
+            className="mb-4"
+          >
+            <ToggleGroupItem value="default" aria-label="일반 요약">
+              <Book className="h-4 w-4 mr-2" />
+              일반 요약
+            </ToggleGroupItem>
+            <ToggleGroupItem value="lecture" aria-label="강의 노트">
+              <BrainCircuit className="h-4 w-4 mr-2" />
+              강의 노트
+            </ToggleGroupItem>
+          </ToggleGroup>
+          
+          <form onSubmit={handleYoutubeSubmit} className="flex items-center gap-2 bg-card border rounded-full p-2 shadow-lg w-full">
+            <Youtube className="h-5 w-5 text-muted-foreground ml-3 flex-shrink-0" />
+            <input
+              type="text"
+              value={youtubeUrl}
+              onChange={(e) => setYoutubeUrl(e.target.value)}
+              placeholder="YouTube 영상 링크를 붙여넣으세요"
+              className="flex-grow bg-transparent px-2 py-2 focus:outline-none"
+            />
+            <Button type="submit" size="icon" className="rounded-full flex-shrink-0" disabled={isSubmitting}>
+              {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
+            </Button>
+          </form>
 
-            <div className="h-6 w-px bg-border mx-1"></div>
-
-            <form onSubmit={handleYoutubeSubmit} className="flex-grow flex items-center gap-2">
-              <Youtube className="h-5 w-5 text-muted-foreground" />
-              <input
-                type="text"
-                value={youtubeUrl}
-                onChange={(e) => setYoutubeUrl(e.target.value)}
-                placeholder="YouTube 영상 링크를 붙여넣으세요"
-                className="flex-grow bg-transparent focus:outline-none h-10"
-              />
-              <Button type="submit" size="icon" className="rounded-full flex-shrink-0" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
-              </Button>
-            </form>
-          </div>
-
-          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6 max-w-xl mx-auto">
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-2 gap-6">
             <Card 
               className="text-left hover:shadow-xl hover:-translate-y-1 transition-all duration-300 cursor-pointer"
               onClick={() => navigate('/textbook')}
