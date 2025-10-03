@@ -1,5 +1,5 @@
 import { db } from './db';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, PostgrestError } from '@supabase/supabase-js';
 import { Note, Subject, Folder } from './types';
 
 // Supabase 'notes' table schema mapped to a type
@@ -10,7 +10,7 @@ type RemoteNote = {
     content: string | null;
     note_type: Note['noteType'] | null;
     subject_id: string | null;
-    folder_id: string | null;
+    folder_id?: string | null;
     source_type: Note['sourceType'] | null;
     source_url: string | null;
     created_at: string;
@@ -84,13 +84,40 @@ export async function syncNotes(
     }
 
     // --- 3. NOTE SYNC ---
-    const { data: remoteNotesData, error: remoteError } = await supabase
-        .from('notes')
-        .select('*');
 
-    if (remoteError) throw remoteError;
+    const baseNoteColumns = [
+        'id',
+        'user_id',
+        'title',
+        'content',
+        'note_type',
+        'subject_id',
+        'source_type',
+        'source_url',
+        'created_at',
+        'updated_at',
+        'note_date',
+        'key_insights',
+        'favorite',
+        'attachments',
+        'is_deleted',
+    ];
 
-    const remoteNotes = remoteNotesData as RemoteNote[];
+    const noteSelectWithoutFolder = baseNoteColumns.join(',');
+
+    let supportsFolderId = true;
+    let remoteNotesDataResult = await supabase.from('notes').select('*');
+
+    if (remoteNotesDataResult.error && isMissingFolderIdError(remoteNotesDataResult.error)) {
+        supportsFolderId = false;
+        remoteNotesDataResult = await supabase.from('notes').select(noteSelectWithoutFolder);
+    }
+
+    if (remoteNotesDataResult.error) {
+        throw new Error(`Failed to fetch notes: ${remoteNotesDataResult.error.message}`);
+    }
+
+    const remoteNotes = remoteNotesDataResult.data as RemoteNote[];
     const allLocalNotes = await db.notes.toArray();
 
     const remoteNotesMap = new Map(remoteNotes.map(n => [n.id, n]));
@@ -116,7 +143,7 @@ export async function syncNotes(
                 content: remoteNote.content || '',
                 noteType: remoteNote.note_type || 'general',
                 subjectId: remoteNote.subject_id || undefined,
-                folderId: remoteNote.folder_id || undefined,
+                folderId: supportsFolderId ? remoteNote.folder_id || undefined : undefined,
                 sourceType: remoteNote.source_type || 'other',
                 sourceUrl: remoteNote.source_url,
                 createdAt: remoteNote.created_at,
@@ -141,26 +168,19 @@ export async function syncNotes(
 
     // Execute DB operations
     if (notesToUpsertToRemote.length > 0) {
-        const upsertData = notesToUpsertToRemote.map(n => ({
-            id: n.id,
-            user_id: userId,
-            title: n.title,
-            content: n.content,
-            note_type: n.noteType,
-            subject_id: n.subjectId,
-            folder_id: n.folderId,
-            source_type: n.sourceType,
-            source_url: n.sourceUrl,
-            created_at: n.createdAt,
-            updated_at: new Date(n.updatedAt).toISOString(),
-            note_date: n.noteDate,
-            key_insights: n.key_insights,
-            favorite: n.favorite,
-            attachments: n.attachments,
-            is_deleted: n.is_deleted || false,
-        }));
-        const { error } = await supabase.from('notes').upsert(upsertData);
-        if (error) throw new Error(`Failed to upsert notes to Supabase: ${error.message}`);
+        const upsertData = buildRemoteNotePayload(notesToUpsertToRemote, userId, supportsFolderId);
+
+        let upsertResult = await supabase.from('notes').upsert(upsertData, { returning: 'minimal' });
+
+        if (upsertResult.error && supportsFolderId && isMissingFolderIdError(upsertResult.error)) {
+            supportsFolderId = false;
+            const retryPayload = buildRemoteNotePayload(notesToUpsertToRemote, userId, supportsFolderId);
+            upsertResult = await supabase.from('notes').upsert(retryPayload, { returning: 'minimal' });
+        }
+
+        if (upsertResult.error) {
+            throw new Error(`Failed to upsert notes to Supabase: ${upsertResult.error.message}`);
+        }
     }
 
     if (notesToPutLocally.length > 0) {
@@ -175,4 +195,37 @@ export async function syncNotes(
         deleted: idsToDeleteLocally.length,
         pushed: notesToUpsertToRemote.length,
     };
+}
+
+function isMissingFolderIdError(error: PostgrestError) {
+    const message = error.message.toLowerCase();
+    return message.includes('folder_id') && message.includes('column');
+}
+
+function buildRemoteNotePayload(notes: Note[], userId: string, includeFolderId: boolean) {
+    return notes.map(note => {
+        const payload: Record<string, unknown> = {
+            id: note.id,
+            user_id: userId,
+            title: note.title,
+            content: note.content,
+            note_type: note.noteType,
+            subject_id: note.subjectId,
+            source_type: note.sourceType,
+            source_url: note.sourceUrl,
+            created_at: note.createdAt,
+            updated_at: new Date(note.updatedAt).toISOString(),
+            note_date: note.noteDate,
+            key_insights: note.key_insights,
+            favorite: note.favorite,
+            attachments: note.attachments,
+            is_deleted: note.is_deleted || false,
+        };
+
+        if (includeFolderId) {
+            payload.folder_id = note.folderId ?? null;
+        }
+
+        return payload;
+    });
 }
