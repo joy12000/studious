@@ -53,6 +53,7 @@
     "date-fns": "^4.1.0",
     "dexie": "^4.0.11",
     "dexie-react-hooks": "^4.2.0",
+    "framer-motion": "^12.23.22",
     "highlight.js": "^11.9.0",
     "katex": "^0.16.22",
     "lucide-react": "^0.539.0",
