@@ -178,8 +178,10 @@ const MarkdownRenderer: React.FC<Props> = ({ content }) => {
   /* renderParts: 기존 로직 최대한 유지 (mermaid 블록은 원문을 <pre.mermaid>에 넣음) */
   const renderParts = () => {
     if (!content) return null;
+    // Un-escape newline characters for content coming from the API
+    const processedContent = content.replace(/\\n/g, '\n');
     const blockRegex = /(```(?:mermaid|visual|chart|[\s\S]*?)```|<details[\s\S]*?<\/details>|[\s\S]+?(?=```|<details|$))/g;
-    const blocks = content.match(blockRegex) || [];
+    const blocks = processedContent.match(blockRegex) || [];
 
     return blocks.map((block, i) => {
       const trimmed = block.trim();
