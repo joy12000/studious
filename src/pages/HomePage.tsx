@@ -257,7 +257,7 @@ export default function HomePage() {
                 value={youtubeUrl}
                 onChange={(e) => setYoutubeUrl(e.target.value)}
                 placeholder="YouTube 영상 링크를 붙여넣으세요"
-                className="flex-grow bg-transparent focus:outline-none h-10"
+                className="flex-grow bg-transparent focus:outline-none h-10 min-w-0"
               />
               <Button type="submit" size="icon" className="rounded-full flex-shrink-0" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
