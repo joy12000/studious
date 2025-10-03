@@ -134,12 +134,14 @@ self.addEventListener('message', (event) => {
     })());
   } else if (event.data && event.data.type === 'GENERATE_YOUTUBE_SUMMARY') {
     const { payload } = event.data;
+    const { noteId, body } = payload;
+
     event.waitUntil((async () => {
       try {
         const response = await fetch('/api/summarize_youtube', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload.body),
+          body: JSON.stringify(body),
         });
 
         if (!response.ok) {
@@ -148,15 +150,13 @@ self.addEventListener('message', (event) => {
         }
 
         const result = await response.json();
-        const { title, summary: content, key_insights } = result;
 
         const updatePayload = {
           title: result.title,
           content: result.summary,
-          noteType: 'general', // 최종 타입을 general로 통일
+          noteType: 'general',
           updatedAt: Date.now(),
           sourceUrl: result.sourceUrl,
-          // API 응답에 따라 조건부로 필드 추가
           ...(result.key_insights && { key_insights: result.key_insights }),
           ...(result.key_terms && { key_terms: result.key_terms }),
           ...(result.review_questions && { review_questions: result.review_questions }),
@@ -166,16 +166,17 @@ self.addEventListener('message', (event) => {
         await db.notes.update(noteId, updatePayload);
 
         await showSafeNotification('YouTube 요약 완료!', {
-          body: `\'${title}\' 요약이 완료되었습니다.`,
+          body: `\'${result.title}\' 요약이 완료되었습니다.`,
           icon: '/icon-192.png',
-          data: { url: `/note/${payload.noteId}` }
+          data: { url: `/note/${noteId}` }
         });
 
       } catch (error) {
         console.error('YouTube summary generation failed in service worker:', error);
-        await db.notes.update(payload.noteId, {
+        await db.notes.update(noteId, {
             title: '[생성 실패] YouTube 요약',
-            content: `오류가 발생하여 YouTube 요약을 완료하지 못했습니다.\n\n${error.message}`
+            content: `오류가 발생하여 YouTube 요약을 완료하지 못했습니다.\n\n${error.message}`,
+            noteType: 'general',
         });
         await showSafeNotification('YouTube 요약 실패', {
           body: '오류가 발생하여 YouTube를 요약하지 못했습니다.',
