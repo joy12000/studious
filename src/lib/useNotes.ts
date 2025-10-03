@@ -458,9 +458,9 @@ export function useNotes(defaultFilters?: Filters) {
             sourceType: noteData.sourceType || 'other',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().getTime(),
-            favorite: false,
-            ...noteData,
-        };
+                    favorite: false,
+                    key_insights: [],
+                    ...noteData,        };
         await db.notes.add(newNote);
         return newNote;
     }, []);
