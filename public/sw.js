@@ -150,14 +150,20 @@ self.addEventListener('message', (event) => {
         const result = await response.json();
         const { title, summary: content, key_insights } = result;
 
-        await db.notes.update(payload.noteId, {
-          title,
-          content,
-          key_insights: key_insights || [],
-          sourceType: 'youtube',
-          sourceUrl: payload.body.youtubeUrl,
+        const updatePayload = {
+          title: result.title,
+          content: result.summary,
+          noteType: 'general', // 최종 타입을 general로 통일
           updatedAt: Date.now(),
-        });
+          sourceUrl: result.sourceUrl,
+          // API 응답에 따라 조건부로 필드 추가
+          ...(result.key_insights && { key_insights: result.key_insights }),
+          ...(result.key_terms && { key_terms: result.key_terms }),
+          ...(result.review_questions && { review_questions: result.review_questions }),
+          ...(result.further_study && { further_study: result.further_study }),
+        };
+
+        await db.notes.update(noteId, updatePayload);
 
         await showSafeNotification('YouTube 요약 완료!', {
           body: `\'${title}\' 요약이 완료되었습니다.`,
