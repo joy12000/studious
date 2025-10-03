@@ -154,7 +154,6 @@ export default function NoteListPage() {
   };
 
   const handleCanvasContextMenu = (e: React.MouseEvent) => {
-    if (e.target !== e.currentTarget) return; // Only fire on the main canvas itself
     e.preventDefault();
     e.stopPropagation();
     setCanvasContextMenu({ visible: true, x: e.clientX, y: e.clientY });
