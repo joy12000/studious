@@ -196,24 +196,7 @@ export default function HomePage() {
         <div className="flex-grow-[1]"></div>
 
         <div className="w-full max-w-xl text-center">
-          {/* ✨ 요약 타입 선택 UI 추가 */}
-          <ToggleGroup 
-            type="single" 
-            value={summaryType} 
-            onValueChange={(value) => { if (value) setSummaryType(value); }}
-            className="mb-4"
-          >
-            <ToggleGroupItem value="default" aria-label="일반 요약">
-              <Book className="h-4 w-4 mr-2" />
-              일반 요약
-            </ToggleGroupItem>
-            <ToggleGroupItem value="lecture" aria-label="강의 노트">
-              <BrainCircuit className="h-4 w-4 mr-2" />
-              강의 노트
-            </ToggleGroupItem>
-          </ToggleGroup>
-          
-          <form onSubmit={handleYoutubeSubmit} className="flex items-center gap-2 bg-card border rounded-full p-2 shadow-lg w-full">
+          <form onSubmit={handleYoutubeSubmit} className="flex items-center gap-4 bg-card border rounded-full p-2 shadow-lg w-full">
             <Youtube className="h-5 w-5 text-muted-foreground ml-3 flex-shrink-0" />
             <input
               type="text"
@@ -222,7 +205,22 @@ export default function HomePage() {
               placeholder="YouTube 영상 링크를 붙여넣으세요"
               className="flex-grow bg-transparent px-2 py-2 focus:outline-none"
             />
-            <Button type="submit" size="icon" className="rounded-full flex-shrink-0" disabled={isSubmitting}>
+            <ToggleGroup 
+              type="single" 
+              value={summaryType} 
+              onValueChange={(value) => { if (value) setSummaryType(value); }}
+              className="flex-shrink-0"
+            >
+              <ToggleGroupItem value="default" aria-label="일반 요약" className="rounded-full">
+                <Book className="h-4 w-4 mr-2" />
+                일반 요약
+              </ToggleGroupItem>
+              <ToggleGroupItem value="lecture" aria-label="강의 노트" className="rounded-full">
+                <BrainCircuit className="h-4 w-4 mr-2" />
+                강의 노트
+              </ToggleGroupItem>
+            </ToggleGroup>
+            <Button type="submit" size="icon" className="rounded-full flex-shrink-0 mr-1" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <ArrowRight className="h-5 w-5" />}
             </Button>
           </form>
