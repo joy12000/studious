@@ -48,7 +48,7 @@ const ContextMenu = ({ x, y, visible, children, onClose }) => {
 const UNCLASSIFIED_ID = '__unclassified__';
 
 export default function NoteListPage() {
-  const { notes, allSubjects, allFolders, loading, toggleFavorite, addFolder, updateFolder, deleteFolder, moveNoteToFolder, importNote, handleSync, setFilters, filters } = useNotes();
+  const { notes, allSubjects, allFolders, loading, toggleFavorite, addFolder, updateFolder, deleteFolder, deleteNote, moveNoteToFolder, importNote, handleSync, setFilters, filters } = useNotes();
   const navigate = useNavigate();
 
   const [currentSubjectId, setCurrentSubjectId] = useState<string | null>(null);
@@ -174,6 +174,16 @@ export default function NoteListPage() {
       folderId: currentFolderId,
     });
     navigate(`/note/${newNote.id}`);
+  };
+
+  const handleDeleteNote = async (note: Note) => {
+    if (window.confirm(`'${note.title}' 노트를 정말 삭제하시겠습니까?`)) {
+      await deleteNote(note.id);
+    }
+  };
+
+  const handleRenameNote = (note: Note) => {
+    navigate(`/note/${note.id}`);
   };
 
   const { filteredFolders, filteredNotesInCurrentView } = useMemo(() => {
@@ -303,9 +313,18 @@ export default function NoteListPage() {
       </ContextMenu>
       <ContextMenu {...noteContextMenu} onClose={() => setNoteContextMenu(prev => ({...prev, visible: false}))}>
         {noteContextMenu.note && (
-          <button onClick={() => handleMoveNoteToParent(noteContextMenu.note!)} className="flex items-center w-full text-left px-3 py-1.5 text-sm hover:bg-muted rounded-sm">
-            <ArrowUpFromLine className="w-4 h-4 mr-2" /> 상위 폴더로 이동
-          </button>
+          <>
+            <button onClick={() => handleRenameNote(noteContextMenu.note!)} className="flex items-center w-full text-left px-3 py-1.5 text-sm hover:bg-muted rounded-sm">
+              <Edit className="w-4 h-4 mr-2" /> 이름 변경 / 열기
+            </button>
+            <button onClick={() => handleMoveNoteToParent(noteContextMenu.note!)} className="flex items-center w-full text-left px-3 py-1.5 text-sm hover:bg-muted rounded-sm">
+              <ArrowUpFromLine className="w-4 h-4 mr-2" /> 상위 폴더로 이동
+            </button>
+            <div className="my-1 h-px bg-border" />
+            <button onClick={() => handleDeleteNote(noteContextMenu.note!)} className="flex items-center w-full text-left px-3 py-1.5 text-sm text-destructive hover:bg-destructive hover:text-destructive-foreground rounded-sm">
+              <Trash2 className="w-4 h-4 mr-2" /> 삭제
+            </button>
+          </>
         )}
       </ContextMenu>
       <ContextMenu {...canvasContextMenu} onClose={() => setCanvasContextMenu(prev => ({...prev, visible: false}))}>
